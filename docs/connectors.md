@@ -8,7 +8,7 @@ Interviu has a small connector registry exposed by `GET /connectors`. The regist
 
 - `mock`: deterministic local HR candidate for demos and tests.
 - `http`: black-box candidate endpoint using the same examiner and grading path as the mock agent.
-- `supabase`: active when `SUPABASE_URL` and a server-only Supabase key are present.
+- `supabase`: active when `INTERVIU_DB_BACKEND=supabase`, `SUPABASE_URL`, and a server-only Supabase key are present. SQLite remains the local default even if Supabase secrets are present.
 - `hugging-face`: marked ready when the `hf` CLI is on PATH. In this workspace `hf version` reports `huggingface_hub 0.36.2`, the account probe reports not logged in, and this installed CLI exposes download/upload/jobs rather than the newer dataset/model search commands.
   - `POST /exam-packs/{pack_id}/export-files` writes a Hub-ready folder under `exports/exam-packs/{pack_id}` with `README.md`, `data/interviu_exam_rows.jsonl`, and `interviu-exam-pack.json`.
 
@@ -33,7 +33,7 @@ Every active candidate connector must produce:
 }
 ```
 
-Interviu stores the full span timeline, then sends candidate-only reasoning/tool steps to TraceRazor.
+Interviu stores the full span timeline, then sends a bounded candidate-only reasoning/tool slice to TraceRazor. Tune the slice and runtime limit with `INTERVIU_TRACERAZOR_MAX_STEPS` and `INTERVIU_TRACERAZOR_TIMEOUT_S`.
 
 ## Local HTTP Starter
 

@@ -3,9 +3,9 @@
 Given a deterministic :class:`AgentSpec`, this module asks OpenAI "what should
 this agent be?" in one of two modes:
 
-* ``fast`` — a single structured reasoning call grounded only in the run's own
+* ``fast`` - a single structured reasoning call grounded only in the run's own
   evaluation evidence. Quick and cheap, no web access, no citations.
-* ``deep`` — OpenAI deep research with the web-search tool, so the answer is
+* ``deep`` - OpenAI deep research with the web-search tool, so the answer is
   grounded in current external best practices and returns cited sources. Slower
   and more expensive; on-demand only.
 
@@ -54,7 +54,7 @@ _RESEARCH_JSON_SCHEMA: dict[str, Any] = {
 _SYSTEM_PROMPT = (
     "You are an agent architect. Given an evaluation of a candidate HR screening agent, "
     "decide what that agent should be to become reliable and useful: its identity, operating "
-    "principles, the tools it needs, the sub-agents it should delegate to, and the risks to watch. "
+    "principles, the tools it needs, the helpers it should delegate to, and the risks to watch. "
     "Ground every recommendation in the supplied evaluation evidence. Be concrete and actionable."
 )
 
@@ -165,11 +165,11 @@ def _build_prompt(spec: AgentSpec, mode: str) -> str:
         [
             f"Candidate agent: {spec.candidate_name}",
             f"Exam pack: {spec.exam_pack_id}",
-            f"Interviu readiness verdict: {spec.readiness} — {spec.headline}",
+            f"Interviu readiness verdict: {spec.readiness} - {spec.headline}",
             f"Verified strengths: {', '.join(spec.strengths) or 'none'}",
             f"Gaps to fix: {', '.join(spec.gaps) or 'none'}",
             f"TraceRazor actions: {', '.join(spec.tracerazor_actions) or 'none'}",
-            f"Interviu's deterministic sub-agent recommendations: {sub_agents}",
+            f"Interviu's deterministic helper recommendations: {sub_agents}",
             "",
             "Interviu's current refined agent definition:",
             spec.agent_markdown,

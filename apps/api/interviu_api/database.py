@@ -433,6 +433,12 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
     candidate = get_candidate(run.candidate_id)
     scorecard = get_scorecard(run_id)
     events = [event.model_dump(mode="json") for event in list_events(run_id)]
+    try:
+        from .product_review import product_review_for_run
+
+        product_review = product_review_for_run(run_id)
+    except Exception:
+        product_review = None
     return {
         "schema": "interviu.proof_bundle.v1",
         "product": "Interviu",
@@ -449,22 +455,25 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
             "trace_status": scorecard.trace_audit.status if scorecard else "pending",
             "event_count": len(events),
         },
+        "product_review": product_review.model_dump(mode="json") if product_review else None,
     }
 
 
 @lru_cache(maxsize=1)
 def store() -> DataStore:
-    backend = os.environ.get("INTERVIU_DB_BACKEND", "").strip().lower()
+    backend = os.environ.get("INTERVIU_DB_BACKEND", "sqlite").strip().lower() or "sqlite"
     supabase_url = os.environ.get("SUPABASE_URL", "").strip()
     supabase_key = (
         os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
         or os.environ.get("SUPABASE_SECRET_KEY", "").strip()
         or os.environ.get("SUPABASE_KEY", "").strip()
     )
-    if backend == "supabase" or (supabase_url and supabase_key):
+    if backend == "supabase":
         if not supabase_url or not supabase_key:
             raise RuntimeError("Supabase persistence requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
         return SupabaseStore(supabase_url, supabase_key)
+    if backend != "sqlite":
+        raise RuntimeError(f"Unsupported INTERVIU_DB_BACKEND {backend!r}; use 'sqlite' or 'supabase'.")
     return SQLiteStore()
 
 

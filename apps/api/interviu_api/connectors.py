@@ -10,7 +10,7 @@ from .trace_audit import LOCAL_TRACERAZOR, _load_tracerazor_client
 
 
 def connector_registry() -> list[dict[str, Any]]:
-    supabase_ready = bool(os.environ.get("SUPABASE_URL") and _server_supabase_key())
+    supabase_ready = database_backend_name() == "supabase"
     hf_ready = shutil.which("hf") is not None
     agent_browser_ready = shutil.which("agent-browser") is not None
     return [
@@ -36,7 +36,7 @@ def connector_registry() -> list[dict[str, Any]]:
             "id": "supabase",
             "name": "Supabase Postgres",
             "status": "connected" if supabase_ready else "planned",
-            "description": "Stores candidates, runs, scorecards, and trace events when Supabase server env vars are configured.",
+            "description": "Stores candidates, runs, scorecards, and trace events when Supabase is explicitly selected on the API process.",
             "config_schema": {
                 "type": "object",
                 "required": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
@@ -218,7 +218,9 @@ def _probe_supabase() -> dict[str, Any]:
             "next_step": None,
         }
 
-    if url_configured and not key_configured:
+    if url_configured and key_configured:
+        evidence = "Supabase credentials are present, but SQLite is active because INTERVIU_DB_BACKEND is not set to supabase."
+    elif url_configured and not key_configured:
         evidence = "Supabase URL is configured, but the server-only service role key is missing."
     else:
         evidence = "SQLite fallback is active; Supabase migration files are present for server mode."
@@ -228,7 +230,7 @@ def _probe_supabase() -> dict[str, Any]:
         "status": "warn",
         "evidence": evidence,
         "details": health | {"url_configured": url_configured, "server_key_configured": key_configured},
-        "next_step": "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the API process to activate Supabase.",
+        "next_step": "Set INTERVIU_DB_BACKEND=supabase plus SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the API process to activate Supabase.",
     }
 
 

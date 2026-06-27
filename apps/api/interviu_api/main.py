@@ -28,6 +28,7 @@ from .exam_packs import exam_pack_export, get_exam_pack, list_exam_packs, regist
 from .exports import write_agent_spec_files, write_exam_pack_files
 from .models import CandidateConfig, ExamPack, JobScope, RunCreate, RunRecord
 from .orchestrator import RunOrchestrator
+from .product_review import product_review_for_run
 from .role_intelligence import (
     analyze_job_scope,
     extract_job_scope_openai,
@@ -238,6 +239,14 @@ def run_scorecard(run_id: str) -> dict:
     if scorecard is None:
         raise HTTPException(status_code=404, detail="Scorecard not found")
     return scorecard.model_dump(mode="json")
+
+
+@app.get("/runs/{run_id}/reviewers")
+def run_reviewers(run_id: str) -> dict:
+    payload = product_review_for_run(run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return payload.model_dump(mode="json")
 
 
 @app.get("/runs/{run_id}/trace")

@@ -47,6 +47,7 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         candidate_id = candidates[0]["id"]
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         scorecard = client.post(f"/runs/{run['id']}/start").json()
+        reviewers = client.get(f"/runs/{run['id']}/reviewers").json()
         events = client.get(f"/runs/{run['id']}/events").json()
         trace = client.get(f"/runs/{run['id']}/trace").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
@@ -60,6 +61,9 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert bundle["summary"]["event_count"] == len(events)
     assert bundle["database"]["backend"] == "sqlite"
     assert any(probe["id"] == "tracerazor" for probe in bundle["connector_probes"])
+    assert reviewers["schema"] == "interviu.product_review.v1"
+    assert [reviewer["key"] for reviewer in reviewers["reviewers"]] == ["experience", "runtime", "evidence"]
+    assert bundle["product_review"]["schema"] == "interviu.product_review.v1"
 
 
 def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
@@ -101,7 +105,7 @@ def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
     assert "AGENTS.md" in export["files"]
     agents_md = Path(export["files"]["AGENTS.md"])
     assert agents_md.exists()
-    assert "Refined Agent Spec" in agents_md.read_text(encoding="utf-8")
+    assert "Operating Notes" in agents_md.read_text(encoding="utf-8")
 
     # Sub-agent .md files are written to disk, one per recommendation.
     assert export["sub_agent_count"] == len(spec["sub_agents"])
@@ -256,6 +260,12 @@ def test_run_round_trips_job_scope_and_proof_bundle(monkeypatch) -> None:
 def test_run_role_analysis_missing_run_is_404() -> None:
     with TestClient(app) as client:
         response = client.get("/runs/run_missing/role-analysis")
+    assert response.status_code == 404
+
+
+def test_run_reviewers_missing_run_is_404() -> None:
+    with TestClient(app) as client:
+        response = client.get("/runs/run_missing/reviewers")
     assert response.status_code == 404
 
 

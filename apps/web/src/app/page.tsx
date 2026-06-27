@@ -17,7 +17,7 @@ import {
   X
 } from "lucide-react";
 import { interviuApi } from "@/lib/api";
-import type { AgentResearch, AgentSpec, CandidateConfig, Connector, ConnectorProbe, DatabaseHealth, ExamPack, ExamPackExport, ExamPackFileExport, JobScope, ProofBundle, RoleAnalysis, RunEvent, RunRecord, Scorecard, TracePayload } from "@/types/interviu";
+import type { AgentResearch, AgentSpec, CandidateConfig, Connector, ConnectorProbe, DatabaseHealth, ExamPack, ExamPackExport, ExamPackFileExport, JobScope, ProductReview, ProductReviewer, ProofBundle, RoleAnalysis, RunEvent, RunRecord, Scorecard, TracePayload } from "@/types/interviu";
 
 type LoadState = "idle" | "loading" | "running" | "complete" | "error";
 
@@ -41,6 +41,7 @@ export default function Home() {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [trace, setTrace] = useState<TracePayload | null>(null);
   const [proofBundle, setProofBundle] = useState<ProofBundle | null>(null);
+  const [productReview, setProductReview] = useState<ProductReview | null>(null);
   const [agentSpec, setAgentSpec] = useState<AgentSpec | null>(null);
   const [agentExport, setAgentExport] = useState<{ run_id: string; directory: string; sub_agent_count: number } | null>(null);
   const [agentResearch, setAgentResearch] = useState<AgentResearch | null>(null);
@@ -48,7 +49,7 @@ export default function Home() {
   const [jobScopeText, setJobScopeText] = useState("");
   const [roleAnalysis, setRoleAnalysis] = useState<RoleAnalysis | null>(null);
   const [roleBusy, setRoleBusy] = useState(false);
-  const [state, setState] = useState<LoadState>("idle");
+  const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [httpCandidateOpen, setHttpCandidateOpen] = useState(false);
@@ -96,6 +97,14 @@ export default function Home() {
   const roster = useMemo(
     () => buildRoster(state === "running", rosterCounts, scorecard, selectedExamPack?.simulator_model),
     [state, rosterCounts, scorecard, selectedExamPack?.simulator_model]
+  );
+  const workflow = useMemo(
+    () => buildWorkflow(state, scorecard, agentSpec, roleAnalysis, passedCount, totalCount),
+    [state, scorecard, agentSpec, roleAnalysis, passedCount, totalCount]
+  );
+  const reviewers = useMemo(
+    () => productReview?.reviewers ?? buildReviewers(state, scorecard, health, databaseHealth, proofBundle),
+    [productReview, state, scorecard, health, databaseHealth, proofBundle]
   );
   const agentMarkdownHref = useMemo(
     () => (agentSpec ? `data:text/markdown;charset=utf-8,${encodeURIComponent(agentSpec.agent_markdown)}` : null),
@@ -209,6 +218,7 @@ export default function Home() {
     setScorecard(null);
     setTrace(null);
     setProofBundle(null);
+    setProductReview(null);
     setAgentSpec(null);
     setAgentExport(null);
     setAgentResearch(null);
@@ -221,21 +231,27 @@ export default function Home() {
           metadata: { source: "web" }
         }));
       setCandidate(activeCandidate);
+      setCandidates((currentCandidates) => [
+        activeCandidate,
+        ...currentCandidates.filter((item) => item.id !== activeCandidate.id)
+      ]);
       const jobScope = jobScopeText.trim() ? buildJobScope(jobScopeText.trim()) : null;
-      const createdRun = await interviuApi.createRun(activeCandidate.id, selectedExamPack?.id ?? "hr-v1", jobScope);
+      const createdRun = await interviuApi.createRun(activeCandidate.id, selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1", jobScope);
       setRun(createdRun);
       const result = await interviuApi.startRun(createdRun.id);
       setScorecard(result);
       setState("complete");
-      const [eventPayload, tracePayload, bundlePayload, runsPayload] = await Promise.all([
+      const [eventPayload, tracePayload, bundlePayload, reviewPayload, runsPayload] = await Promise.all([
         interviuApi.events(createdRun.id),
         interviuApi.trace(createdRun.id),
         interviuApi.proofBundle(createdRun.id),
+        interviuApi.reviewers(createdRun.id),
         interviuApi.runs()
       ]);
       setEvents(eventPayload);
       setTrace(tracePayload);
       setProofBundle(bundlePayload);
+      setProductReview(reviewPayload);
       setAgentSpec(bundlePayload.agent_spec ?? null);
       setRoleAnalysis(bundlePayload.role_analysis ?? null);
       setRecentRuns(runsPayload);
@@ -250,9 +266,10 @@ export default function Home() {
     setState("loading");
     setError(null);
     try {
-      const [tracePayload, bundlePayload] = await Promise.all([
+      const [tracePayload, bundlePayload, reviewPayload] = await Promise.all([
         interviuApi.trace(runId),
-        interviuApi.proofBundle(runId)
+        interviuApi.proofBundle(runId),
+        interviuApi.reviewers(runId)
       ]);
       setRun(bundlePayload.run);
       setCandidate(bundlePayload.candidate);
@@ -266,6 +283,7 @@ export default function Home() {
       setEvents(tracePayload.events);
       setTrace(tracePayload);
       setProofBundle(bundlePayload);
+      setProductReview(reviewPayload);
       setAgentSpec(bundlePayload.agent_spec ?? null);
       setRoleAnalysis(bundlePayload.role_analysis ?? null);
       setAgentExport(null);
@@ -289,13 +307,15 @@ export default function Home() {
     if (!hasCurrentTrace || !hasCurrentBundle) {
       setError(null);
       try {
-        const [tracePayload, bundlePayload] = await Promise.all([
+        const [tracePayload, bundlePayload, reviewPayload] = await Promise.all([
           interviuApi.trace(runId),
-          interviuApi.proofBundle(runId)
+          interviuApi.proofBundle(runId),
+          interviuApi.reviewers(runId)
         ]);
         setEvents(tracePayload.events);
         setTrace(tracePayload);
         setProofBundle(bundlePayload);
+        setProductReview(reviewPayload);
         setAgentSpec(bundlePayload.agent_spec ?? null);
         setRoleAnalysis(bundlePayload.role_analysis ?? null);
       } catch (exc) {
@@ -381,6 +401,7 @@ export default function Home() {
     try {
       const bundlePayload = await interviuApi.proofBundle(runId);
       setProofBundle(bundlePayload);
+      setProductReview(bundlePayload.product_review ?? null);
       downloadJson(`interviu-${runId}-proof-bundle.json`, bundlePayload);
     } catch (exc) {
       setError(errorMessage(exc));
@@ -389,13 +410,13 @@ export default function Home() {
 
   return (
     <main className="app-shell">
-      <section className="arena-band" aria-label="Interviu evaluation room">
+      <section className="arena-band workbench" aria-label="Interviu evaluation workspace">
         <div className="topbar">
           <div className="brand">
-            <div className="brand-mark" aria-hidden="true" />
+            <span className="brand-mark" aria-hidden="true" />
             <div>
               <h1>Interviu</h1>
-              <p>Local evaluation workspace</p>
+              <p>Trace-backed evaluation workspace</p>
             </div>
           </div>
           <div className="toolbar">
@@ -418,26 +439,35 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="arena">
-          <div className="arena-inner">
-          <div className="room-panel">
-            <div className="room-copy">
-              <span className="eyebrow">{state === "running" ? "Running" : "Ready"}</span>
+        <div className="cockpit-grid">
+          <section className="run-brief" aria-label="current evaluation">
+            <div className="run-brief-copy">
+              <span className={`eyebrow ${state === "running" ? "live" : ""}`}>{state === "running" ? "Running" : runLabel}</span>
               <h2>{candidate?.name ?? "Demo Candidate"}</h2>
               <p>{selectedExamPack?.name ?? "HR screening reliability"}</p>
+              <div className="brief-tags" aria-label="evaluation context">
+                <span>{selectedExamPack?.items.length ?? 5} checks</span>
+                <span>pass^{scorecard?.k ?? run?.k ?? 3}</span>
+                <span>{scorecard?.simulator_model ?? selectedExamPack?.simulator_model ?? "deterministic simulator"}</span>
+              </div>
             </div>
-            <div className="candidate-zone">
+            <div className="candidate-zone compact">
               <div className={`sprite-sheet hero-sprite sprite-${spriteKind} ${state === "running" ? "thinking" : ""}`} aria-hidden="true" />
             </div>
-            <div className="room-summary">
-              <div>
-                <span>Outcome</span>
-                <strong>{runLabel}</strong>
-              </div>
-              <div>
-                <span>Current focus</span>
-                <strong>{labelize(latestCompetency)}</strong>
-              </div>
+          </section>
+
+          <section className="metric-deck" aria-label="run summary">
+            <MetricTile label="Outcome" value={runLabel} tone={scorecard?.certified ? "pass" : scorecard ? "warn" : "neutral"} />
+            <MetricTile label="Trace score" value={traceScoreLabel(scorecard)} tone={scorecard?.trace_audit.passes ? "pass" : scorecard ? "warn" : "neutral"} />
+            <MetricTile label="Transfer gap" value={scorecard ? maxTransferGap(scorecard).toFixed(2) : "0.00"} tone={scorecard && maxTransferGap(scorecard) <= (scorecard.thresholds.max_transfer_gap ?? 0.2) ? "pass" : "neutral"} />
+            <MetricTile label="Storage" value={health?.database_backend ?? "sqlite"} tone={databaseHealth?.ok === false ? "warn" : "neutral"} />
+          </section>
+
+          <section className="evidence-panel" aria-label="evaluation evidence">
+            <div className="panel-head">
+              <span className="roster-title">
+                <Bot size={16} /> Evaluation panel {state === "running" ? "working" : scorecard ? "complete" : "ready"}
+              </span>
               <div className="badges" aria-label="pass at k progress">
                 {Array.from({ length: totalCount }).map((_, index) => {
                   const isKnown = index < passValues.length;
@@ -450,11 +480,40 @@ export default function Home() {
                 })}
               </div>
             </div>
-          </div>
-          <div className="agent-roster" aria-label="interview agent panel">
-            <span className="roster-title">
-              <Bot size={16} /> Agent panel {state === "running" ? "convening" : scorecard ? "complete" : "ready"}
-            </span>
+            <div className="workflow-strip" aria-label="evaluation workflow">
+              {workflow.map((item) => (
+                <div className={`workflow-card ${item.state}`} key={item.key}>
+                  <span className={`sprite-sheet ${item.sheet} workflow-sprite sprite-${item.sprite}`} aria-hidden="true" />
+                  <span>
+                    <strong>{item.label}</strong>
+                    <small>{item.meta}</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="focus-panel" aria-label="current focus">
+            <span>Current focus</span>
+            <strong>{labelize(latestCompetency)}</strong>
+            <small>{run?.id ?? "No run started"}</small>
+            <div className="focus-facts">
+              <div>
+                <span>Gate</span>
+                <strong>{passedCount}/{totalCount}</strong>
+              </div>
+              <div>
+                <span>Threshold</span>
+                <strong>{Math.round((scorecard?.thresholds.competency ?? 0.8) * 100)}%</strong>
+              </div>
+              <div>
+                <span>Judge variance</span>
+                <strong>{scorecard ? scorecard.grader_disagreement.toFixed(2) : "0.00"}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="agent-roster evidence-panel" aria-label="interview agent panel">
             <div className="roster-track">
               {roster.map((agent) => (
                 <div className={`roster-agent ${agent.state}`} key={agent.key} title={agent.title}>
@@ -467,8 +526,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-          </div>
-          </div>
+          </section>
         </div>
 
         <div className="status-strip">
@@ -530,13 +588,13 @@ export default function Home() {
               className="job-scope-input"
               value={jobScopeText}
               onChange={(event) => setJobScopeText(event.target.value)}
-              placeholder="Paste a role/job scope — e.g. 'Screen and rank candidates fairly; parse resume uploads; handle SSNs and medical notes.'"
+              placeholder="Paste a role or job scope, for example: Screen and rank candidates fairly; parse resume uploads; handle SSNs and medical notes."
               rows={3}
             />
           </label>
           <button className="command-button" type="button" onClick={analyzeRole} disabled={roleBusy || !jobScopeText.trim()}>
             <Sparkles size={16} />
-            {roleBusy ? "Analyzing…" : "Analyze role"}
+            {roleBusy ? "Analyzing..." : "Analyze role"}
           </button>
           <details
             className="setup-details"
@@ -592,9 +650,9 @@ export default function Home() {
           {roleAnalysis ? (
             <>
               <p className="refinery-headline">
-                Role needs <strong>{roleAnalysis.requirements.length}</strong> competenc{roleAnalysis.requirements.length === 1 ? "y" : "ies"} ·
+                Role needs <strong>{roleAnalysis.requirements.length}</strong> competenc{roleAnalysis.requirements.length === 1 ? "y" : "ies"} /
                 pack <strong>{roleAnalysis.recommended_exam_pack_id}</strong>
-                {roleAnalysis.supplemental_pack_ids.length ? ` (+${roleAnalysis.supplemental_pack_ids.join(", ")})` : ""} ·{" "}
+                {roleAnalysis.supplemental_pack_ids.length ? ` (+${roleAnalysis.supplemental_pack_ids.join(", ")})` : ""} /{" "}
                 <span className="pill ready">{roleAnalysis.extraction_status}</span>
               </p>
               {roleAnalysis.requirements.map((req) => (
@@ -616,7 +674,7 @@ export default function Home() {
                   )}
                   <small className="decision-meta">
                     {req.expected_check_ids.length} check{req.expected_check_ids.length === 1 ? "" : "s"}
-                    {req.recommended_subagent_id ? ` · ${req.recommended_subagent_id}` : ""}
+                    {req.recommended_subagent_id ? ` / ${req.recommended_subagent_id}` : ""}
                   </small>
                 </div>
               ))}
@@ -636,7 +694,7 @@ export default function Home() {
             </>
           ) : (
             <p className="refinery-note">
-              Add a job scope above and click &ldquo;Analyze role&rdquo; to see which competencies, checks, and sub-agents the role needs &mdash; and why.
+              Add a job scope above and click &ldquo;Analyze role&rdquo; to see which competencies, checks, and helpers the role needs, with reasons.
             </p>
           )}
         </section>
@@ -685,7 +743,25 @@ export default function Home() {
         </section>
 
         <section className="panel-section">
-          <h2 className="section-title">Agent refinery</h2>
+          <h2 className="section-title">Reviewers</h2>
+          <div className="reviewer-list">
+            {reviewers.map((reviewer) => (
+              <div className={`reviewer-row ${reviewer.status}`} key={reviewer.key}>
+                <span className={`sprite-sheet mini-sprite sprite-${reviewer.sprite}`} aria-hidden="true" />
+                <span>
+                  <strong>{reviewer.name}</strong>
+                  <small>{reviewer.summary}</small>
+                </span>
+                <span className={`pill ${reviewer.status === "pass" ? "ready" : reviewer.status === "warn" ? "warn" : "planned"}`}>
+                  {reviewer.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel-section">
+          <h2 className="section-title">Coaching plan</h2>
           {agentSpec ? (
             <>
               <div className={`score-hero ${refineryHeroClass(agentSpec.readiness)}`}>
@@ -698,7 +774,7 @@ export default function Home() {
               <div className="refinery-stats">
                 <Metric label="Strengths" value={String(agentSpec.strengths.length)} />
                 <Metric label="Gaps" value={String(agentSpec.gaps.length)} />
-                <Metric label="Sub-agents" value={String(agentSpec.sub_agents.length)} />
+                <Metric label="Helpers" value={String(agentSpec.sub_agents.length)} />
               </div>
               {agentSpec.sub_agents.length > 0 && (
                 <div className="subagent-rail">
@@ -719,12 +795,12 @@ export default function Home() {
               <div className="library-actions">
                 <button className="command-button" type="button" onClick={openTraceDrawer}>
                   <Bot size={16} />
-                  View spec
+                  View plan
                 </button>
                 {agentMarkdownHref && (
                   <a className="command-button" href={agentMarkdownHref} download={agentMarkdownFilename}>
                     <Save size={16} />
-                    AGENTS.md
+                    Export spec
                   </a>
                 )}
                 <button className="command-button" type="button" onClick={writeAgentSpecFiles}>
@@ -741,7 +817,7 @@ export default function Home() {
                   title="One OpenAI reasoning call grounded in this run"
                 >
                   <Sparkles size={16} />
-                  {researchBusy === "fast" ? "Researching…" : "OpenAI research"}
+                  {researchBusy === "fast" ? "Researching..." : "OpenAI research"}
                 </button>
                 <button
                   className="command-button"
@@ -751,7 +827,7 @@ export default function Home() {
                   title="OpenAI web-search deep research; can take a few minutes"
                 >
                   <Sparkles size={16} />
-                  {researchBusy === "deep" ? "Deep researching…" : "Deep research (web)"}
+                  {researchBusy === "deep" ? "Deep researching..." : "Deep research (web)"}
                 </button>
               </div>
               {agentResearch && agentResearch.status !== "ok" && (
@@ -762,17 +838,17 @@ export default function Home() {
               {agentExport && (
                 <div className="artifact-card">
                   <span>Agent export</span>
-                  <strong>{agentExport.sub_agent_count} sub-agent files</strong>
+                  <strong>{agentExport.sub_agent_count} helper files</strong>
                   <small>{agentExport.directory}</small>
                 </div>
               )}
             </>
           ) : (
             <div className="refinery-empty">
-              <p>Run an evaluation to refine a reusable agent.md and sub-agent recommendations.</p>
+              <p>Run an evaluation to create a coaching plan and focused helper recommendations.</p>
               <button className="command-button" type="button" onClick={refreshAgentSpec} disabled={!scorecard && !run}>
                 <Sparkles size={16} />
-                Refine agent.md
+                Build plan
               </button>
             </div>
           )}
@@ -922,6 +998,15 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MetricTile({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "pass" | "warn" }) {
+  return (
+    <div className={`metric-tile ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function TraceDrawer({
   events,
   trace,
@@ -998,15 +1083,15 @@ function TraceDrawer({
         <section className="drawer-refinery">
           <div className="drawer-refinery-head">
             <span className="refinery-verdict">
-              <Sparkles size={16} /> Agent refinery — {readinessLabel(agentSpec.readiness)}
+              <Sparkles size={16} /> Coaching plan / {readinessLabel(agentSpec.readiness)}
             </span>
             <div className="drawer-actions">
               {agentMarkdownHref && (
-                <a className="icon-button" title="Download AGENTS.md" href={agentMarkdownHref} download={agentMarkdownFilename}>
+                <a className="icon-button" title="Download operating notes" href={agentMarkdownHref} download={agentMarkdownFilename}>
                   <Save size={18} />
                 </a>
               )}
-              <button className="icon-button" type="button" title="Write agent spec files" onClick={onWriteAgentFiles}>
+              <button className="icon-button" type="button" title="Write coaching files" onClick={onWriteAgentFiles}>
                 <Bot size={18} />
               </button>
             </div>
@@ -1049,13 +1134,13 @@ function TraceDrawer({
             </div>
           )}
           <details className="quiet-details drawer-md">
-            <summary>Refined AGENTS.md</summary>
+            <summary>Operating notes</summary>
             <pre>{agentSpec.agent_markdown}</pre>
           </details>
           {agentExport && (
             <div className="artifact-card">
               <span>Agent export</span>
-              <strong>{agentExport.sub_agent_count} sub-agent files</strong>
+              <strong>{agentExport.sub_agent_count} helper files</strong>
               <small>{agentExport.directory}</small>
             </div>
           )}
@@ -1203,6 +1288,112 @@ function candidateDockSprite(candidate: CandidateConfig | null) {
   return "sprite-candidate";
 }
 
+type WorkflowStage = {
+  key: string;
+  label: string;
+  meta: string;
+  sprite: string;
+  sheet: string;
+  state: "idle" | "active" | "done" | "attention";
+};
+
+function buildWorkflow(
+  state: LoadState,
+  scorecard: Scorecard | null,
+  agentSpec: AgentSpec | null,
+  roleAnalysis: RoleAnalysis | null,
+  passedCount: number,
+  totalCount: number
+): WorkflowStage[] {
+  const hasRun = scorecard !== null;
+  const hasCoaching = agentSpec !== null || roleAnalysis !== null;
+  return [
+    {
+      key: "prepare",
+      label: "Prepare",
+      meta: roleAnalysis ? `${roleAnalysis.requirements.length} role checks` : "candidate and role",
+      sprite: roleAnalysis ? "lesson-pinned" : "run-queued",
+      sheet: roleAnalysis ? "sheet-lessons" : "sheet-runs",
+      state: state === "idle" && !hasRun ? "active" : "done"
+    },
+    {
+      key: "evaluate",
+      label: "Evaluate",
+      meta: state === "running" ? "exam in progress" : hasRun ? `${passedCount}/${totalCount} checks` : "not started",
+      sprite: state === "running" ? "run-running" : hasRun ? "run-complete" : "timeline-node",
+      sheet: "sheet-runs",
+      state: state === "running" ? "active" : hasRun ? "done" : "idle"
+    },
+    {
+      key: "judge",
+      label: "Judge",
+      meta: scorecard ? (scorecard.certified ? "passed" : "needs review") : "waiting",
+      sprite: scorecard?.certified ? "grader-approve" : scorecard ? "grader-reject" : "grader-deliberating",
+      sheet: "sheet-judging",
+      state: scorecard ? (scorecard.certified ? "done" : "attention") : state === "running" ? "active" : "idle"
+    },
+    {
+      key: "teach",
+      label: "Teach",
+      meta: agentSpec ? readinessLabel(agentSpec.readiness) : "coaching next",
+      sprite: agentSpec ? "lesson-applied" : "lesson-book",
+      sheet: "sheet-lessons",
+      state: hasCoaching ? "done" : scorecard ? "active" : "idle"
+    }
+  ];
+}
+
+function buildReviewers(
+  state: LoadState,
+  scorecard: Scorecard | null,
+  health: { ok: boolean; tracerazor_importable: boolean; database_backend?: string } | null,
+  databaseHealth: DatabaseHealth | null,
+  proofBundle: ProofBundle | null
+): ProductReviewer[] {
+  const traceStatus = scorecard?.trace_audit.status;
+  const runtimeWarn = state === "error" || databaseHealth?.ok === false || traceStatus === "error";
+  const proofReady = scorecard?.certified && scorecard.trace_audit.status === "ok";
+  return [
+    {
+      key: "experience",
+      name: "UX reviewer",
+      summary: scorecard ? "workflow, score, and coaching are visible" : "room is ready for a first run",
+      sprite: "candidate-document",
+      status: scorecard ? "pass" : "wait",
+      label: scorecard ? "clear" : "ready",
+      evidence: []
+    },
+    {
+      key: "runtime",
+      name: "Runtime reviewer",
+      summary: runtimeWarn
+        ? traceStatus === "error"
+          ? "TraceRazor needs attention"
+          : "local service needs attention"
+        : `${health?.database_backend ?? "sqlite"} storage responding`,
+      sprite: runtimeWarn ? "candidate-alert" : "candidate-shield",
+      status: runtimeWarn ? "warn" : "pass",
+      label: runtimeWarn ? "check" : "stable",
+      evidence: []
+    },
+    {
+      key: "evidence",
+      name: "Evidence reviewer",
+      summary: proofReady
+        ? "proof bundle and audit passed"
+        : scorecard
+          ? "proof bundle records the review reasons"
+          : proofBundle
+            ? "proof bundle is available"
+            : "waiting for scorecard",
+      sprite: proofReady ? "candidate-approved" : scorecard ? "candidate-review" : "candidate-audit",
+      status: proofReady ? "pass" : scorecard ? "warn" : "wait",
+      label: proofReady ? "passed" : scorecard ? "review" : "waiting",
+      evidence: []
+    },
+  ];
+}
+
 type RosterAgent = {
   key: string;
   label: string;
@@ -1290,7 +1481,7 @@ function traceRosterMeta(scorecard: Scorecard | null) {
 
 function readinessLabel(readiness: AgentSpec["readiness"]) {
   if (readiness === "ready") return "Ready to ship";
-  if (readiness === "needs_subagents") return "Add sub-agents";
+  if (readiness === "needs_subagents") return "Add helpers";
   return "Refine";
 }
 

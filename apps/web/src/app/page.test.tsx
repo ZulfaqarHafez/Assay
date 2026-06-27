@@ -85,10 +85,10 @@ const agentSpec = {
   generated_at: "2026-06-27T00:00:00Z",
   readiness: "ready",
   headline: "Demo Candidate certified pass^3 on held-out variants.",
-  agent_markdown: "# Demo Candidate — Refined Agent Spec\n\n## Guardrails\n- Use job-related criteria only.\n",
+  agent_markdown: "# Demo Candidate - Operating Notes\n\n## Guardrails\n- Use job-related criteria only.\n",
   strengths: ["Compliance (held-out 96%)"],
   gaps: [],
-  tracerazor_actions: ["TraceRazor TAS 88/100 [Good] — passed."],
+  tracerazor_actions: ["TraceRazor TAS 88/100 [Good] - passed."],
   sub_agents: [
     {
       id: "trace-auditor",
@@ -104,6 +104,44 @@ const agentSpec = {
     }
   ],
   metrics: { recommended_subagents: 0, optional_subagents: 1, tas_score: 88 }
+};
+
+const productReview = {
+  schema: "interviu.product_review.v1",
+  run_id: "run_demo",
+  generated_at: "2026-06-27T00:00:00Z",
+  reviewers: [
+    {
+      key: "experience",
+      name: "UX reviewer",
+      status: "pass",
+      label: "clear",
+      summary: "Workflow, score, and coaching are visible after the run.",
+      evidence: ["2/2 competencies passed."],
+      next_step: null,
+      sprite: "candidate-document"
+    },
+    {
+      key: "runtime",
+      name: "Runtime reviewer",
+      status: "pass",
+      label: "stable",
+      summary: "SQLite storage is responding.",
+      evidence: ["Database backend: sqlite."],
+      next_step: null,
+      sprite: "candidate-shield"
+    },
+    {
+      key: "evidence",
+      name: "Evidence reviewer",
+      status: "pass",
+      label: "passed",
+      summary: "Proof bundle, trace events, and audit summary support the result.",
+      evidence: ["TraceRazor TAS 88.0."],
+      next_step: null,
+      sprite: "candidate-approved"
+    }
+  ]
 };
 
 const proofBundle = {
@@ -125,7 +163,8 @@ const proofBundle = {
   database: { ok: true, backend: "sqlite" },
   connectors: [],
   connector_probes: [],
-  agent_spec: agentSpec
+  agent_spec: agentSpec,
+  product_review: productReview
 };
 
 let agentSpecOverride: typeof agentSpec | null = null;
@@ -273,6 +312,9 @@ beforeEach(() => {
     if (url.endsWith("/runs/run_demo/proof-bundle")) {
       return json(agentSpecOverride ? { ...proofBundle, agent_spec: agentSpecOverride } : proofBundle);
     }
+    if (url.endsWith("/runs/run_demo/reviewers")) {
+      return json(productReview);
+    }
     if (url.includes("/runs/run_demo/agent-spec/research")) {
       return json({
         run_id: "run_demo",
@@ -321,32 +363,38 @@ describe("Interviu page", () => {
     expect(screen.getByText("Run setup")).toBeInTheDocument();
     expect(screen.getByText("Score")).toBeInTheDocument();
     expect(screen.getByText("Proof")).toBeInTheDocument();
+    expect(screen.getByText("Reviewers")).toBeInTheDocument();
+    expect(screen.getByText("UX reviewer")).toBeInTheDocument();
+    expect(screen.getByText("Runtime reviewer")).toBeInTheDocument();
+    expect(screen.getByText("Evidence reviewer")).toBeInTheDocument();
     expect(screen.getByText("Add HTTP candidate")).toBeInTheDocument();
     expect(screen.getByText("Exam export")).toBeInTheDocument();
     expect(screen.getByText("Adversarial HR screening")).toBeInTheDocument();
-    expect(screen.getByText("Agent refinery")).toBeInTheDocument();
+    expect(screen.getByText("Coaching plan")).toBeInTheDocument();
+    expect(screen.getByText("Teach")).toBeInTheDocument();
     expect(screen.getByText("Judge panel")).toBeInTheDocument();
   });
 
-  it("refines an agent.md and recommends sub-agents after a run", async () => {
+  it("builds coaching notes and recommends helpers after a run", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await screen.findByRole("button", { name: /run evaluation/i });
-    await user.click(screen.getByRole("button", { name: /run evaluation/i }));
-    expect(await screen.findByText("Ready to ship")).toBeInTheDocument();
+    const runButton = await screen.findByRole("button", { name: /run evaluation/i });
+    await waitFor(() => expect(runButton).toBeEnabled());
+    await user.click(runButton);
+    await waitFor(() => expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0));
     expect(screen.getAllByText("Trace Auditor").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: /view spec/i }));
-    expect(await screen.findByText("Refined AGENTS.md")).toBeInTheDocument();
-    // The optional trace-auditor sub-agent exposes a downloadable .md.
+    await user.click(screen.getByRole("button", { name: /view plan/i }));
+    expect(await screen.findByText("Operating notes")).toBeInTheDocument();
+    // The optional trace-auditor helper exposes a downloadable .md.
     const subAgentLink = screen.getByRole("link", { name: /trace-auditor\.md/ });
     expect(subAgentLink).toHaveAttribute("download", "trace-auditor.md");
   });
 
-  it("surfaces recommended sub-agents for a needs_subagents verdict", async () => {
+  it("surfaces recommended helpers for a needs_subagents verdict", async () => {
     agentSpecOverride = {
       ...agentSpec,
       readiness: "needs_subagents",
-      headline: "Weak Agent needs refinement on 1 competency area(s); delegate to 1 focused sub-agent(s).",
+      headline: "Weak Agent needs refinement on 1 competency area(s); use 1 focused helper(s).",
       sub_agents: [
         {
           id: "fairness",
@@ -364,11 +412,12 @@ describe("Interviu page", () => {
     };
     const user = userEvent.setup();
     render(<Home />);
-    await screen.findByRole("button", { name: /run evaluation/i });
-    await user.click(screen.getByRole("button", { name: /run evaluation/i }));
-    expect(await screen.findByText("Add sub-agents")).toBeInTheDocument();
+    const runButton = await screen.findByRole("button", { name: /run evaluation/i });
+    await waitFor(() => expect(runButton).toBeEnabled());
+    await user.click(runButton);
+    await waitFor(() => expect(screen.getAllByText("Add helpers").length).toBeGreaterThan(0));
     expect(screen.getByText("rec")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /view spec/i }));
+    await user.click(screen.getByRole("button", { name: /view plan/i }));
     const recLink = await screen.findByRole("link", { name: /fairness\.md/ });
     expect(recLink).toHaveAttribute("download", "fairness.md");
   });
@@ -376,9 +425,10 @@ describe("Interviu page", () => {
   it("runs OpenAI research and shows the result in the drawer", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await screen.findByRole("button", { name: /run evaluation/i });
-    await user.click(screen.getByRole("button", { name: /run evaluation/i }));
-    await screen.findByText("Ready to ship");
+    const runButton = await screen.findByRole("button", { name: /run evaluation/i });
+    await waitFor(() => expect(runButton).toBeEnabled());
+    await user.click(runButton);
+    await waitFor(() => expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0));
     await user.click(screen.getByRole("button", { name: /^openai research$/i }));
     expect(await screen.findByText("A compliance-first, auditable HR screening agent.")).toBeInTheDocument();
     expect(screen.getByText("Research brief")).toBeInTheDocument();
@@ -388,9 +438,10 @@ describe("Interviu page", () => {
   it("starts a demo run and shows TraceRazor output", async () => {
     const user = userEvent.setup();
     render(<Home />);
-    await screen.findByRole("button", { name: /run evaluation/i });
-    await user.click(screen.getByRole("button", { name: /run evaluation/i }));
-    await waitFor(() => expect(screen.getByText("88.0")).toBeInTheDocument());
+    const runButton = await screen.findByRole("button", { name: /run evaluation/i });
+    await waitFor(() => expect(runButton).toBeEnabled());
+    await user.click(runButton);
+    await waitFor(() => expect(screen.getAllByText("88.0").length).toBeGreaterThan(0));
     expect(screen.getAllByText("Passed").length).toBeGreaterThan(0);
   });
 
@@ -418,10 +469,9 @@ describe("Interviu page", () => {
     render(<Home />);
     fireEvent.click(await screen.findByText("Add HTTP candidate"));
     await screen.findByLabelText(/^name$/i);
-    await user.clear(screen.getByLabelText(/^name$/i));
-    await user.type(screen.getByLabelText(/^name$/i), "Webhook Candidate");
-    await user.type(screen.getByLabelText(/^endpoint$/i), "http://127.0.0.1:9191/ask");
-    await user.type(screen.getByLabelText(/model tag/i), "hr-agent-preview");
+    fireEvent.change(screen.getByLabelText(/^name$/i), { target: { value: "Webhook Candidate" } });
+    fireEvent.change(screen.getByLabelText(/^endpoint$/i), { target: { value: "http://127.0.0.1:9191/ask" } });
+    fireEvent.change(screen.getByLabelText(/model tag/i), { target: { value: "hr-agent-preview" } });
     await user.click(screen.getByRole("button", { name: /add http/i }));
 
     await waitFor(() => expect(screen.getAllByText("Webhook Candidate").length).toBeGreaterThan(1));

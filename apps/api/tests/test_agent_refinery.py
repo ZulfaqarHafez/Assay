@@ -70,10 +70,10 @@ def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
     assert spec.readiness == "ready"
     assert spec.strengths  # at least one verified competency
     assert spec.gaps == []
-    assert "# Solid Agent — Refined Agent Spec" in spec.agent_markdown
+    assert "# Solid Agent - Operating Notes" in spec.agent_markdown
     assert "## Guardrails" in spec.agent_markdown
     assert "READY" in spec.agent_markdown
-    # No competency failed, so no specialist sub-agent is marked recommended.
+    # No competency failed, so no specialist helper is marked recommended.
     assert all(agent.priority == "optional" for agent in spec.sub_agents)
     assert spec.metrics["recommended_subagents"] == 0
 
@@ -140,11 +140,11 @@ def test_certified_run_with_trace_fixes_keeps_subagents_optional() -> None:
 
     spec = build_agent_spec(run, candidate, scorecard, pack, [])
 
-    # Certified runs must never carry a "recommended" sub-agent, even with fixes.
+    # Certified runs must never carry a "recommended" helper, even with fixes.
     assert spec.readiness == "ready"
     assert all(agent.priority == "optional" for agent in spec.sub_agents)
     assert spec.metrics["recommended_subagents"] == 0
-    assert "recommended sub-agent" not in spec.headline
+    assert "recommended helper" not in spec.headline
 
 
 def test_subagent_cap_reserves_cross_cutting_auditors() -> None:

@@ -131,6 +131,24 @@ export type Scorecard = {
   created_at: string;
 };
 
+export type ProductReviewer = {
+  key: string;
+  name: string;
+  status: "pass" | "warn" | "wait";
+  label: string;
+  summary: string;
+  evidence: string[];
+  next_step?: string | null;
+  sprite: string;
+};
+
+export type ProductReview = {
+  schema: "interviu.product_review.v1";
+  run_id: string;
+  generated_at: string;
+  reviewers: ProductReviewer[];
+};
+
 export type TracePayload = {
   run_id: string;
   events: RunEvent[];
@@ -277,4 +295,5 @@ export type ProofBundle = {
   connector_probes: ConnectorProbe[];
   agent_spec: AgentSpec | null;
   role_analysis?: RoleAnalysis | null;
+  product_review?: ProductReview | null;
 };

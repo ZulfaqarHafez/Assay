@@ -5,18 +5,22 @@
 @tailwind utilities;
 
 :root {
-  --ink: #1f2320;
-  --paper: #f6f4ef;
+  --ink: #101915;
+  --paper: #f6f7f4;
   --panel: #ffffff;
-  --line: #d8d1c7;
-  --muted: #6f6a62;
-  --teal: #2d7d73;
-  --coral: #b95645;
-  --gold: #bd8b35;
-  --grass: #4f8d65;
-  --violet: #7564a8;
-  --soft: #ebe5dc;
-  --shadow: 0 18px 50px rgba(31, 35, 32, 0.08);
+  --line: #dfe4dc;
+  --muted: #65716a;
+  --teal: #155e54;
+  --coral: #b84a3a;
+  --gold: #b7832b;
+  --grass: #2f7d55;
+  --violet: #5f5a9a;
+  --soft: #edf1eb;
+  --surface: #fbfcf8;
+  --review-bg: #fff7ed;
+  --pass-bg: #eef7f0;
+  --shadow: 0 18px 55px rgba(20, 31, 27, 0.07);
+  --shadow-soft: 0 8px 24px rgba(20, 31, 27, 0.05);
 }
 
 * {
@@ -30,10 +34,12 @@ body {
 
 body {
   margin: 0;
-  background: var(--paper);
+  background:
+    linear-gradient(180deg, #fbfcf9 0%, var(--paper) 260px),
+    var(--paper);
   color: var(--ink);
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -55,17 +61,21 @@ select {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 400px;
-  background: var(--paper);
+  grid-template-columns: minmax(0, 1fr) 390px;
+  background: transparent;
 }
 
 .arena-band {
   min-width: 0;
-  padding: 24px;
+  padding: 26px 24px 28px;
   display: grid;
-  grid-template-rows: auto minmax(430px, 620px) auto;
+  grid-template-rows: auto auto auto;
   gap: 16px;
   align-content: start;
+}
+
+.workbench {
+  gap: 14px;
 }
 
 .topbar,
@@ -73,18 +83,198 @@ select {
 .side-panel,
 .drawer {
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-soft);
   border-radius: 8px;
 }
 
 .topbar {
-  min-height: 68px;
+  min-height: 72px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 14px;
+  padding: 14px 16px;
+  backdrop-filter: blur(10px);
+}
+
+.cockpit-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.2fr) minmax(280px, 0.8fr);
+  grid-template-areas:
+    "brief metrics"
+    "evidence evidence"
+    "focus roster";
+  gap: 14px;
+}
+
+.run-brief,
+.metric-deck,
+.evidence-panel,
+.focus-panel {
+  border: 1px solid #dce4da;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-soft);
+}
+
+.run-brief {
+  grid-area: brief;
+  min-height: 240px;
+  padding: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  align-items: center;
+  gap: 28px;
+}
+
+.run-brief-copy {
+  min-width: 0;
+}
+
+.run-brief h2 {
+  margin: 16px 0 8px;
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 0.95;
+  letter-spacing: 0;
+  font-weight: 800;
+}
+
+.run-brief p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.brief-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.brief-tags span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #f7faf6;
+  color: #52615a;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.metric-deck {
+  grid-area: metrics;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-tile {
+  min-width: 0;
+  min-height: 104px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 14px;
+  display: grid;
+  align-content: space-between;
+}
+
+.metric-tile span,
+.focus-panel span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.metric-tile strong {
+  font-size: clamp(20px, 3vw, 30px);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.metric-tile.pass {
+  border-color: #bed8c4;
+  background: var(--pass-bg);
+}
+
+.metric-tile.warn {
+  border-color: #e7caa7;
+  background: var(--review-bg);
+}
+
+.evidence-panel {
+  grid-area: evidence;
+  padding: 14px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.focus-panel {
+  grid-area: focus;
+  min-height: 118px;
+  padding: 18px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.focus-panel strong {
+  display: block;
+  font-size: clamp(24px, 4vw, 38px);
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.focus-panel small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.focus-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.focus-facts div {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+
+.focus-facts div span,
+.focus-facts div strong {
+  display: block;
+}
+
+.focus-facts div strong {
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.agent-roster.evidence-panel {
+  grid-area: roster;
 }
 
 .brand {
@@ -95,19 +285,20 @@ select {
 }
 
 .brand-mark {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #20342f;
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, #1f4f49 0 50%, #d9b45b 50% 100%);
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  display: block;
+  background: url("/brand/interviu-mark.svg") center / contain no-repeat;
+  box-shadow: 0 8px 18px rgba(18, 63, 56, 0.14);
 }
 
 .brand h1 {
-  font-size: 24px;
+  font-size: 25px;
   line-height: 1;
   margin: 0;
   letter-spacing: 0;
+  font-weight: 800;
 }
 
 .brand p {
@@ -127,7 +318,7 @@ select {
 .icon-button,
 .command-button {
   min-height: 40px;
-  border: 1px solid var(--line);
+  border: 1px solid #d7ded5;
   border-radius: 8px;
   background: #fff;
   color: var(--ink);
@@ -136,8 +327,8 @@ select {
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: none;
-  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+  box-shadow: 0 1px 0 rgba(20, 31, 27, 0.04);
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
   text-decoration: none;
 }
 
@@ -151,9 +342,10 @@ select {
 }
 
 .command-button.primary {
-  background: var(--teal);
+  background: #155e54;
   color: #fff;
-  border-color: var(--teal);
+  border-color: #155e54;
+  box-shadow: 0 8px 20px rgba(21, 94, 84, 0.18);
 }
 
 .command-button:disabled {
@@ -163,8 +355,9 @@ select {
 
 .icon-button:hover,
 .command-button:hover:not(:disabled) {
-  background: #f7f4ee;
-  border-color: #bcb3a6;
+  background: #f7faf6;
+  border-color: #aeb9b1;
+  transform: translateY(-1px);
 }
 
 .command-button.primary:hover:not(:disabled) {
@@ -191,22 +384,24 @@ select {
 .arena {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid #dce4da;
   border-radius: 8px;
   min-height: 430px;
-  background: linear-gradient(180deg, #ffffff 0%, #f0ece3 100%);
+  background:
+    linear-gradient(180deg, #ffffff 0%, #f4f7f2 100%);
   display: grid;
   place-items: center;
-  padding: 28px;
+  padding: 34px;
+  box-shadow: var(--shadow);
 }
 
 .room-panel {
   width: min(850px, 100%);
   min-height: 360px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 150px minmax(0, 1fr);
   align-items: center;
-  gap: 28px;
+  gap: 34px;
 }
 
 .room-copy,
@@ -229,9 +424,10 @@ select {
 
 .room-copy h2 {
   margin: 16px 0 8px;
-  font-size: 42px;
+  font-size: 44px;
   line-height: 1;
   letter-spacing: 0;
+  font-weight: 800;
 }
 
 .room-copy p {
@@ -242,13 +438,19 @@ select {
 }
 
 .candidate-zone {
-  width: 140px;
-  height: 140px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #faf8f4;
+  width: 150px;
+  height: 150px;
+  border: 1px solid #dfe6dd;
+  border-radius: 12px;
+  background: #fff;
   display: grid;
   place-items: center;
+  box-shadow: inset 0 0 0 8px #f6f8f4, 0 10px 28px rgba(20, 31, 27, 0.06);
+}
+
+.candidate-zone.compact {
+  width: 132px;
+  height: 132px;
 }
 
 .room-summary {
@@ -266,7 +468,7 @@ select {
 .room-summary strong {
   display: block;
   margin-top: 4px;
-  font-size: 22px;
+  font-size: 23px;
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
@@ -292,7 +494,7 @@ select {
   image-rendering: pixelated;
 }
 
-/* Additional sprite sheets (judging / lessons / runs) — each 9 cols x 1 row.
+/* Additional sprite sheets (judging / lessons / runs), each 9 cols x 1 row.
    Apply alongside .sprite-sheet, e.g. class="sprite-sheet sheet-runs sprite-pass-bead". */
 .sheet-judging { --sprite-sheet-url: url("/sprites/interviu-judging-sprites.svg"); --sprite-cols: 9; --sprite-rows: 1; }
 .sheet-lessons { --sprite-sheet-url: url("/sprites/interviu-lessons-sprites.svg"); --sprite-cols: 9; --sprite-rows: 1; }
@@ -393,7 +595,7 @@ select {
 
 .agent-roster {
   border-top: 1px solid var(--line);
-  padding-top: 16px;
+  padding-top: 18px;
   display: grid;
   gap: 10px;
 }
@@ -409,15 +611,78 @@ select {
   letter-spacing: 0.02em;
 }
 
+.workflow-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workflow-card {
+  min-width: 0;
+  border: 1px solid #dfe6dd;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.workflow-card.active {
+  border-color: var(--teal);
+  background: #f0f8f6;
+}
+
+.workflow-card.done {
+  border-color: #b8d3c0;
+  background: var(--pass-bg);
+}
+
+.workflow-card.attention {
+  border-color: #e3bd91;
+  background: var(--review-bg);
+}
+
+.workflow-card.idle {
+  opacity: 0.64;
+}
+
+.workflow-sprite {
+  --sprite-scale: 1.18;
+}
+
+.workflow-card strong,
+.workflow-card small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.workflow-card strong {
+  font-size: 12px;
+}
+
+.workflow-card small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .roster-track {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
+.agent-roster.evidence-panel .roster-track {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
 .roster-agent {
   min-width: 0;
-  border: 1px solid var(--line);
+  border: 1px solid #dfe6dd;
   border-radius: 8px;
   background: #fff;
   padding: 10px 6px;
@@ -434,12 +699,12 @@ select {
 
 .roster-agent.active {
   border-color: var(--teal);
-  background: #f1f8f6;
+  background: #f0f8f6;
 }
 
 .roster-agent.done {
   border-color: #bed8c4;
-  background: #f6fbf7;
+  background: var(--pass-bg);
 }
 
 .roster-sprite {
@@ -537,7 +802,7 @@ select {
   border-radius: 8px;
   padding: 12px;
   margin: 12px 0;
-  background: #faf8f4;
+  background: var(--surface);
 }
 
 .drawer-refinery-head {
@@ -791,7 +1056,8 @@ select {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 12px;
-  padding: 12px;
+  padding: 13px 14px;
+  box-shadow: var(--shadow-soft);
 }
 
 .metric {
@@ -818,13 +1084,15 @@ select {
   border-width: 0 0 0 1px;
   border-radius: 0;
   box-shadow: none;
-  padding: 18px;
+  padding: 22px 20px;
   overflow-y: auto;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
 }
 
 .panel-section {
-  padding: 16px 0;
-  border-bottom: 1px solid rgba(31, 35, 32, 0.12);
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(31, 35, 32, 0.1);
 }
 
 .panel-section:first-child {
@@ -833,9 +1101,10 @@ select {
 
 .section-title {
   margin: 0 0 10px;
-  font-size: 15px;
-  color: var(--muted);
-  font-weight: 700;
+  font-size: 13px;
+  color: #52615a;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .bar-row {
@@ -863,9 +1132,9 @@ select {
 .connector-row,
 .event-row,
 .failure-row {
-  border: 1px solid rgba(31, 35, 32, 0.12);
+  border: 1px solid rgba(31, 35, 32, 0.1);
   border-radius: 8px;
-  padding: 10px;
+  padding: 11px;
   margin: 8px 0;
   background: #fff;
 }
@@ -877,9 +1146,9 @@ select {
 }
 
 .connector-card {
-  border: 1px solid rgba(31, 35, 32, 0.12);
+  border: 1px solid rgba(31, 35, 32, 0.1);
   border-radius: 8px;
-  padding: 10px;
+  padding: 11px;
   margin: 8px 0;
   background: #fff;
 }
@@ -912,13 +1181,14 @@ select {
 
 .candidate-dock-card {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 11px;
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: start;
   gap: 8px;
-  background: #faf8f4;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
 }
 
 .candidate-dock-card strong,
@@ -942,8 +1212,8 @@ select {
 .pill {
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 3px 8px;
+  font-size: 10px;
   font-weight: 800;
   background: #fff;
   white-space: nowrap;
@@ -1023,15 +1293,15 @@ select {
 }
 
 .proof-card {
-  background: #f7fff8;
+  background: #f8fcf7;
 }
 
 .ledger-row {
   width: 100%;
   min-height: 52px;
-  border: 1px solid rgba(31, 35, 32, 0.12);
+  border: 1px solid rgba(31, 35, 32, 0.1);
   border-radius: 8px;
-  padding: 10px;
+  padding: 11px;
   margin: 8px 0;
   background: #fff;
   color: var(--ink);
@@ -1098,7 +1368,7 @@ select {
 .field-row input {
   min-width: 0;
   min-height: 40px;
-  border: 1px solid rgba(31, 35, 32, 0.2);
+  border: 1px solid rgba(31, 35, 32, 0.16);
   border-radius: 8px;
   background: #fff;
   color: var(--ink);
@@ -1167,25 +1437,25 @@ select {
 .score-hero {
   min-height: 52px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 13px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: #faf8f4;
+  background: var(--surface);
   color: var(--muted);
   font-weight: 800;
 }
 
 .score-hero.passed {
-  background: #eef7f0;
+  background: var(--pass-bg);
   color: #315f44;
   border-color: #bed8c4;
 }
 
 .score-hero.review {
-  background: #fff5eb;
+  background: var(--review-bg);
   color: #7c4b24;
   border-color: #e7caa7;
 }
@@ -1197,6 +1467,50 @@ select {
   margin-top: 10px;
 }
 
+.reviewer-list {
+  display: grid;
+  gap: 8px;
+}
+
+.reviewer-row {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+}
+
+.reviewer-row.pass {
+  background: var(--pass-bg);
+  border-color: #bed8c4;
+}
+
+.reviewer-row.warn {
+  background: var(--review-bg);
+  border-color: #e7caa7;
+}
+
+.reviewer-row strong,
+.reviewer-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.reviewer-row strong {
+  font-size: 12px;
+}
+
+.reviewer-row small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
 .artifact-card {
   border: 2px solid var(--line);
   border-radius: 6px;
@@ -1204,7 +1518,7 @@ select {
   margin-top: 10px;
   display: grid;
   gap: 4px;
-  background: #f7fff8;
+  background: var(--pass-bg);
 }
 
 .artifact-card span,
@@ -1405,6 +1719,16 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .cockpit-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "brief"
+      "metrics"
+      "evidence"
+      "focus"
+      "roster";
+  }
+
   .side-panel {
     border-width: 1px 0 0;
     border-radius: 0;
@@ -1420,15 +1744,25 @@ pre {
     text-align: center;
   }
 
+  .run-brief {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
   .room-summary {
     width: min(420px, 100%);
+  }
+
+  .brief-tags {
+    justify-content: center;
   }
 }
 
 @media (max-width: 640px) {
   .arena-band {
     padding: 10px;
-    grid-template-rows: auto minmax(500px, 1fr) auto;
+    grid-template-rows: auto auto auto;
   }
 
   .topbar {
@@ -1447,6 +1781,27 @@ pre {
 
   .arena {
     padding: 18px;
+  }
+
+  .run-brief {
+    min-height: auto;
+    padding: 22px 16px;
+    gap: 18px;
+  }
+
+  .metric-deck {
+    grid-template-columns: 1fr 1fr;
+    padding: 10px;
+  }
+
+  .metric-tile {
+    min-height: 84px;
+    padding: 11px;
+  }
+
+  .panel-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .room-copy h2 {
@@ -1472,6 +1827,10 @@ pre {
 
   .roster-track {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .workflow-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .subagent-grid {

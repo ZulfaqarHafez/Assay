@@ -201,6 +201,26 @@ class TraceAuditSummary(BaseModel):
     message: str | None = None
 
 
+class ProductReviewer(BaseModel):
+    key: str
+    name: str
+    status: Literal["pass", "warn", "wait"]
+    label: str
+    summary: str
+    evidence: list[str] = Field(default_factory=list)
+    next_step: str | None = None
+    sprite: str = "candidate-audit"
+
+
+class ProductReview(BaseModel):
+    schema_: Literal["interviu.product_review.v1"] = Field(default="interviu.product_review.v1", alias="schema")
+    run_id: str
+    generated_at: datetime = Field(default_factory=utc_now)
+    reviewers: list[ProductReviewer]
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 class Scorecard(BaseModel):
     run_id: str
     status: RunStatus = "completed"

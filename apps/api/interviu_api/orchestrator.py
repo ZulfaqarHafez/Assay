@@ -374,7 +374,7 @@ class RunOrchestrator:
             if scope.domain:
                 descriptors.append(f"domain: {scope.domain}")
             if descriptors:
-                role_lines.append("Role under evaluation — " + "; ".join(descriptors) + ".")
+                role_lines.append("Role under evaluation - " + "; ".join(descriptors) + ".")
         role_block = ("\n" + "\n".join(role_lines)) if role_lines else ""
         return (
             f"Candidate {candidate.name} is being evaluated by Interviu.\n"

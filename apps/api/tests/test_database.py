@@ -10,6 +10,14 @@ def test_default_database_backend_is_sqlite() -> None:
     assert store().health()["ok"] is True
 
 
+def test_supabase_env_without_backend_flag_keeps_sqlite(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SUPABASE_URL", "https://project.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "server-key")
+    reset_store_cache()
+
+    assert database_backend_name() == "sqlite"
+
+
 def test_forced_supabase_requires_server_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INTERVIU_DB_BACKEND", "supabase")
     reset_store_cache()

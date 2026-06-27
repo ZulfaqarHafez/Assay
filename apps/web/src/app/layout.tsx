@@ -3,7 +3,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Interviu",
-  description: "Candidate evaluation with TraceRazor proof"
+  description: "Candidate evaluation with TraceRazor proof",
+  icons: {
+    icon: "/brand/interviu-mark.svg"
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

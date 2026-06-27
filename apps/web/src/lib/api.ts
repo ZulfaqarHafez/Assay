@@ -1,4 +1,4 @@
-import type { AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, Connector, ConnectorProbe, DatabaseHealth, ExamPack, ExamPackExport, ExamPackFileExport, JobScope, ProofBundle, RoleAnalysis, RunEvent, RunRecord, Scorecard, TracePayload } from "@/types/interviu";
+import type { AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, Connector, ConnectorProbe, DatabaseHealth, ExamPack, ExamPackExport, ExamPackFileExport, JobScope, ProductReview, ProofBundle, RoleAnalysis, RunEvent, RunRecord, Scorecard, TracePayload } from "@/types/interviu";
 
 function apiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
@@ -58,6 +58,7 @@ export const interviuApi = {
     }),
   events: (runId: string) => request<RunEvent[]>(`/runs/${runId}/events`),
   scorecard: (runId: string) => request<Scorecard>(`/runs/${runId}/scorecard`),
+  reviewers: (runId: string) => request<ProductReview>(`/runs/${runId}/reviewers`),
   trace: (runId: string) => request<TracePayload>(`/runs/${runId}/trace`),
   proofBundle: (runId: string) => request<ProofBundle>(`/runs/${runId}/proof-bundle`),
   agentSpec: (runId: string) => request<AgentSpec>(`/runs/${runId}/agent-spec`),
