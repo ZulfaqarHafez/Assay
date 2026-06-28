@@ -154,6 +154,8 @@ export type Scorecard = {
   created_at: string;
   lessons_applied: string[];
   prior_run_id: string | null;
+  degraded?: boolean;
+  degraded_reason?: string | null;
 };
 
 export type ProductReviewer = {

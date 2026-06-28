@@ -240,6 +240,10 @@ class Scorecard(BaseModel):
     failure_reasons: list[str] = Field(default_factory=list)
     lessons_applied: list[str] = Field(default_factory=list)
     prior_run_id: str | None = None
+    # True when the live OpenAI key was rate-limited / out of quota and the run
+    # fell back to deterministic demo answers, so the verdict is illustrative.
+    degraded: bool = False
+    degraded_reason: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
 
 

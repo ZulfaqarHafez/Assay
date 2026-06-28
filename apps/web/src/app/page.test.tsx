@@ -414,7 +414,7 @@ describe("Interviu page", () => {
 
   it("renders the evaluation workspace as the first screen", async () => {
     renderHome();
-    await screen.findByRole("heading", { name: "Interviu" });
+    await screen.findByRole("heading", { name: "Assay cockpit" });
     expect(screen.getByRole("button", { name: /run evaluation/i })).toBeInTheDocument();
     expect(await screen.findByText("Mock candidate")).toBeInTheDocument();
     expect(screen.getByText("Run setup")).toBeInTheDocument();

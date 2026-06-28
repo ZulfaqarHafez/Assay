@@ -185,7 +185,7 @@ export function ProgressTrend({ candidateId, progress: provided, className }: Pr
                   fontSize: 12
                 }}
                 formatter={(value: number | string, name: string) => [
-                  value === null ? "—" : `${value}%`,
+                  value === null ? "·" : `${value}%`,
                   labelize(name)
                 ]}
               />

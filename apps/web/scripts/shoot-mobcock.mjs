@@ -1,0 +1,13 @@
+import { chromium } from "playwright";
+const out = process.argv[2];
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport:{width:390,height:844} });
+const p = await ctx.newPage();
+await p.addInitScript(()=>localStorage.setItem("interviu-theme","light"));
+await p.goto("http://127.0.0.1:3000/",{waitUntil:"networkidle"});
+await p.getByText("Evaluation cockpit (advanced)").click().catch(()=>{});
+await p.waitForTimeout(900);
+const scrollW = await p.evaluate(()=>({doc:document.documentElement.scrollWidth, win:window.innerWidth}));
+console.log("horizontal overflow?", scrollW.doc > scrollW.win+2, scrollW);
+await p.screenshot({path:out+"/mobile-cockpit.png", fullPage:true});
+await b.close(); console.log("done");

@@ -120,6 +120,17 @@ class RunOrchestrator:
             scorecard = self._scorecard(run, candidate, pack.simulator_model, seen_scores, held_scores, panel_results)
             scorecard.lessons_applied = applied_lesson_ids
             scorecard.prior_run_id = prior_run_id
+            # If the live key was rate-limited, the run answered deterministically;
+            # mark the verdict as a demo so the UI can say so plainly.
+            if getattr(adapter, "degraded", False):
+                scorecard.degraded = True
+                scorecard.degraded_reason = getattr(adapter, "degraded_reason", None)
+                self._event(
+                    run.id,
+                    "system",
+                    "degraded_to_demo",
+                    {"reason": scorecard.degraded_reason or "OpenAI rate limit"},
+                )
             self._record_lesson_outcomes(run, prior_by_comp, scorecard)
             self._persist_new_lessons(run, candidate, pack, scorecard, lesson_feedback)
             save_scorecard(scorecard)

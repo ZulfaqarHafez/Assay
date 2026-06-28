@@ -168,12 +168,12 @@ export function TraceDrawer({
             <SummaryItem label="TraceRazor" value={traceScoreLabel(scorecard)} hint={audit?.grade ?? undefined} />
             <SummaryItem
               label="Transfer gap"
-              value={scorecard ? maxTransferGap(scorecard).toFixed(2) : "—"}
+              value={scorecard ? maxTransferGap(scorecard).toFixed(2) : "·"}
             />
             <SummaryItem label="Spans" value={String(spanEvents.length)} />
             <SummaryItem
               label="Certificate"
-              value={scorecard ? (scorecard.certified ? "Passed" : "Needs review") : "—"}
+              value={scorecard ? (scorecard.certified ? "Passed" : "Needs review") : "·"}
             />
             {agentSpec && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>

@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { FlaskConical, Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2 } from "lucide-react";
 import { liveSteps, type LiveStep } from "@/lib/assay";
+import BrandMark from "@/components/ui/BrandMark";
 import type { RunEvent } from "@/types/interviu";
 import type { RunStreamStatus } from "@/lib/useRunStream";
 
@@ -66,7 +67,7 @@ export function JudgingWaterfall({
       <header className="assay-judging-head">
         <span className="assay-judging-title">
           <span className={`assay-flask ${isActive ? "bubbling" : ""}`} aria-hidden="true">
-            <FlaskConical size={18} />
+            <BrandMark size={36} />
           </span>
           <strong>{heading}</strong>
         </span>

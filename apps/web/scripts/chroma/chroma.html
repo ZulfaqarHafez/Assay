@@ -1,0 +1,85 @@
+<!doctype html>
+<!--
+  "Chromatographic Ascension" — a seeded generative chromatogram.
+
+  Philosophy: a mixture, placed at a baseline, is drawn upward by an invisible
+  solvent front. Each pigment ascends to its own retention height (its Rf),
+  separating a single drop into a ladder of warm-to-cool bands. Beauty is the
+  PROCESS of separation: capillary wicking modeled as thousands of low-alpha
+  vertical strokes drifting under layered noise, and each pigment settling into
+  a feathered band of soft, shadow-blurred deposits. Same seed → same chromatogram.
+  Rendered to a transparent PNG to sit, quietly, behind the hero.
+-->
+<html>
+<head>
+<meta charset="utf-8" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+<style>html,body{margin:0;background:transparent}</style>
+</head>
+<body>
+<script>
+const W = 1600, H = 900;
+const SEED = 73;
+// Warm saffron -> cool indigo. Rf rises with "cooler" pigments (lab-true feel).
+const PIGMENTS = [
+  { c: [242, 117, 43],  rf: 0.30 },
+  { c: [246, 83, 52],   rf: 0.42 },
+  { c: [220, 46, 75],   rf: 0.54 },
+  { c: [160, 69, 117],  rf: 0.67 },
+  { c: [117, 58, 125],  rf: 0.80 },
+  { c: [77, 98, 165],   rf: 0.92 }
+];
+
+function setup() {
+  const cnv = createCanvas(W, H);
+  cnv.parent(document.body);
+  pixelDensity(1);
+  randomSeed(SEED);
+  noiseSeed(SEED);
+  clear();
+  const ctx = drawingContext;
+
+  // 1) Capillary wicking: faint vertical streaks rising from the baseline.
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < 5200; i++) {
+    const pig = PIGMENTS[floor(random(PIGMENTS.length))];
+    let x = random(W);
+    const top = H - pig.rf * H * random(0.7, 1.05);
+    const a = random(2, 8);
+    stroke(pig.c[0], pig.c[1], pig.c[2], a);
+    strokeWeight(random(0.6, 1.6));
+    let y = H;
+    noFill();
+    beginShape();
+    while (y > top) {
+      x += (noise(x * 0.004, y * 0.004, pig.rf * 10) - 0.5) * 6;
+      vertex(x, y);
+      y -= 6;
+    }
+    endShape();
+  }
+
+  // 2) Separation bands: each pigment settles into a soft, blurred band at its Rf.
+  noStroke();
+  for (const pig of PIGMENTS) {
+    const yBand = H - pig.rf * H;
+    ctx.shadowColor = `rgba(${pig.c[0]},${pig.c[1]},${pig.c[2]},0.9)`;
+    for (let i = 0; i < 320; i++) {
+      const x = random(-40, W + 40);
+      const y = yBand + randomGaussian(0, H * 0.035);
+      const rx = random(30, 120);
+      const ry = random(8, 26);
+      ctx.shadowBlur = random(28, 70);
+      fill(pig.c[0], pig.c[1], pig.c[2], random(6, 16));
+      ellipse(x, y, rx, ry);
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  // Signal completion + expose the PNG for the headless renderer.
+  window.__chromaDone = canvas.toDataURL("image/png");
+  noLoop();
+}
+</script>
+</body>
+</html>

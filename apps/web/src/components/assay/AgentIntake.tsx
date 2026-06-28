@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { FlaskConical, Upload, FileText, Wrench, Hash, Sparkles, Zap } from "lucide-react";
+import { FlaskConical, Upload, UploadCloud, FileText, Wrench, Hash, Sparkles, Zap } from "lucide-react";
 import { detectAgentFacts } from "@/lib/assay";
+import HeroScanCard from "@/components/assay/HeroScanCard";
 
 /**
  * The calm first screen: "bring the agent.md you already have."
@@ -54,14 +55,14 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
 
   return (
     <section className="assay-intake" aria-label="Test your agent">
+      <div className="assay-hero-grid">
+        <div className="assay-hero-main">
       <header className="assay-intake-head">
-        <span className="assay-kicker">
-          <FlaskConical size={15} /> Pre-deployment litmus test
-        </span>
+        <span className="assay-kicker">Pre-deployment litmus test</span>
         <h2>Bring your <code>agent.md</code>. Find out where it breaks.</h2>
         <p>
           Drop or paste your agent&rsquo;s definition. Assay runs it through an adversarial exam, grades it,
-          and hands you a ranked list of what to fix — before you ship.
+          and hands you a ranked list of what to fix before you ship.
         </p>
       </header>
 
@@ -74,6 +75,12 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
+        <div className="assay-editor-bar" aria-hidden="true">
+          <span className="assay-editor-dots"><i /><i /><i /></span>
+          <span className="assay-editor-name">
+            <FileText size={12} /> {facts.title ? `${facts.title}.md` : "agent.md"}
+          </span>
+        </div>
         <textarea
           className="assay-textarea"
           value={markdown}
@@ -97,6 +104,12 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
             if (file) readFile(file);
           }}
         />
+        {dragging && (
+          <div className="assay-drop-overlay" aria-hidden="true">
+            <UploadCloud size={28} />
+            <span>Drop your <code>agent.md</code> to load it</span>
+          </div>
+        )}
       </div>
 
       {hasContent && (
@@ -125,17 +138,31 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           <FlaskConical size={18} />
           {submitting ? "Running the litmus test…" : `Run the litmus test`}
         </button>
+        <button
+          type="button"
+          className="assay-ghost-button"
+          onClick={() =>
+            document.querySelector('[aria-label="How it works"]')?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        >
+          See how it works
+        </button>
         <span className={`assay-mode ${liveMode ? "live" : "demo"}`}>
           {liveMode ? (
             <>
-              <Zap size={13} /> Live — runs against {examPackName}
+              <Zap size={13} /> Live &middot; runs against {examPackName}
             </>
           ) : (
             <>
-              <Sparkles size={13} /> Demo mode — add an OpenAI key to test your real agent
+              <Sparkles size={13} /> Demo mode &middot; add an OpenAI key to test your real agent
             </>
           )}
         </span>
+      </div>
+        </div>
+        <aside className="assay-hero-aside">
+          <HeroScanCard />
+        </aside>
       </div>
 
       <div className="assay-templates">

@@ -40,6 +40,16 @@ export function VerdictPanel({ scorecard, agentSpec, agentName, onViewTrace, onT
 
   return (
     <section className="assay-verdict" aria-label="Verdict">
+      {scorecard.degraded && (
+        <div className="assay-demo-banner" role="status">
+          <AlertTriangle size={16} />
+          <span>
+            <strong>Demo result.</strong> Your OpenAI key hit its rate limit (free tier is ~3 requests/min), so
+            Assay graded with deterministic stand-in answers. Add billing to your OpenAI account for a live
+            evaluation of your real agent.
+          </span>
+        </div>
+      )}
       <div className={`assay-verdict-hero ${verdict.verdict}`}>
         <div className="assay-verdict-mark" aria-hidden="true">
           <Icon size={34} />
@@ -50,9 +60,24 @@ export function VerdictPanel({ scorecard, agentSpec, agentName, onViewTrace, onT
           <p>{verdict.headline}</p>
         </div>
         <div className="assay-verdict-score" aria-label={`Capability score ${verdict.score} out of 100`}>
-          <strong>{verdict.score}</strong>
+          <strong className="litmus-num">{verdict.score}</strong>
           <span>/ 100</span>
           <small>{verdict.passedChecks}/{verdict.totalChecks} checks held</small>
+        </div>
+      </div>
+
+      <div className="assay-verdict-meter">
+        <div
+          className="assay-litmus-meter"
+          role="img"
+          aria-label={`Litmus score ${verdict.score} of 100 on the fail-to-ship scale`}
+        >
+          <span className="knob" style={{ left: `${Math.min(98, Math.max(2, verdict.score))}%` }} />
+        </div>
+        <div className="scale" aria-hidden="true">
+          <span>Fail</span>
+          <span>Risky</span>
+          <span>Ship</span>
         </div>
       </div>
 

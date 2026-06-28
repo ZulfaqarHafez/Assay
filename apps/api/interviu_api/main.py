@@ -325,10 +325,23 @@ def create_run(payload: RunCreate) -> dict:
     if payload.job_scope is not None and exam_pack_id == "hr-v1":
         exam_pack_id = analyze_job_scope(payload.job_scope).recommended_exam_pack_id
 
+    # Live (OpenAI) candidates fire k x items x 2 LLM calls per run; on a
+    # rate-limited free-tier key that is slow. INTERVIU_LIVE_K caps attempts for
+    # live candidates only (mock/deterministic runs and tests are untouched).
+    effective_k = payload.k
+    live_k_env = os.environ.get("INTERVIU_LIVE_K", "").strip()
+    if live_k_env:
+        candidate = get_candidate(payload.candidate_id)
+        if candidate is not None and candidate.adapter_type == "openai-compatible":
+            try:
+                effective_k = max(1, min(payload.k, int(live_k_env)))
+            except ValueError:
+                pass
+
     run = RunRecord(
         candidate_id=payload.candidate_id,
         exam_pack_id=exam_pack_id,
-        k=payload.k,
+        k=effective_k,
         competency_threshold=payload.competency_threshold,
         max_transfer_gap=payload.max_transfer_gap,
         tas_threshold=payload.tas_threshold,

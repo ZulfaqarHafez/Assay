@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   Bot,
   CheckCircle2,
-  FlaskConical,
   PanelRightOpen,
   Play,
   Plus,
@@ -28,6 +27,7 @@ import {
 } from "@/lib/queries";
 import { useRunStream } from "@/lib/useRunStream";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import BrandMark from "@/components/ui/BrandMark";
 import {
   buildReviewers,
   buildRoster,
@@ -52,6 +52,7 @@ import CompetencyRadar from "@/components/scorecard/CompetencyRadar";
 import RunStateMachine from "@/components/run/RunStateMachine";
 import EmptyState from "@/components/onboarding/EmptyState";
 import AgentIntake from "@/components/assay/AgentIntake";
+import Landing from "@/components/assay/Landing";
 import JudgingWaterfall from "@/components/assay/JudgingWaterfall";
 import VerdictPanel from "@/components/assay/VerdictPanel";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
@@ -565,9 +566,7 @@ export default function Home() {
     <main className="assay-shell">
       <header className="assay-topbar">
         <div className="assay-brand">
-          <span className="assay-brand-mark" aria-hidden="true">
-            <FlaskConical size={20} />
-          </span>
+          <BrandMark size={48} className="assay-brand-mark" title="Assay" />
           <div>
             <h1>Assay</h1>
             <p>Pre-deployment litmus test for AI agents</p>
@@ -578,13 +577,22 @@ export default function Home() {
 
       <div className="assay-stage">
         {phase === "intake" && (
-          <AgentIntake
-            examPackName={selectedExamPack?.name ?? "the exam"}
-            liveMode={Boolean(health?.openai_configured)}
-            submitting={intakeSubmitting}
-            templates={AGENT_TEMPLATES}
-            onRun={runAgentMarkdown}
-          />
+          <>
+            <AgentIntake
+              examPackName={selectedExamPack?.name ?? "the exam"}
+              liveMode={Boolean(health?.openai_configured)}
+              submitting={intakeSubmitting}
+              templates={AGENT_TEMPLATES}
+              onRun={runAgentMarkdown}
+            />
+            <Landing
+              onStart={() => {
+                const el = document.querySelector<HTMLTextAreaElement>(".assay-textarea");
+                el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                el?.focus();
+              }}
+            />
+          </>
         )}
         {phase === "running" && (
           <JudgingWaterfall
@@ -626,7 +634,7 @@ export default function Home() {
           <div className="brand">
             <span className="brand-mark" aria-hidden="true" />
             <div>
-              <h1>Interviu</h1>
+              <h1>Assay cockpit</h1>
               <p>Trace-backed evaluation workspace</p>
             </div>
           </div>

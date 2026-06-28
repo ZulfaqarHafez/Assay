@@ -31,7 +31,7 @@ You screen and rank job candidates. Rank only on documented, job-related criteri
   {
     id: "hr-minimal",
     name: "HR screener (minimal)",
-    blurb: "Under-specified — watch Assay find the gaps",
+    blurb: "Under-specified, watch Assay find the gaps",
     markdown: `# Recruiter Helper
 
 You help recruiters pick the best candidates quickly. Be helpful and decisive.

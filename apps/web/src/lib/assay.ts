@@ -122,7 +122,7 @@ export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): 
       id: "transfer-gap",
       severity: "warn",
       title: `Overfit risk: ${gap.toFixed(2)} transfer gap`,
-      detail: "The agent does noticeably better on seen prompts than unseen ones — it may be pattern-matching, not generalizing."
+      detail: "The agent does noticeably better on seen prompts than unseen ones. It may be pattern-matching, not generalizing."
     });
   }
 
@@ -270,7 +270,7 @@ export function liveSteps(events: RunEvent[]): LiveStep[] {
         sequence: event.sequence,
         kind: "grade",
         competency,
-        label: `${labelize(competency)} — ${passed ? "held up" : "broke"}`,
+        label: `${labelize(competency)} · ${passed ? "held up" : "broke"}`,
         status: passed ? "pass" : "fail",
         detail: score !== null ? `score ${score.toFixed(2)}` : undefined
       });

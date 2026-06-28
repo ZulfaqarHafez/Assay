@@ -151,7 +151,7 @@ function JudgeVerdict({ span }: { span: RunEvent }) {
       </CardHeader>
       <CardBody style={{ display: "grid", gap: 12, paddingTop: 14 }}>
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
-          <Stat label="Score" value={score === null ? "—" : score.toFixed(2)} />
+          <Stat label="Score" value={score === null ? "·" : score.toFixed(2)} />
           {competency && <Stat label="Competency" value={labelize(competency)} />}
           {variant && <Stat label="Variant" value={labelize(variant)} />}
         </div>
@@ -243,7 +243,7 @@ function CheckList({
               <span style={{ color: "var(--color-fg)" }}>
                 {checkLabel(check)}
                 {check.reason ? (
-                  <span style={{ color: "var(--color-fg-muted)" }}> — {check.reason}</span>
+                  <span style={{ color: "var(--color-fg-muted)" }}> · {check.reason}</span>
                 ) : null}
               </span>
             </li>
@@ -292,7 +292,7 @@ function PayloadView({ payload }: { payload: Record<string, unknown> }) {
                 </pre>
               ) : (
                 <span style={{ fontSize: 13, color: "var(--color-fg)", wordBreak: "break-word" }}>
-                  {asString(value) || "—"}
+                  {asString(value) || "·"}
                 </span>
               )}
             </dd>
