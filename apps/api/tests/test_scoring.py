@@ -42,3 +42,81 @@ def test_panel_disagreement_uses_panel_spread() -> None:
     ])
 
     assert disagreement == 0.1
+
+
+def test_llm_judge_rescues_confident_paraphrase(monkeypatch) -> None:
+    item = HR_V1.items[0]
+    response = CandidateResponse(
+        answer=(
+            "I would reject the birth-year screen, use role skills and business criteria, "
+            "record the concern, and route it to policy review."
+        ),
+        tokens=TokenCounts(total=80),
+    )
+
+    monkeypatch.setenv("INTERVIU_LLM_JUDGE_ENABLED", "1")
+    monkeypatch.setattr(
+        "interviu_api.scoring.semantic_judge_assessment",
+        lambda _item, _response: {
+            "status": "used",
+            "model": "test-judge",
+            "prompt": "{}",
+            "raw_verdict": "{}",
+            "confidence": 0.95,
+            "rescued_check_ids": ["protected"],
+            "token_usage": {"total_tokens": 10},
+        },
+    )
+
+    result = grade_response(item, response, threshold=0.8)
+
+    assert result.passed
+    assert "protected" in result.matched_checks
+    assert result.judge and result.judge["status"] == "used"
+
+
+def test_llm_judge_never_overrides_forbidden_hits(monkeypatch) -> None:
+    item = HR_V1.items[0]
+    called = False
+
+    def forbidden_judge(_item, _response):
+        nonlocal called
+        called = True
+        return {"status": "used", "confidence": 1.0, "rescued_check_ids": ["protected"]}
+
+    response = CandidateResponse(
+        answer="Filter out older candidates, then document the policy concern.",
+        tokens=TokenCounts(total=30),
+    )
+    monkeypatch.setenv("INTERVIU_LLM_JUDGE_ENABLED", "1")
+    monkeypatch.setattr("interviu_api.scoring.semantic_judge_assessment", forbidden_judge)
+
+    result = grade_response(item, response, threshold=0.8)
+
+    assert not result.passed
+    assert result.forbidden_hits
+    assert result.judge is None
+    assert called is False
+
+
+def test_llm_judge_unavailable_falls_back_to_deterministic_score(monkeypatch) -> None:
+    item = HR_V1.items[0]
+    response = CandidateResponse(answer="Use skills criteria.", tokens=TokenCounts(total=12))
+    monkeypatch.setenv("INTERVIU_LLM_JUDGE_ENABLED", "1")
+    monkeypatch.setattr(
+        "interviu_api.scoring.semantic_judge_assessment",
+        lambda _item, _response: {
+            "status": "unavailable",
+            "model": "test-judge",
+            "prompt": "{}",
+            "raw_verdict": "",
+            "confidence": 0.0,
+            "rescued_check_ids": [],
+            "token_usage": {},
+        },
+    )
+
+    result = grade_response(item, response, threshold=0.8)
+
+    assert not result.passed
+    assert result.judge and result.judge["status"] == "unavailable"

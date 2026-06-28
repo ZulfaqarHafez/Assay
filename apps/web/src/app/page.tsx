@@ -153,7 +153,7 @@ export default function Home() {
   // Assay primary flow: take an uploaded/authored agent.md, register it as the
   // candidate under test (live LLM when a key is set, deterministic demo when
   // not), then immediately run the adversarial exam and stream the judging.
-  async function runAgentMarkdown(markdown: string) {
+  async function runAgentMarkdown(markdown: string, roleScopeText?: string) {
     if (!markdown.trim()) return;
     setError(null);
     resetRunArtifacts();
@@ -167,9 +167,25 @@ export default function Home() {
       setSelectedCandidateId(created.id);
       void candidatesQuery.refetch();
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
-      const createdRun = await interviuApi.createRun(created.id, packId, null);
+      const jobScope = roleScopeText?.trim()
+        ? {
+            raw_text: roleScopeText.trim(),
+            title: "",
+            seniority: "unspecified" as const,
+            responsibilities: [],
+            required_skills: [],
+            nice_to_have: [],
+            qualifications: [],
+            domain: "",
+            risks: [],
+            compliance_flags: [],
+            extraction: "none" as const
+          }
+        : null;
+      const createdRun = await interviuApi.createRun(created.id, packId, jobScope);
+      const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
-      runStream.start(createdRun.id, { k: createdRun.k, itemCount: selectedExamPack?.items.length });
+      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
     } catch (exc) {
       setError(errorMessage(exc));
     } finally {

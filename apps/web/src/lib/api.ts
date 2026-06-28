@@ -33,6 +33,11 @@ export const interviuApi = {
   health: () => request<Health>("/health"),
   databaseHealth: () => request<DatabaseHealth>("/health/database"),
   examPacks: () => request<ExamPack[]>("/exam-packs"),
+  importExamPackFile: (content: string, format: "json" | "yaml" | "yml") =>
+    request<ExamPack>("/exam-packs/import-file", {
+      method: "POST",
+      body: JSON.stringify({ content, format })
+    }),
   examPackExport: (packId: string) => request<ExamPackExport>(`/exam-packs/${packId}/export`),
   examPackFileExport: (packId: string) =>
     request<ExamPackFileExport>(`/exam-packs/${packId}/export-files`, {

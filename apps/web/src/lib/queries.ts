@@ -85,6 +85,20 @@ export function useExamPacks(options?: QueryOpts<ExamPack[]>) {
   });
 }
 
+export function useImportExamPackFile(
+  options?: MutationOpts<ExamPack, { content: string; format: "json" | "yaml" | "yml" }>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ content, format }) => interviuApi.importExamPackFile(content, format),
+    ...options,
+    onSettled: (...args) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.examPacks() });
+      options?.onSettled?.(...args);
+    }
+  });
+}
+
 export function useConnectors(options?: QueryOpts<Connector[]>) {
   return useQuery({
     queryKey: queryKeys.connectors(),

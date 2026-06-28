@@ -2485,6 +2485,24 @@ pre {
 .assay-advanced[open] > summary::before { transform: rotate(90deg); }
 
 .assay-advanced > summary:hover { color: var(--color-accent); }
+.assay-scope-textarea {
+  width: 100%;
+  min-height: 82px;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-fg);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-top: 10px;
+}
+.assay-scope-textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+}
 
 /* ---- Animations (respecting reduced motion) ---- */
 
@@ -3522,6 +3540,8 @@ body,
 .ws-cmdk-hint:focus-visible,
 .ws-brand:focus-visible,
 .ws-cell-strong:focus-visible,
+.ws-icon-button:focus-visible,
+.ws-row-link.as-button:focus-visible,
 .cmdk-item:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -3557,6 +3577,38 @@ body,
   margin: 0;
 }
 .ws-head p { margin: 5px 0 0; color: var(--color-fg-muted); font-size: 13.5px; line-height: 1.5; max-width: 72ch; }
+.ws-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.ws-icon-button {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-fg);
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.ws-icon-button:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: var(--color-accent-subtle);
+}
+.ws-icon-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ws-surface-message {
+  margin: -6px 0 16px;
+  font-size: 12.5px;
+  color: var(--color-fg-muted);
+}
 .ws-count {
   font-size: 12.5px;
   color: var(--color-fg-muted);
@@ -3763,6 +3815,16 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
 .ws-card-title { font-family: var(--font-display); font-size: 17px; font-weight: 600; margin: 0; }
 .ws-card-sub { font-size: 12.5px; color: var(--color-fg-muted); margin: 4px 0 0; }
 .ws-card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.ws-card-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+.ws-row-link.as-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
 .ws-chip {
   font-size: 11.5px;
   color: var(--color-fg);

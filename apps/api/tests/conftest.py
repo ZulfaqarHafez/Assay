@@ -12,6 +12,8 @@ def isolated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("INTERVIU_DB_BACKEND", raising=False)
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.delenv("INTERVIU_REQUIRE_TENANT", raising=False)
+    monkeypatch.delenv("INTERVIU_DEFAULT_TENANT", raising=False)
     from interviu_api.database import reset_store_cache
     from interviu_api import rate_limit as rl
 

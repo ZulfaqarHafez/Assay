@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useExamPacks } from "@/lib/queries";
+import { Download, Upload } from "lucide-react";
+import { interviuApi } from "@/lib/api";
+import { downloadJson, errorMessage } from "@/lib/derive";
+import { useExamPacks, useImportExamPackFile } from "@/lib/queries";
 import { ProbeArrayArt } from "@/components/ui/EmptyArt";
 
 /**
@@ -10,7 +13,35 @@ import { ProbeArrayArt } from "@/components/ui/EmptyArt";
  */
 export default function SuitesPage() {
   const packsQuery = useExamPacks();
+  const importPack = useImportExamPackFile();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [message, setMessage] = React.useState<string | null>(null);
   const packs = packsQuery.data ?? [];
+
+  async function handleImport(file: File | undefined) {
+    if (!file) return;
+    setMessage(null);
+    try {
+      const content = await file.text();
+      const format = file.name.endsWith(".yml") ? "yml" : file.name.endsWith(".yaml") ? "yaml" : "json";
+      const pack = await importPack.mutateAsync({ content, format });
+      setMessage(`Imported ${pack.name}`);
+    } catch (exc) {
+      setMessage(errorMessage(exc));
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function exportPack(packId: string) {
+    setMessage(null);
+    try {
+      const payload = await interviuApi.examPackExport(packId);
+      downloadJson(`${packId}-interviu-exam-pack.json`, payload);
+    } catch (exc) {
+      setMessage(errorMessage(exc));
+    }
+  }
 
   return (
     <main className="ws-page">
@@ -19,8 +50,29 @@ export default function SuitesPage() {
           <h1>Test suites</h1>
           <p>Versioned datasets of adversarial probes with seen and held-out variants, graded against documented checks.</p>
         </div>
-        <span className="ws-count">{packs.length} suite{packs.length === 1 ? "" : "s"}</span>
+        <div className="ws-toolbar">
+          <button
+            type="button"
+            className="ws-icon-button"
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Import suite"
+            title="Import suite"
+            disabled={importPack.isPending}
+          >
+            <Upload size={15} />
+          </button>
+          <span className="ws-count">{packs.length} suite{packs.length === 1 ? "" : "s"}</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.yaml,.yml,application/json,text/yaml,text/x-yaml"
+            hidden
+            onChange={(event) => void handleImport(event.target.files?.[0])}
+          />
+        </div>
       </header>
+
+      {message ? <p className="ws-surface-message" role="status">{message}</p> : null}
 
       {packsQuery.isLoading ? (
         <div className="ws-grid" aria-hidden="true">
@@ -51,6 +103,15 @@ export default function SuitesPage() {
                   {competencies.slice(0, 6).map((c) => (
                     <span className="ws-chip" key={c}>{labelize(c)}</span>
                   ))}
+                </div>
+                <div className="ws-card-actions">
+                  <button
+                    type="button"
+                    className="ws-row-link as-button"
+                    onClick={() => void exportPack(pack.id)}
+                  >
+                    <Download size={13} /> Export JSON
+                  </button>
                 </div>
               </article>
             );

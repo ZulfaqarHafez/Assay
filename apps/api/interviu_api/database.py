@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import CandidateConfig, DiagnosticLesson, RunEvent, RunRecord, Scorecard, utc_now
+from .tenancy import current_tenant_id
 
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "interviu.db"
@@ -106,12 +107,14 @@ class SQLiteStore(DataStore):
                 """
                 CREATE TABLE IF NOT EXISTS candidates (
                     id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL DEFAULT 'local',
                     payload TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS runs (
                     id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL DEFAULT 'local',
                     candidate_id TEXT NOT NULL,
                     exam_pack_id TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -122,22 +125,22 @@ class SQLiteStore(DataStore):
 
                 CREATE TABLE IF NOT EXISTS events (
                     span_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL DEFAULT 'local',
                     run_id TEXT NOT NULL,
                     sequence INTEGER NOT NULL,
                     payload TEXT NOT NULL
                 );
 
-                CREATE INDEX IF NOT EXISTS idx_events_run_sequence
-                ON events(run_id, sequence);
-
                 CREATE TABLE IF NOT EXISTS scorecards (
                     run_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL DEFAULT 'local',
                     payload TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS lessons (
                     id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL DEFAULT 'local',
                     candidate_id TEXT NOT NULL,
                     exam_pack_id TEXT NOT NULL,
                     competency TEXT NOT NULL,
@@ -146,11 +149,33 @@ class SQLiteStore(DataStore):
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
-
-                CREATE INDEX IF NOT EXISTS idx_lessons_candidate
-                ON lessons(candidate_id, exam_pack_id, competency, active);
                 """
             )
+            self._ensure_tenant_columns(conn)
+            conn.executescript(
+                """
+                CREATE INDEX IF NOT EXISTS idx_events_tenant_run_sequence
+                ON events(tenant_id, run_id, sequence);
+
+                CREATE INDEX IF NOT EXISTS idx_candidates_tenant_created
+                ON candidates(tenant_id, created_at);
+
+                CREATE INDEX IF NOT EXISTS idx_runs_tenant_created
+                ON runs(tenant_id, created_at);
+
+                CREATE INDEX IF NOT EXISTS idx_lessons_tenant_candidate
+                ON lessons(tenant_id, candidate_id, exam_pack_id, competency, active);
+                """
+            )
+
+    @staticmethod
+    def _ensure_tenant_columns(conn: sqlite3.Connection) -> None:
+        for table in ("candidates", "runs", "events", "scorecards", "lessons"):
+            columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+            if "tenant_id" not in columns:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local'"
+                )
 
     def health(self) -> dict[str, Any]:
         self.init()
@@ -168,37 +193,46 @@ class SQLiteStore(DataStore):
         }
 
     def save_candidate(self, candidate: CandidateConfig) -> CandidateConfig:
+        candidate = _with_current_tenant(candidate)
         with self.connect() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO candidates (id, payload, created_at)
-                VALUES (?, ?, ?)
+                INSERT OR REPLACE INTO candidates (id, tenant_id, payload, created_at)
+                VALUES (?, ?, ?, ?)
                 """,
-                (candidate.id, _dump_model(candidate), candidate.created_at.isoformat()),
+                (candidate.id, candidate.tenant_id, _dump_model(candidate), candidate.created_at.isoformat()),
             )
         return candidate
 
     def list_candidates(self) -> list[CandidateConfig]:
         with self.connect() as conn:
-            rows = conn.execute("SELECT payload FROM candidates ORDER BY created_at DESC").fetchall()
-        return [CandidateConfig.model_validate_json(row["payload"]) for row in rows]
+            rows = conn.execute(
+                "SELECT payload FROM candidates WHERE tenant_id = ? ORDER BY created_at DESC",
+                (current_tenant_id(),),
+            ).fetchall()
+        return [_load_candidate(row["payload"]) for row in rows]
 
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
         with self.connect() as conn:
-            row = conn.execute("SELECT payload FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
-        return CandidateConfig.model_validate_json(row["payload"]) if row else None
+            row = conn.execute(
+                "SELECT payload FROM candidates WHERE id = ? AND tenant_id = ?",
+                (candidate_id, current_tenant_id()),
+            ).fetchone()
+        return _load_candidate(row["payload"]) if row else None
 
     def save_run(self, run: RunRecord) -> RunRecord:
+        run = _with_current_tenant(run)
         run.updated_at = utc_now()
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO runs
-                (id, candidate_id, exam_pack_id, status, payload, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id, tenant_id, candidate_id, exam_pack_id, status, payload, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.id,
+                    run.tenant_id,
                     run.candidate_id,
                     run.exam_pack_id,
                     run.status,
@@ -211,68 +245,86 @@ class SQLiteStore(DataStore):
 
     def list_runs(self) -> list[RunRecord]:
         with self.connect() as conn:
-            rows = conn.execute("SELECT payload FROM runs ORDER BY created_at DESC").fetchall()
+            rows = conn.execute(
+                "SELECT payload FROM runs WHERE tenant_id = ? ORDER BY created_at DESC",
+                (current_tenant_id(),),
+            ).fetchall()
         return [RunRecord.model_validate_json(row["payload"]) for row in rows]
 
     def get_run(self, run_id: str) -> RunRecord | None:
         with self.connect() as conn:
-            row = conn.execute("SELECT payload FROM runs WHERE id = ?", (run_id,)).fetchone()
+            row = conn.execute(
+                "SELECT payload FROM runs WHERE id = ? AND tenant_id = ?",
+                (run_id, current_tenant_id()),
+            ).fetchone()
         return RunRecord.model_validate_json(row["payload"]) if row else None
 
     def save_event(self, event: RunEvent) -> RunEvent:
+        event = _with_current_tenant(event)
         with self.connect() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO events (span_id, run_id, sequence, payload)
-                VALUES (?, ?, ?, ?)
+                INSERT OR REPLACE INTO events (span_id, tenant_id, run_id, sequence, payload)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (event.span_id, event.run_id, event.sequence, _dump_model(event)),
+                (event.span_id, event.tenant_id, event.run_id, event.sequence, _dump_model(event)),
             )
         return event
 
     def list_events(self, run_id: str) -> list[RunEvent]:
         with self.connect() as conn:
             rows = conn.execute(
-                "SELECT payload FROM events WHERE run_id = ? ORDER BY sequence ASC",
-                (run_id,),
+                "SELECT payload FROM events WHERE run_id = ? AND tenant_id = ? ORDER BY sequence ASC",
+                (run_id, current_tenant_id()),
             ).fetchall()
         return [RunEvent.model_validate_json(row["payload"]) for row in rows]
 
     def save_scorecard(self, scorecard: Scorecard) -> Scorecard:
+        scorecard = _with_current_tenant(scorecard)
         with self.connect() as conn:
             conn.execute(
                 """
-                INSERT OR REPLACE INTO scorecards (run_id, payload, created_at)
-                VALUES (?, ?, ?)
+                INSERT OR REPLACE INTO scorecards (run_id, tenant_id, payload, created_at)
+                VALUES (?, ?, ?, ?)
                 """,
-                (scorecard.run_id, _dump_model(scorecard), scorecard.created_at.isoformat()),
+                (
+                    scorecard.run_id,
+                    scorecard.tenant_id,
+                    _dump_model(scorecard),
+                    scorecard.created_at.isoformat(),
+                ),
             )
         return scorecard
 
     def get_scorecard(self, run_id: str) -> Scorecard | None:
         with self.connect() as conn:
-            row = conn.execute("SELECT payload FROM scorecards WHERE run_id = ?", (run_id,)).fetchone()
+            row = conn.execute(
+                "SELECT payload FROM scorecards WHERE run_id = ? AND tenant_id = ?",
+                (run_id, current_tenant_id()),
+            ).fetchone()
         return Scorecard.model_validate_json(row["payload"]) if row else None
 
     def list_runs_for_candidate(self, candidate_id: str) -> list[RunRecord]:
         with self.connect() as conn:
             rows = conn.execute(
-                "SELECT payload FROM runs WHERE candidate_id = ? ORDER BY created_at ASC",
-                (candidate_id,),
+                "SELECT payload FROM runs WHERE candidate_id = ? AND tenant_id = ? ORDER BY created_at ASC",
+                (candidate_id, current_tenant_id()),
             ).fetchall()
         return [RunRecord.model_validate_json(row["payload"]) for row in rows]
 
     def save_lesson(self, lesson: DiagnosticLesson) -> DiagnosticLesson:
+        lesson = _with_current_tenant(lesson)
         lesson.updated_at = utc_now()
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO lessons
-                (id, candidate_id, exam_pack_id, competency, active, payload, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, tenant_id, candidate_id, exam_pack_id, competency, active, payload, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     lesson.id,
+                    lesson.tenant_id,
                     lesson.candidate_id,
                     lesson.exam_pack_id,
                     lesson.competency,
@@ -291,8 +343,8 @@ class SQLiteStore(DataStore):
         competencies: list[str] | None = None,
         active_only: bool = True,
     ) -> list[DiagnosticLesson]:
-        clauses = ["candidate_id = ?"]
-        params: list[Any] = [candidate_id]
+        clauses = ["tenant_id = ?", "candidate_id = ?"]
+        params: list[Any] = [current_tenant_id(), candidate_id]
         if exam_pack_id is not None:
             clauses.append("exam_pack_id = ?")
             params.append(exam_pack_id)
@@ -309,7 +361,10 @@ class SQLiteStore(DataStore):
 
     def get_lesson(self, lesson_id: str) -> DiagnosticLesson | None:
         with self.connect() as conn:
-            row = conn.execute("SELECT payload FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
+            row = conn.execute(
+                "SELECT payload FROM lessons WHERE id = ? AND tenant_id = ?",
+                (lesson_id, current_tenant_id()),
+            ).fetchone()
         return DiagnosticLesson.model_validate_json(row["payload"]) if row else None
 
 
@@ -350,10 +405,12 @@ class SupabaseStore(DataStore):
         }
 
     def save_candidate(self, candidate: CandidateConfig) -> CandidateConfig:
+        candidate = _with_current_tenant(candidate)
         self._upsert(
             self.tables["candidates"],
             {
                 "id": candidate.id,
+                "tenant_id": candidate.tenant_id,
                 "payload": candidate.model_dump(mode="json"),
                 "created_at": candidate.created_at.isoformat(),
             },
@@ -363,18 +420,20 @@ class SupabaseStore(DataStore):
 
     def list_candidates(self) -> list[CandidateConfig]:
         rows = self._select(self.tables["candidates"], order="created_at", desc=True)
-        return [CandidateConfig.model_validate(row["payload"]) for row in rows]
+        return [_load_candidate(row["payload"]) for row in rows]
 
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
         row = self._single(self.tables["candidates"], "id", candidate_id)
-        return CandidateConfig.model_validate(row["payload"]) if row else None
+        return _load_candidate(row["payload"]) if row else None
 
     def save_run(self, run: RunRecord) -> RunRecord:
+        run = _with_current_tenant(run)
         run.updated_at = utc_now()
         self._upsert(
             self.tables["runs"],
             {
                 "id": run.id,
+                "tenant_id": run.tenant_id,
                 "candidate_id": run.candidate_id,
                 "exam_pack_id": run.exam_pack_id,
                 "status": run.status,
@@ -395,10 +454,12 @@ class SupabaseStore(DataStore):
         return RunRecord.model_validate(row["payload"]) if row else None
 
     def save_event(self, event: RunEvent) -> RunEvent:
+        event = _with_current_tenant(event)
         self._upsert(
             self.tables["events"],
             {
                 "span_id": event.span_id,
+                "tenant_id": event.tenant_id,
                 "run_id": event.run_id,
                 "sequence": event.sequence,
                 "payload": event.model_dump(mode="json"),
@@ -413,16 +474,19 @@ class SupabaseStore(DataStore):
             self.client.table(self.tables["events"])
             .select("payload")
             .eq("run_id", run_id)
+            .eq("tenant_id", current_tenant_id())
             .order("sequence")
             .execute()
         )
         return [RunEvent.model_validate(row["payload"]) for row in response.data or []]
 
     def save_scorecard(self, scorecard: Scorecard) -> Scorecard:
+        scorecard = _with_current_tenant(scorecard)
         self._upsert(
             self.tables["scorecards"],
             {
                 "run_id": scorecard.run_id,
+                "tenant_id": scorecard.tenant_id,
                 "payload": scorecard.model_dump(mode="json"),
                 "created_at": scorecard.created_at.isoformat(),
             },
@@ -439,17 +503,20 @@ class SupabaseStore(DataStore):
             self.client.table(self.tables["runs"])
             .select("payload")
             .eq("candidate_id", candidate_id)
+            .eq("tenant_id", current_tenant_id())
             .order("created_at")
             .execute()
         )
         return [RunRecord.model_validate(row["payload"]) for row in response.data or []]
 
     def save_lesson(self, lesson: DiagnosticLesson) -> DiagnosticLesson:
+        lesson = _with_current_tenant(lesson)
         lesson.updated_at = utc_now()
         self._upsert(
             self.tables["lessons"],
             {
                 "id": lesson.id,
+                "tenant_id": lesson.tenant_id,
                 "candidate_id": lesson.candidate_id,
                 "exam_pack_id": lesson.exam_pack_id,
                 "competency": lesson.competency,
@@ -472,6 +539,7 @@ class SupabaseStore(DataStore):
         query = (
             self.client.table(self.tables["lessons"])
             .select("payload")
+            .eq("tenant_id", current_tenant_id())
             .eq("candidate_id", candidate_id)
         )
         if exam_pack_id is not None:
@@ -491,11 +559,24 @@ class SupabaseStore(DataStore):
         self.client.table(table).upsert(row, on_conflict=on_conflict).execute()
 
     def _select(self, table: str, order: str, desc: bool = False) -> list[dict[str, Any]]:
-        response = self.client.table(table).select("payload").order(order, desc=desc).execute()
+        response = (
+            self.client.table(table)
+            .select("payload")
+            .eq("tenant_id", current_tenant_id())
+            .order(order, desc=desc)
+            .execute()
+        )
         return response.data or []
 
     def _single(self, table: str, column: str, value: str) -> dict[str, Any] | None:
-        response = self.client.table(table).select("payload").eq(column, value).limit(1).execute()
+        response = (
+            self.client.table(table)
+            .select("payload")
+            .eq(column, value)
+            .eq("tenant_id", current_tenant_id())
+            .limit(1)
+            .execute()
+        )
         rows = response.data or []
         return rows[0] if rows else None
 
@@ -611,6 +692,7 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
     return {
         "schema": "interviu.proof_bundle.v1",
         "product": "Interviu",
+        "tenant_id": run.tenant_id,
         "generated_at": utc_now().isoformat(),
         "run": run.model_dump(mode="json"),
         "candidate": candidate.model_dump(mode="json") if candidate else None,
@@ -652,3 +734,27 @@ def reset_store_cache() -> None:
 
 def _dump_model(model: Any) -> str:
     return json.dumps(model.model_dump(mode="json"), ensure_ascii=True)
+
+
+def _with_current_tenant(model: Any) -> Any:
+    tenant_id = current_tenant_id()
+    if getattr(model, "tenant_id", None) == tenant_id:
+        return model
+    return model.model_copy(update={"tenant_id": tenant_id})
+
+
+def _load_candidate(payload: str | dict[str, Any]) -> CandidateConfig:
+    try:
+        if isinstance(payload, str):
+            return CandidateConfig.model_validate_json(payload)
+        return CandidateConfig.model_validate(payload)
+    except Exception:
+        data = json.loads(payload) if isinstance(payload, str) else dict(payload)
+        endpoint = data.get("endpoint_url")
+        metadata = dict(data.get("metadata") or {})
+        if endpoint:
+            metadata["quarantined_endpoint_url"] = endpoint
+            metadata["quarantine_reason"] = "Endpoint failed current SSRF validation on load."
+            data["endpoint_url"] = None
+        data["metadata"] = metadata
+        return CandidateConfig.model_validate(data)

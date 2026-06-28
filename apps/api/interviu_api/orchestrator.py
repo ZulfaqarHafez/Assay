@@ -72,7 +72,7 @@ class RunOrchestrator:
                     "role_scope_applied",
                     analyze_job_scope(run.job_scope).model_dump(mode="json"),
                 )
-            seen_scores, held_scores, panel_results, lesson_feedback = await self._run_items(
+            seen_scores, held_scores, panel_results, lesson_feedback, judge_results = await self._run_items(
                 run,
                 adapter,
                 candidate,
@@ -80,7 +80,15 @@ class RunOrchestrator:
                 lessons,
             )
 
-            scorecard = self._assemble_scorecard(run, candidate, pack.simulator_model, seen_scores, held_scores, panel_results)
+            scorecard = self._assemble_scorecard(
+                run,
+                candidate,
+                pack.simulator_model,
+                seen_scores,
+                held_scores,
+                panel_results,
+                judge_results,
+            )
             scorecard.lessons_applied = applied_lesson_ids
             scorecard.prior_run_id = prior_run_id
             # If the live key was rate-limited, the run answered deterministically;
@@ -292,11 +300,18 @@ class RunOrchestrator:
         candidate: CandidateConfig,
         pack: Any,
         lessons: list[str],
-    ) -> tuple[dict[str, list[float]], dict[str, list[float]], list[dict[str, float]], dict[str, str]]:
+    ) -> tuple[
+        dict[str, list[float]],
+        dict[str, list[float]],
+        list[dict[str, float]],
+        dict[str, str],
+        list[dict[str, Any]],
+    ]:
         seen_scores: dict[str, list[float]] = defaultdict(list)
         held_scores: dict[str, list[float]] = defaultdict(list)
         panel_results: list[dict[str, float]] = []
         lesson_feedback: dict[str, str] = {}
+        judge_results: list[dict[str, Any]] = []
 
         for item in pack.items:
             for trial in range(1, run.k + 1):
@@ -321,6 +336,8 @@ class RunOrchestrator:
                 )
                 seen_scores[item.competency].append(seen_grade.score)
                 panel_results.append(seen_grade.panel_scores)
+                if seen_grade.judge is not None:
+                    judge_results.append(seen_grade.judge)
                 if not seen_grade.passed:
                     lesson = f"{item.competency}: {seen_grade.feedback}"
                     lessons.append(lesson)
@@ -353,6 +370,8 @@ class RunOrchestrator:
                 )
                 held_scores[item.competency].append(held_grade.score)
                 panel_results.append(held_grade.panel_scores)
+                if held_grade.judge is not None:
+                    judge_results.append(held_grade.judge)
                 if not held_grade.passed:
                     lesson = f"{item.competency}: {held_grade.feedback}"
                     lessons.append(lesson)
@@ -365,7 +384,7 @@ class RunOrchestrator:
                         {"competency": item.competency, "lesson": lesson},
                     )
 
-        return seen_scores, held_scores, panel_results, lesson_feedback
+        return seen_scores, held_scores, panel_results, lesson_feedback, judge_results
 
     def _grade(
         self,
@@ -396,6 +415,7 @@ class RunOrchestrator:
                 "missed_checks": result.missed_checks,
                 "forbidden_hits": result.forbidden_hits,
                 "feedback": result.feedback,
+                "judge": result.judge,
             },
         )
         return result
@@ -408,6 +428,7 @@ class RunOrchestrator:
         seen_scores: dict[str, list[float]],
         held_scores: dict[str, list[float]],
         panel_results: list[dict[str, float]],
+        judge_results: list[dict[str, Any]] | None = None,
     ) -> Scorecard:
         seen_mean = {key: round(mean(values), 3) for key, values in seen_scores.items()}
         held_mean = {key: round(mean(values), 3) for key, values in held_scores.items()}
@@ -445,6 +466,7 @@ class RunOrchestrator:
             failures.append(f"TraceRazor TAS {trace_audit.tas_score:.1f} is below {run.tas_threshold:.1f}")
 
         certified = not failures
+        judge_summary = self._judge_summary(judge_results or [])
         return Scorecard(
             run_id=run.id,
             certified=certified,
@@ -463,7 +485,26 @@ class RunOrchestrator:
             grader_disagreement=panel_disagreement(panel_results),
             trace_audit=trace_audit,
             failure_reasons=failures,
+            semantic_judge_used=judge_summary["used"] > 0,
+            semantic_judge_summary=judge_summary,
         )
+
+    @staticmethod
+    def _judge_summary(judge_results: list[dict[str, Any]]) -> dict[str, Any]:
+        used = [judge for judge in judge_results if judge.get("status") == "used"]
+        rescued = sum(len(judge.get("rescued_check_ids") or []) for judge in used)
+        models = sorted({str(judge.get("model")) for judge in judge_results if judge.get("model")})
+        statuses: dict[str, int] = {}
+        for judge in judge_results:
+            status = str(judge.get("status") or "unknown")
+            statuses[status] = statuses.get(status, 0) + 1
+        return {
+            "attempted": len(judge_results),
+            "used": len(used),
+            "rescued_checks": rescued,
+            "models": models,
+            "statuses": statuses,
+        }
 
     def _event(
         self,
@@ -597,7 +638,7 @@ class RunOrchestrator:
         role_block = ("\n" + "\n".join(role_lines)) if role_lines else ""
         return (
             f"Candidate {candidate.name} is being evaluated by Interviu.\n"
-            "Answer as an HR screening agent. Use retained lessons when relevant."
+            "Answer as the candidate agent under evaluation. Use retained lessons when relevant."
             f"{role_block}\n"
             f"Retained lessons:\n{lesson_block or '- none yet'}"
         )

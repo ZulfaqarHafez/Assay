@@ -49,6 +49,47 @@ def test_correct_header_allows_access_when_key_configured(monkeypatch: pytest.Mo
         assert response.status_code == 200
 
 
+def test_tenant_header_required_in_hosted_tenant_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INTERVIU_API_KEYS", "secret-key-1")
+    monkeypatch.setenv("INTERVIU_REQUIRE_TENANT", "1")
+    with TestClient(app) as client:
+        missing = client.get("/candidates", headers={"X-API-Key": "secret-key-1"})
+        present = client.get(
+            "/candidates",
+            headers={"X-API-Key": "secret-key-1", "X-Interviu-Tenant": "tenant_a"},
+        )
+
+    assert missing.status_code == 400
+    assert present.status_code == 200
+
+
+def test_tenant_scope_isolates_candidates_and_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INTERVIU_API_KEYS", "secret-key-1")
+    monkeypatch.setenv("INTERVIU_REQUIRE_TENANT", "1")
+    headers_a = {"X-API-Key": "secret-key-1", "X-Interviu-Tenant": "tenant_a"}
+    headers_b = {"X-API-Key": "secret-key-1", "X-Interviu-Tenant": "tenant_b"}
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/candidates",
+            headers=headers_a,
+            json={"name": "Tenant A Candidate", "adapter_type": "mock"},
+        ).json()
+        run = client.post(
+            "/runs",
+            headers=headers_a,
+            json={"candidate_id": created["id"]},
+        ).json()
+        visible_a = client.get("/candidates", headers=headers_a).json()
+        visible_b = client.get("/candidates", headers=headers_b).json()
+        cross_run = client.get(f"/runs/{run['id']}", headers=headers_b)
+
+    assert created["tenant_id"] == "tenant_a"
+    assert any(candidate["id"] == created["id"] for candidate in visible_a)
+    assert all(candidate["id"] != created["id"] for candidate in visible_b)
+    assert cross_run.status_code == 404
+
+
 def test_health_is_exempt_from_auth(monkeypatch: pytest.MonkeyPatch) -> None:
     """Health probes must never require a key, even when auth is configured."""
 

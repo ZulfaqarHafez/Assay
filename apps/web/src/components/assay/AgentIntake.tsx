@@ -26,11 +26,12 @@ export type AgentIntakeProps = {
   liveMode: boolean;
   submitting: boolean;
   templates: AgentTemplate[];
-  onRun: (markdown: string) => void;
+  onRun: (markdown: string, roleScopeText?: string) => void;
 };
 
 export function AgentIntake({ examPackName, liveMode, submitting, templates, onRun }: AgentIntakeProps) {
   const [markdown, setMarkdown] = React.useState("");
+  const [roleScopeText, setRoleScopeText] = React.useState("");
   const [dragging, setDragging] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -132,7 +133,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <button
           type="button"
           className="assay-run-button"
-          onClick={() => onRun(markdown)}
+          onClick={() => onRun(markdown, roleScopeText)}
           disabled={!hasContent || submitting}
         >
           <FlaskConical size={18} />
@@ -159,6 +160,18 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           )}
         </span>
       </div>
+
+      <details className="assay-advanced">
+        <summary>Role scope</summary>
+        <textarea
+          className="assay-scope-textarea"
+          value={roleScopeText}
+          onChange={(event) => setRoleScopeText(event.target.value)}
+          placeholder="Support triage for refunds, account privacy, and escalation policy."
+          aria-label="Role scope"
+          rows={3}
+        />
+      </details>
         </div>
         <aside className="assay-hero-aside">
           <HeroScanCard />

@@ -305,6 +305,7 @@ def test_exam_pack_export_and_import() -> None:
         file_export = client.post("/exam-packs/unit-pack-v1/export-files").json()
 
     assert any(pack["id"] == "hr-injection-v1" for pack in packs)
+    assert any(pack["id"] == "support-triage-v1" for pack in packs)
     assert export["schema"] == "interviu.exam_pack.v1"
     assert export["pack"]["id"] == "hr-injection-v1"
     assert len(export["huggingface"]["files"]["data/interviu_exam_rows.jsonl"]) == 6
@@ -319,3 +320,75 @@ def test_exam_pack_export_and_import() -> None:
     assert [row["split"] for row in rows] == ["seen", "held_out"]
     assert Path(file_export["files"]["README.md"]).exists()
     assert Path(file_export["files"]["interviu-exam-pack.json"]).exists()
+
+
+def test_exam_pack_import_file_validates_schema() -> None:
+    content = json.dumps(
+        {
+            "schema": "interviu.exam_pack.v1",
+            "id": "uploaded-pack-v1",
+            "name": "Uploaded Pack",
+            "simulator_model": "uploaded-sim-v1",
+            "items": [
+                {
+                    "id": "uploaded-001",
+                    "competency": "support_policy",
+                    "prompt": "Seen support prompt.",
+                    "held_out_prompt": "Held-out support prompt.",
+                    "rubric": "Follow policy.",
+                    "expected_checks": [
+                        {
+                            "id": "policy",
+                            "label": "Uses policy",
+                            "keywords": ["policy"],
+                            "forbidden": [],
+                            "weight": 1,
+                        }
+                    ],
+                    "difficulty": "intro",
+                }
+            ],
+        }
+    )
+    bad_content = json.dumps(
+        {
+            "id": "bad-pack-v1",
+            "name": "Bad Pack",
+            "simulator_model": "bad-sim-v1",
+            "items": [
+                {
+                    "id": "dup",
+                    "competency": "support_policy",
+                    "prompt": "Seen prompt.",
+                    "held_out_prompt": "",
+                    "rubric": "Follow policy.",
+                    "expected_checks": [],
+                    "difficulty": "intro",
+                },
+                {
+                    "id": "dup",
+                    "competency": "support_policy",
+                    "prompt": "Seen prompt.",
+                    "held_out_prompt": "Held prompt.",
+                    "rubric": "Follow policy.",
+                    "expected_checks": [],
+                    "difficulty": "intro",
+                },
+            ],
+        }
+    )
+
+    with TestClient(app) as client:
+        imported = client.post(
+            "/exam-packs/import-file",
+            json={"format": "json", "content": content},
+        )
+        bad = client.post(
+            "/exam-packs/import-file",
+            json={"format": "json", "content": bad_content},
+        )
+
+    assert imported.status_code == 200
+    assert imported.json()["id"] == "uploaded-pack-v1"
+    assert bad.status_code == 400
+    assert "Invalid exam pack schema" in bad.json()["detail"]

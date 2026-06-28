@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from interviu_api.database import SupabaseStore, database_backend_name, reset_store_cache, store
@@ -96,6 +98,31 @@ def test_sqlite_lessons_round_trip() -> None:
     save_lesson(lesson)
     assert list_lessons_for_candidate("cand_1", active_only=True) == []
     assert len(list_lessons_for_candidate("cand_1", active_only=False)) == 1
+
+
+def test_sqlite_quarantines_legacy_private_http_candidate() -> None:
+    from interviu_api.database import init_db, list_candidates
+
+    init_db()
+    store_instance = store()
+    payload = {
+        "id": "cand_legacy",
+        "tenant_id": "local",
+        "name": "Legacy HTTP",
+        "adapter_type": "http",
+        "endpoint_url": "http://127.0.0.1:8080/ask",
+        "metadata": {},
+    }
+    with store_instance.connect() as conn:
+        conn.execute(
+            "INSERT INTO candidates (id, tenant_id, payload, created_at) VALUES (?, ?, ?, ?)",
+            ("cand_legacy", "local", json.dumps(payload), "2026-01-01T00:00:00+00:00"),
+        )
+
+    candidate = next(item for item in list_candidates() if item.id == "cand_legacy")
+
+    assert candidate.endpoint_url is None
+    assert candidate.metadata["quarantined_endpoint_url"] == "http://127.0.0.1:8080/ask"
 
 
 def test_supabase_store_persists_lessons(monkeypatch: pytest.MonkeyPatch) -> None:

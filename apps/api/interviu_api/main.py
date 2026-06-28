@@ -28,7 +28,13 @@ from .progress import candidate_progress, lesson_library, run_comparison
 from .agent_intake import detect_agent_facts
 from .agent_refinery import agent_spec_payload
 from .agent_research import load_local_env, research_agent_spec, resolve_openai_key
-from .exam_packs import exam_pack_export, get_exam_pack, list_exam_packs, register_exam_pack
+from .exam_packs import (
+    exam_pack_export,
+    get_exam_pack,
+    list_exam_packs,
+    parse_exam_pack_content,
+    register_exam_pack,
+)
 from .exports import write_agent_spec_files, write_exam_pack_files
 from .models import CandidateConfig, ExamPack, JobScope, RunCreate, RunRecord
 from .orchestrator import RunOrchestrator
@@ -48,6 +54,7 @@ from .logging_config import (
 )
 from .rate_limit import RATE_LIMIT_ENABLED_ENV, limiter, rate_limit, rate_limiting_enabled
 from .security import API_KEYS_ENV, configured_api_keys, require_api_key
+from .tenancy import REQUIRE_TENANT_ENV, require_tenant, tenant_required
 
 _MAX_ROLE_SCOPE_CHARS = 8000
 _MAX_AGENT_MD_CHARS = 20000
@@ -97,12 +104,19 @@ class AgentMarkdownRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ExamPackImportFileRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=300_000)
+    format: Literal["json", "yaml", "yml"] = "json"
+
+    model_config = ConfigDict(extra="forbid")
+
+
 # Auth is applied globally (opt-in via INTERVIU_API_KEYS). /health and
 # /health/database are exempted below so probes never require a key.
 app = FastAPI(
     title="Interviu API",
     version="0.1.0",
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_api_key), Depends(require_tenant)],
 )
 
 app.state.limiter = limiter
@@ -145,6 +159,8 @@ def production_hardening_findings() -> list[str]:
     findings: list[str] = []
     if not configured_api_keys():
         findings.append(f"{API_KEYS_ENV} is unset")
+    if tenant_required() and not configured_api_keys():
+        findings.append(f"{REQUIRE_TENANT_ENV} requires API keys")
     if not os.environ.get("INTERVIU_CORS_ORIGINS", "").strip():
         findings.append("INTERVIU_CORS_ORIGINS is unset")
     if not rate_limiting_enabled():
@@ -230,6 +246,16 @@ def exam_packs() -> list[dict]:
 @app.post("/exam-packs/import")
 def import_exam_pack(pack: ExamPack) -> dict:
     try:
+        registered = register_exam_pack(pack)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return registered.model_dump(mode="json")
+
+
+@app.post("/exam-packs/import-file")
+def import_exam_pack_file(request: ExamPackImportFileRequest) -> dict:
+    try:
+        pack = parse_exam_pack_content(request.content, request.format)
         registered = register_exam_pack(pack)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

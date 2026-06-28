@@ -56,6 +56,16 @@ python -m pytest apps/api/tests
 npm --workspace apps/web run test
 ```
 
+Run Assay from CI or a local shell:
+
+```powershell
+$env:PYTHONPATH="apps/api"
+python -m interviu_api.cli run --agent-md .\agent.md --pack hr-v1 --pass-threshold 0.8
+```
+
+The reusable GitHub Action lives at `.github/actions/assay` and uploads the
+scorecard JSON, proof bundle JSON, and Markdown verdict summary.
+
 ## Product Surface
 
 - The first screen is the evaluation workspace with run setup, score, proof, a candidate room, and the agent panel.
@@ -63,6 +73,8 @@ npm --workspace apps/web run test
 - A free-text job scope can be turned into decision logic: role analysis deterministically maps job-scope phrases to competencies, expected checks, and recommended sub-agents with a traceable evidence chain, picks the exam pack, and flags protected-attribute language as compliance notes only (never requirements). Available via `POST /role-analysis`, `GET /runs/{run_id}/role-analysis`, and embedded in the proof bundle; details are in [docs/role-intelligence.md](docs/role-intelligence.md).
 - The pixel sprite system now spans four sheets — the `dojo` character sheet plus dedicated `judging`, `lessons`, and `runs` state sheets that drive the roster judge verdict, lessons-library growth, and recent-runs status glyphs — and is extended or regenerated through the `sprite-generator` skill; details are in [docs/sprites.md](docs/sprites.md).
 - Advanced details such as exam export, previous runs, connector probes, and trace spans stay collapsed until needed.
+- Suite import/export, role analysis, HTTP candidates, research, and server-only
+  connector surfaces are tracked in [docs/backend-surfaces.md](docs/backend-surfaces.md).
 - HTTP candidates can be registered from the web app and use the same examiner, scoring, persistence, and TraceRazor path as mock candidates.
 - The Agent Refinery turns each run into a refined `AGENTS.md` for the candidate plus grounded sub-agent recommendations; details are in [docs/agent-refinery.md](docs/agent-refinery.md).
 - An optional OpenAI layer can research "what this agent should be" on demand — fast (grounded in the run) or deep (web search with cited sources) — via `POST /runs/{run_id}/agent-spec/research?mode=fast|deep`. The key is read server-side only from `OPENAI_API_KEY`/`openai_key` in a git-ignored root `.env`/`env`; with no key the feature reports `unavailable` and the rest of Interviu keeps working offline.
@@ -75,6 +87,9 @@ npm --workspace apps/web run test
 
 - Certificates are internal capability bars, not legal or standards compliance claims.
 - Mock grading is deterministic development mode.
+- Optional semantic judge assistance is disabled by default; set
+  `INTERVIU_LLM_JUDGE_ENABLED=1` server-side to allow bounded LLM paraphrase
+  rescue evidence in scorecards.
 - Supabase is supported as the server database when server-only env vars are configured; SQLite remains the local fallback.
 - MCP, OpenAI-compatible, Hugging Face, Vercel agent-browser, and local-command connectors are registry-ready, with active adapters added incrementally.
 

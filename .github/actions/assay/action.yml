@@ -1,0 +1,144 @@
+name: Interviu Assay
+description: Run an agent.md through Interviu Assay and publish proof artifacts.
+
+inputs:
+  agent-md:
+    description: Path to the agent.md or AGENTS.md file under test.
+    required: true
+  pack:
+    description: Interviu exam pack id.
+    required: false
+    default: hr-v1
+  pack-file:
+    description: Optional JSON/YAML exam pack file to register before the run.
+    required: false
+    default: ""
+  pass-threshold:
+    description: Minimum mean competency score.
+    required: false
+    default: "0.8"
+  k:
+    description: Trials per seen/held-out item.
+    required: false
+    default: "1"
+  require-trace:
+    description: Whether TraceRazor audit availability should block the check.
+    required: false
+    default: "false"
+  python-version:
+    description: Python version used for the Assay runner.
+    required: false
+    default: "3.11"
+  json-out:
+    description: Scorecard JSON output path.
+    required: false
+    default: artifacts/assay/scorecard.json
+  proof-out:
+    description: Proof bundle JSON output path.
+    required: false
+    default: artifacts/assay/proof-bundle.json
+  summary-out:
+    description: Markdown summary output path.
+    required: false
+    default: artifacts/assay/summary.md
+  comment-pr:
+    description: Comment the markdown summary on pull requests.
+    required: false
+    default: "true"
+
+outputs:
+  exit-code:
+    description: The assay CLI exit code.
+    value: ${{ steps.assay.outputs.exit_code }}
+  scorecard-json:
+    description: Path to the scorecard JSON artifact.
+    value: ${{ inputs.json-out }}
+  proof-bundle-json:
+    description: Path to the proof bundle JSON artifact.
+    value: ${{ inputs.proof-out }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: apps/api/requirements-dev.txt
+
+    - name: Install Interviu API dependencies
+      shell: bash
+      run: python -m pip install -r apps/api/requirements-dev.txt
+
+    - name: Run assay
+      id: assay
+      shell: bash
+      run: |
+        set +e
+        args=(
+          run
+          --agent-md "${{ inputs.agent-md }}"
+          --pack "${{ inputs.pack }}"
+          --pass-threshold "${{ inputs.pass-threshold }}"
+          --k "${{ inputs.k }}"
+          --json-out "${{ inputs.json-out }}"
+          --proof-out "${{ inputs.proof-out }}"
+          --summary-out "${{ inputs.summary-out }}"
+        )
+        if [ -n "${{ inputs.pack-file }}" ]; then
+          args+=(--pack-file "${{ inputs.pack-file }}")
+        fi
+        if [ "${{ inputs.require-trace }}" = "true" ]; then
+          args+=(--require-trace)
+        fi
+        PYTHONPATH=apps/api python -m interviu_api.cli "${args[@]}"
+        status=$?
+        echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: Add summary to job
+      if: always()
+      shell: bash
+      run: |
+        if [ -f "${{ inputs.summary-out }}" ]; then
+          cat "${{ inputs.summary-out }}" >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Upload proof artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: interviu-assay
+        path: |
+          ${{ inputs.json-out }}
+          ${{ inputs.proof-out }}
+          ${{ inputs.summary-out }}
+        if-no-files-found: warn
+
+    - name: Comment verdict on pull request
+      if: always() && inputs.comment-pr == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require("fs");
+          const path = "${{ inputs.summary-out }}";
+          if (!fs.existsSync(path)) return;
+          const body = [
+            "<!-- interviu-assay-comment -->",
+            fs.readFileSync(path, "utf8")
+          ].join("\n");
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const comments = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 });
+          const existing = comments.data.find((comment) => comment.body && comment.body.includes("<!-- interviu-assay-comment -->"));
+          if (existing) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          }
+
+    - name: Fail when assay failed
+      if: steps.assay.outputs.exit_code != '0'
+      shell: bash
+      run: exit "${{ steps.assay.outputs.exit_code }}"

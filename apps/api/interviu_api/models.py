@@ -8,6 +8,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from .network_guard import validate_http_candidate_endpoint
+from .tenancy import current_tenant_id
 
 AgentReadiness = Literal["ready", "refine", "needs_subagents"]
 SubAgentPriority = Literal["recommended", "optional"]
@@ -19,6 +20,12 @@ _MAX_CANDIDATE_REASONING_CHARS = 20000
 _MAX_TOOL_CALLS = 20
 _MAX_TOOL_PARAM_BYTES = 8192
 _MAX_TOOL_TEXT_CHARS = 8000
+_TENANT_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$"
+_PUBLIC_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$"
+_MAX_PROMPT_CHARS = 4000
+_MAX_RUBRIC_CHARS = 2000
+_MAX_CHECK_TEXT_CHARS = 240
+_MAX_CHECK_TERMS = 30
 
 
 def utc_now() -> datetime:
@@ -62,6 +69,7 @@ class TokenCounts(BaseModel):
 
 class CandidateConfig(BaseModel):
     id: str = Field(default_factory=lambda: f"cand_{uuid4().hex[:10]}")
+    tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
     name: str
     adapter_type: AdapterType = "mock"
     endpoint_url: HttpUrl | None = None
@@ -162,6 +170,7 @@ class RunCreate(BaseModel):
 
 class RunRecord(BaseModel):
     id: str = Field(default_factory=lambda: f"run_{uuid4().hex[:10]}")
+    tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
     candidate_id: str
     exam_pack_id: str = "hr-v1"
     status: RunStatus = "created"
@@ -176,29 +185,45 @@ class RunRecord(BaseModel):
 
 
 class ExpectedCheck(BaseModel):
-    id: str
-    label: str
-    keywords: list[str] = Field(default_factory=list)
-    forbidden: list[str] = Field(default_factory=list)
-    weight: float = 1.0
+    id: str = Field(pattern=_PUBLIC_ID_PATTERN)
+    label: str = Field(min_length=1, max_length=_MAX_CHECK_TEXT_CHARS)
+    keywords: list[str] = Field(default_factory=list, max_length=_MAX_CHECK_TERMS)
+    forbidden: list[str] = Field(default_factory=list, max_length=_MAX_CHECK_TERMS)
+    weight: float = Field(default=1.0, gt=0, le=5.0)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("keywords", "forbidden")
+    @classmethod
+    def _clean_terms(cls, value: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in value if item and item.strip()]
+        for item in cleaned:
+            if len(item) > _MAX_CHECK_TEXT_CHARS:
+                raise ValueError(f"check term exceeds {_MAX_CHECK_TEXT_CHARS} characters")
+        return cleaned
 
 
 class ExamItem(BaseModel):
-    id: str
-    competency: str
-    prompt: str
-    held_out_prompt: str
-    rubric: str
-    expected_checks: list[ExpectedCheck]
+    id: str = Field(pattern=_PUBLIC_ID_PATTERN)
+    competency: str = Field(min_length=1, max_length=120, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$")
+    prompt: str = Field(min_length=1, max_length=_MAX_PROMPT_CHARS)
+    held_out_prompt: str = Field(min_length=1, max_length=_MAX_PROMPT_CHARS)
+    rubric: str = Field(min_length=1, max_length=_MAX_RUBRIC_CHARS)
+    expected_checks: list[ExpectedCheck] = Field(min_length=1, max_length=20)
     difficulty: Literal["intro", "standard", "adversarial"] = "standard"
     counterfactual_group: str | None = None
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class ExamPack(BaseModel):
-    id: str
-    name: str
-    simulator_model: str
-    items: list[ExamItem]
+    schema_: Literal["interviu.exam_pack.v1"] = Field(default="interviu.exam_pack.v1", alias="schema")
+    id: str = Field(pattern=_PUBLIC_ID_PATTERN)
+    name: str = Field(min_length=1, max_length=160)
+    simulator_model: str = Field(min_length=1, max_length=120)
+    items: list[ExamItem] = Field(min_length=1, max_length=100)
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True, extra="forbid")
 
 
 class ExamPackFileExport(BaseModel):
@@ -211,6 +236,7 @@ class ExamPackFileExport(BaseModel):
 
 class RunEvent(BaseModel):
     span_id: str = Field(default_factory=lambda: f"span_{uuid4().hex[:12]}")
+    tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
     run_id: str
     sequence: int
     actor: Literal["candidate", "examiner", "grader_panel", "lesson_library", "trace_auditor", "system"]
@@ -257,6 +283,7 @@ class ProductReview(BaseModel):
 
 
 class Scorecard(BaseModel):
+    tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
     run_id: str
     status: RunStatus = "completed"
     certified: bool
@@ -278,6 +305,8 @@ class Scorecard(BaseModel):
     # fell back to deterministic demo answers, so the verdict is illustrative.
     degraded: bool = False
     degraded_reason: str | None = None
+    semantic_judge_used: bool = False
+    semantic_judge_summary: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)
 
 
@@ -390,6 +419,7 @@ class DiagnosticLesson(BaseModel):
     """
 
     id: str = Field(default_factory=lambda: f"lesson_{uuid4().hex[:10]}")
+    tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
     candidate_id: str
     exam_pack_id: str
     competency: str

@@ -1,5 +1,6 @@
 export type CandidateConfig = {
   id: string;
+  tenant_id?: string;
   name: string;
   adapter_type: "mock" | "http" | "openai-compatible" | "local-command" | "mcp-server";
   endpoint_url?: string | null;
@@ -35,6 +36,7 @@ export type AgentIntakeResponse = {
 };
 
 export type ExamPack = {
+  schema?: "interviu.exam_pack.v1";
   id: string;
   name: string;
   simulator_model: string;
@@ -95,6 +97,7 @@ export type ConnectorProbe = {
 
 export type RunRecord = {
   id: string;
+  tenant_id?: string;
   candidate_id: string;
   exam_pack_id: string;
   status: "created" | "running" | "completed" | "failed";
@@ -115,6 +118,7 @@ export type RunRecord = {
 
 export type RunEvent = {
   span_id: string;
+  tenant_id?: string;
   run_id: string;
   sequence: number;
   actor: "candidate" | "examiner" | "grader_panel" | "lesson_library" | "trace_auditor" | "system";
@@ -141,6 +145,7 @@ export type TraceAuditSummary = {
 };
 
 export type Scorecard = {
+  tenant_id?: string;
   run_id: string;
   status: string;
   certified: boolean;
@@ -161,6 +166,8 @@ export type Scorecard = {
   prior_run_id: string | null;
   degraded?: boolean;
   degraded_reason?: string | null;
+  semantic_judge_used?: boolean;
+  semantic_judge_summary?: Record<string, unknown>;
 };
 
 export type ProductReviewer = {
@@ -309,6 +316,7 @@ export type DatabaseHealth = {
 export type ProofBundle = {
   schema: "interviu.proof_bundle.v1";
   product: "Interviu";
+  tenant_id?: string;
   generated_at: string;
   run: RunRecord;
   candidate: CandidateConfig | null;
