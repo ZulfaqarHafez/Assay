@@ -1,1 +1,0 @@
-{"image":"/sprites/interviu-judging-sprites.svg","tileSize":32,"columns":9,"sprites":{"graderDeliberating":{"x":0,"y":0},"graderApprove":{"x":1,"y":0},"graderReject":{"x":2,"y":0},"gavel":{"x":3,"y":0},"scoreMeterLow":{"x":4,"y":0},"scoreMeterMid":{"x":5,"y":0},"scoreMeterHigh":{"x":6,"y":0},"graderDisagreement":{"x":7,"y":0},"verdictSealed":{"x":8,"y":0}}}

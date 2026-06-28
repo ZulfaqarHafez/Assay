@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { CheckCircle2, AlertTriangle, FlaskConical } from "lucide-react";
 import { useCandidates, useRuns } from "@/lib/queries";
+import { AgentArt } from "@/components/ui/EmptyArt";
 import type { RunRecord } from "@/types/interviu";
 
 /**
@@ -30,10 +31,17 @@ export default function AgentsPage() {
       </header>
 
       {candidatesQuery.isLoading ? (
-        <div className="ws-empty">Loading agents…</div>
+        <div className="ws-table-wrap" aria-hidden="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div className="ws-skeleton-row" key={i} />
+          ))}
+        </div>
       ) : rows.length === 0 ? (
-        <div className="ws-empty">
-          No agents yet. <Link href="/" className="lp-link" style={{ display: "inline" }}>Test an agent</Link> to register one.
+        <div className="ws-empty-rich">
+          <AgentArt size={104} className="ws-empty-art" />
+          <h2>No agents yet</h2>
+          <p>Every agent definition you test gets registered here, with its reliability rolled up across runs.</p>
+          <Link href="/" className="ws-empty-cta"><FlaskConical size={15} /> Test an agent</Link>
         </div>
       ) : (
         <div className="ws-table-wrap">

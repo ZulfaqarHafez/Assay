@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, AlertTriangle, Circle, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Circle, Loader2, FlaskConical } from "lucide-react";
 import { useRuns, useCandidates } from "@/lib/queries";
+import { VialArt } from "@/components/ui/EmptyArt";
 import type { RunRecord } from "@/types/interviu";
 
 /**
@@ -32,10 +33,17 @@ export default function ExperimentsPage() {
       </header>
 
       {runsQuery.isLoading ? (
-        <div className="ws-empty">Loading runs…</div>
+        <div className="ws-table-wrap" aria-hidden="true">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div className="ws-skeleton-row" key={i} />
+          ))}
+        </div>
       ) : runs.length === 0 ? (
-        <div className="ws-empty">
-          No runs yet. <Link href="/" className="lp-link" style={{ display: "inline" }}>Test an agent</Link> to create your first experiment.
+        <div className="ws-empty-rich">
+          <VialArt size={104} className="ws-empty-art" />
+          <h2>No experiments yet</h2>
+          <p>Run an agent through an adversarial suite and every scored, certified run will land here — ready to compare and inspect.</p>
+          <Link href="/" className="ws-empty-cta"><FlaskConical size={15} /> Run your first test</Link>
         </div>
       ) : (
         <div className="ws-table-wrap">

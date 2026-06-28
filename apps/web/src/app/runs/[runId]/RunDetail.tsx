@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQueryState, parseAsStringEnum } from "nuqs";
-import { ArrowLeft, PanelRightOpen, Save } from "lucide-react";
+import { ArrowLeft, PanelRightOpen, Save, CheckCircle2, AlertTriangle } from "lucide-react";
 import {
   useProofBundle,
   useReviewers,
@@ -15,6 +15,7 @@ import CompetencyRadar from "@/components/scorecard/CompetencyRadar";
 import RunComparison from "@/components/scorecard/RunComparison";
 import ProgressTrend from "@/components/progress/ProgressTrend";
 import DiagnosticLibrary from "@/components/library/DiagnosticLibrary";
+import Sprite from "@/components/ui/Sprite";
 
 /**
  * Shareable run-detail view. Reuses the same composition pieces as the console
@@ -43,25 +44,27 @@ export default function RunDetail({ runId }: { runId: string }) {
   const candidateId = proofBundle?.candidate?.id ?? scorecard?.run_id ?? null;
   const candidateName = proofBundle?.candidate?.name ?? "Candidate";
 
-  const isLoading = proofBundleQuery.isLoading && !proofBundle;
-  const loadError = proofBundleQuery.error;
+  // Gate the analytics on the fast scorecard, not the ~8s proof-bundle assembly.
+  const isLoading = scorecardQuery.isLoading && !scorecard;
+  const loadError = scorecardQuery.error ?? proofBundleQuery.error;
+  const passEntries = scorecard ? Object.values(scorecard.pass_at_k ?? {}) : [];
+  const passCount = passEntries.filter(Boolean).length;
+  const passTotal = passEntries.length;
+  const certified = scorecard?.certified ?? false;
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px", display: "grid", gap: 18 }}>
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "grid", gap: 4 }}>
           <Link
-            href="/"
+            href="/runs"
             style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-fg-muted)" }}
           >
-            <ArrowLeft size={14} /> Back to console
+            <ArrowLeft size={14} /> Experiments
           </Link>
           <h1 style={{ margin: 0, fontSize: 22, color: "var(--color-fg)" }}>{candidateName}</h1>
           <p style={{ margin: 0, fontSize: 13, color: "var(--color-fg-muted)" }}>
             Run <code>{runId}</code>
-            {scorecard ? ` · ${scorecard.certified ? "Passed" : "Needs review"}` : ""}
-            {scorecard ? ` · TraceRazor ${traceScoreLabel(scorecard)}` : ""}
-            {scorecard ? ` · transfer gap ${maxTransferGap(scorecard).toFixed(2)}` : ""}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -83,8 +86,24 @@ export default function RunDetail({ runId }: { runId: string }) {
         </div>
       </header>
 
+      {scorecard ? (
+        <div className={`rd-verdict ${certified ? "ship" : "hold"}`}>
+          <span className="rd-verdict-badge">
+            {certified ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+            {certified ? "Ship" : "Needs review"}
+          </span>
+          <span className="rd-verdict-score">
+            <strong>{passCount}/{passTotal}</strong> competencies passed
+          </span>
+          <span className="rd-verdict-meta">TraceRazor {traceScoreLabel(scorecard)} · transfer gap {maxTransferGap(scorecard).toFixed(2)}</span>
+        </div>
+      ) : null}
+
       {isLoading ? (
-        <p style={{ color: "var(--color-fg-muted)", fontSize: 13 }}>Loading run…</p>
+        <div className="learning-surfaces">
+          <div className="ws-skeleton-card" />
+          <div className="ws-skeleton-card" />
+        </div>
       ) : loadError ? (
         <p role="alert" style={{ color: "var(--color-fail)", fontSize: 13 }}>
           Could not load run {runId}: {errorMessage(loadError)}
@@ -104,7 +123,7 @@ export default function RunDetail({ runId }: { runId: string }) {
           <div className="reviewer-list">
             {reviewers.reviewers.map((reviewer) => (
               <div className={`reviewer-row ${reviewer.status}`} key={reviewer.key}>
-                <span className={`sprite-sheet mini-sprite sprite-${reviewer.sprite}`} aria-hidden="true" />
+                <Sprite name={reviewer.sprite} aria-hidden="true" />
                 <span>
                   <strong>{reviewer.name}</strong>
                   <small>{reviewer.summary}</small>

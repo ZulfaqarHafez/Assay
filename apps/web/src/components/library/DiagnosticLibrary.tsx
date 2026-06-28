@@ -61,7 +61,7 @@ export function DiagnosticLibrary({ candidateId, examPackId, lessons: provided, 
       <Card className={className} aria-busy="true">
         {header}
         <CardBody>
-          <p style={{ color: "var(--color-fg-muted)", fontSize: 13, margin: 0 }}>Loading lessons…</p>
+          <div className="ws-skeleton-row" style={{ height: 72 }} aria-hidden="true" />
         </CardBody>
       </Card>
     );

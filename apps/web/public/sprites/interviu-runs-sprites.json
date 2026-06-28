@@ -1,1 +1,0 @@
-{"image":"/sprites/interviu-runs-sprites.svg","tileSize":32,"columns":9,"sprites":{"runQueued":{"x":0,"y":0},"runRunning":{"x":1,"y":0},"seenTrial":{"x":2,"y":0},"heldOutTrial":{"x":3,"y":0},"passBead":{"x":4,"y":0},"failBead":{"x":5,"y":0},"runComplete":{"x":6,"y":0},"currentPhaseMarker":{"x":7,"y":0},"timelineNode":{"x":8,"y":0}}}

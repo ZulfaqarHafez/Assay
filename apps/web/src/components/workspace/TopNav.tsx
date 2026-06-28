@@ -3,8 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Search } from "lucide-react";
 import BrandMark from "@/components/ui/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CommandPalette } from "@/components/workspace/CommandPalette";
 
 /**
  * Persistent platform nav across the whole workspace: the front door ("Test an
@@ -43,8 +45,21 @@ export function TopNav() {
             </Link>
           ))}
         </nav>
-        <ThemeToggle />
+        <div className="ws-nav-actions">
+          <button
+            type="button"
+            className="ws-cmdk-hint"
+            onClick={() => window.dispatchEvent(new Event("assay:open-cmdk"))}
+            aria-label="Open command palette"
+          >
+            <Search size={13} />
+            <span>Search</span>
+            <kbd>⌘K</kbd>
+          </button>
+          <ThemeToggle />
+        </div>
       </div>
+      <CommandPalette />
     </header>
   );
 }

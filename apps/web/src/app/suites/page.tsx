@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useExamPacks } from "@/lib/queries";
+import { ProbeArrayArt } from "@/components/ui/EmptyArt";
 
 /**
  * Test suites — the adversarial datasets agents are run against. Each pack is a
@@ -22,9 +23,17 @@ export default function SuitesPage() {
       </header>
 
       {packsQuery.isLoading ? (
-        <div className="ws-empty">Loading suites…</div>
+        <div className="ws-grid" aria-hidden="true">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div className="ws-skeleton-card" key={i} />
+          ))}
+        </div>
       ) : packs.length === 0 ? (
-        <div className="ws-empty">No suites registered.</div>
+        <div className="ws-empty-rich">
+          <ProbeArrayArt size={104} className="ws-empty-art" />
+          <h2>No suites registered</h2>
+          <p>Test suites are versioned datasets of adversarial probes. Once registered, each suite and its coverage shows up here.</p>
+        </div>
       ) : (
         <div className="ws-grid">
           {packs.map((pack) => {

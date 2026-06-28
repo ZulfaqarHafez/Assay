@@ -57,7 +57,7 @@ export function ProgressTrend({ candidateId, progress: provided, className }: Pr
   const error = !provided ? query.error : null;
 
   const headerSprite = (
-    <Sprite name="timeline-node" sheet="runs" aria-hidden="true" />
+    <Sprite name="learning-trend" aria-hidden="true" />
   );
 
   if (isLoading) {
@@ -70,7 +70,7 @@ export function ProgressTrend({ candidateId, progress: provided, className }: Pr
           </span>
         </CardHeader>
         <CardBody>
-          <p style={{ color: "var(--color-fg-muted)", fontSize: 13, margin: 0 }}>Loading progress…</p>
+          <div className="ws-skeleton-row" style={{ height: 72 }} aria-hidden="true" />
         </CardBody>
       </Card>
     );
