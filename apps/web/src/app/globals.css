@@ -2401,6 +2401,18 @@ pre {
 }
 .assay-text-button:hover { color: var(--color-fg); }
 
+/* Portable rerun/improve controls (RunDetail header, agent home). */
+.agent-run-controls { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.agent-run-controls.running {
+  color: var(--color-fg-muted);
+  font-size: 13px;
+  gap: 7px;
+}
+.command-button.accent { color: var(--color-accent); border-color: var(--color-accent); }
+.agent-run-error { color: var(--color-fail); font-size: 12.5px; }
+.agent-delta.up { color: var(--color-pass); }
+.agent-delta.down { color: var(--color-fail); }
+
 .assay-demo-note { font-size: 12.5px; margin: 0 0 12px; }
 .assay-verdict-comparison { margin-top: 4px; }
 

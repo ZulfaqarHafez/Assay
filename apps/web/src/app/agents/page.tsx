@@ -60,8 +60,8 @@ export default function AgentsPage() {
               {rows.map((r) => (
                 <tr key={r.name}>
                   <td>
-                    {r.latestRunId ? (
-                      <Link href={`/runs/${r.latestRunId}`} className="ws-cell-strong">{r.name}</Link>
+                    {r.candidateId ? (
+                      <Link href={`/agents/${r.candidateId}`} className="ws-cell-strong">{r.name}</Link>
                     ) : (
                       <span className="ws-cell-strong">{r.name}</span>
                     )}
@@ -80,7 +80,7 @@ export default function AgentsPage() {
                   </td>
                   <td className="num">{r.score ?? "—"}</td>
                   <td className="num">
-                    {r.latestRunId ? <Link href={`/runs/${r.latestRunId}`} className="ws-row-link">Open →</Link> : null}
+                    {r.candidateId ? <Link href={`/agents/${r.candidateId}`} className="ws-row-link">Open →</Link> : null}
                   </td>
                 </tr>
               ))}
@@ -94,6 +94,7 @@ export default function AgentsPage() {
 
 type AgentRow = {
   name: string;
+  candidateId: string | null;
   adapter: string;
   runCount: number;
   latestRunId: string | null;
@@ -115,14 +116,14 @@ function groupAgents(
   // Seed from candidates so agents with zero runs still appear.
   for (const c of candidates) {
     if (!map.has(c.name)) {
-      map.set(c.name, { name: c.name, adapter: c.adapter_type, runCount: 0, latestRunId: null, verdict: null, score: null });
+      map.set(c.name, { name: c.name, candidateId: c.id, adapter: c.adapter_type, runCount: 0, latestRunId: null, verdict: null, score: null });
     }
   }
   // Runs come newest-first; the first run we see per name is the latest.
   for (const run of runs) {
     const name = idToName[run.candidate_id];
     if (!name) continue;
-    const row = map.get(name) ?? { name, adapter: idToAdapter[run.candidate_id] ?? "—", runCount: 0, latestRunId: null, verdict: null, score: null };
+    const row = map.get(name) ?? { name, candidateId: run.candidate_id, adapter: idToAdapter[run.candidate_id] ?? "—", runCount: 0, latestRunId: null, verdict: null, score: null };
     row.runCount += 1;
     if (!row.latestRunId) {
       row.latestRunId = run.id;

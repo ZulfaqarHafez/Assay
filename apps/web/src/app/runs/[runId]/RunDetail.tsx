@@ -15,6 +15,8 @@ import CompetencyRadar from "@/components/scorecard/CompetencyRadar";
 import RunComparison from "@/components/scorecard/RunComparison";
 import ProgressTrend from "@/components/progress/ProgressTrend";
 import DiagnosticLibrary from "@/components/library/DiagnosticLibrary";
+import AgentRunControls from "@/components/assay/AgentRunControls";
+import ImprovePanel from "@/components/assay/ImprovePanel";
 import Sprite from "@/components/ui/Sprite";
 
 /**
@@ -43,6 +45,8 @@ export default function RunDetail({ runId }: { runId: string }) {
   const agentSpec = proofBundle?.agent_spec ?? null;
   const candidateId = proofBundle?.candidate?.id ?? proofBundle?.run?.candidate_id ?? null;
   const candidateName = proofBundle?.candidate?.name ?? "Candidate";
+  // Rerun against the originally-requested pack (a tailored run repoints exam_pack_id at a gen-* id).
+  const rerunPackId = proofBundle?.run?.source_pack_id ?? proofBundle?.run?.exam_pack_id ?? "hr-v1";
 
   // Gate the analytics on the fast scorecard, not the ~8s proof-bundle assembly.
   const isLoading = scorecardQuery.isLoading && !scorecard;
@@ -68,6 +72,12 @@ export default function RunDetail({ runId }: { runId: string }) {
           </p>
         </div>
         <div className="rd-actions">
+          <AgentRunControls
+            candidateId={candidateId}
+            agentName={candidateName}
+            examPackId={rerunPackId}
+            refinedMarkdown={agentSpec?.agent_markdown}
+          />
           <button
             type="button"
             className="command-button"
@@ -98,6 +108,8 @@ export default function RunDetail({ runId }: { runId: string }) {
           <span className="rd-verdict-meta">TraceRazor {traceScoreLabel(scorecard)} · transfer gap {maxTransferGap(scorecard).toFixed(2)}</span>
         </div>
       ) : null}
+
+      {agentSpec ? <ImprovePanel agentSpec={agentSpec} agentName={candidateName} /> : null}
 
       {isLoading ? (
         <div className="learning-surfaces">
