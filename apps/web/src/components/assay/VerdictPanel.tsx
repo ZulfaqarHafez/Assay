@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, AlertTriangle, XCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard, Sparkles } from "lucide-react";
 import { deriveVerdict, deriveFixes, deriveCategoryScores, type FixSeverity } from "@/lib/assay";
 import RoleBriefCard from "@/components/assay/RoleBriefCard";
+import ImprovePanel from "@/components/assay/ImprovePanel";
+import RunComparison from "@/components/scorecard/RunComparison";
 import type { Scorecard, AgentSpec } from "@/types/assay";
 
 /**
@@ -20,6 +22,8 @@ export type VerdictPanelProps = {
   agentName: string;
   onViewTrace: () => void;
   onTestAnother: () => void;
+  onRerun: () => void;
+  onTestImproved: () => void;
 };
 
 const VERDICT_ICON = {
@@ -34,11 +38,20 @@ const SEVERITY_LABEL: Record<FixSeverity, string> = {
   info: "Note"
 };
 
-export function VerdictPanel({ scorecard, agentSpec, agentName, onViewTrace, onTestAnother }: VerdictPanelProps) {
+export function VerdictPanel({
+  scorecard,
+  agentSpec,
+  agentName,
+  onViewTrace,
+  onTestAnother,
+  onRerun,
+  onTestImproved
+}: VerdictPanelProps) {
   const verdict = React.useMemo(() => deriveVerdict(scorecard), [scorecard]);
   const fixes = React.useMemo(() => deriveFixes(scorecard, agentSpec), [scorecard, agentSpec]);
   const categories = React.useMemo(() => deriveCategoryScores(scorecard), [scorecard]);
   const Icon = VERDICT_ICON[verdict.verdict];
+  const canTestImproved = Boolean(agentSpec?.agent_markdown?.trim());
 
   return (
     <section className="assay-verdict" aria-label="Verdict">
@@ -84,18 +97,32 @@ export function VerdictPanel({ scorecard, agentSpec, agentName, onViewTrace, onT
       </div>
 
       <div className="assay-verdict-actions">
-        <button type="button" className="assay-run-button slim" onClick={onTestAnother}>
-          <RotateCcw size={16} /> Test another agent
+        <button type="button" className="assay-run-button slim" onClick={onRerun}>
+          <RotateCcw size={16} /> Rerun same agent
         </button>
+        {canTestImproved && (
+          <button type="button" className="assay-run-button slim ghost-accent" onClick={onTestImproved}>
+            <Sparkles size={16} /> Test improved version
+          </button>
+        )}
         <Link href={`/runs/${scorecard.run_id}`} className="assay-ghost-button">
           <LayoutDashboard size={16} /> Open in workspace
         </Link>
         <button type="button" className="assay-ghost-button" onClick={onViewTrace}>
           <PanelRightOpen size={16} /> Open full trace
         </button>
+        <button type="button" className="assay-text-button" onClick={onTestAnother}>
+          Test a different agent
+        </button>
       </div>
 
+      {scorecard.prior_run_id && (
+        <RunComparison runId={scorecard.run_id} className="assay-verdict-comparison" />
+      )}
+
       <RoleBriefCard runId={scorecard.run_id} />
+
+      <ImprovePanel agentSpec={agentSpec} agentName={agentName} />
 
       <div className="assay-fixes">
         <h3 className="assay-section-label">What to fix</h3>
@@ -114,6 +141,12 @@ export function VerdictPanel({ scorecard, agentSpec, agentName, onViewTrace, onT
 
       <div className="assay-categories">
         <h3 className="assay-section-label">By capability</h3>
+        {scorecard.degraded && (
+          <p className="assay-muted assay-demo-note">
+            Demo scores — graded from deterministic stand-in answers shaped by your agent.md, not a
+            live model run. Add OpenAI billing for a live evaluation.
+          </p>
+        )}
         <div className="assay-category-grid">
           {categories.map((category) => (
             <div key={category.competency} className={`assay-category ${category.passed ? "pass" : "fail"}`}>

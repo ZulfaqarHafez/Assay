@@ -371,13 +371,21 @@ class SQLiteStore(DataStore):
 class SupabaseStore(DataStore):
     name = "supabase"
 
-    tables = {
+    DEFAULT_TABLES = {
         "candidates": "assay_candidates",
         "runs": "assay_runs",
         "events": "assay_events",
         "scorecards": "assay_scorecards",
         "lessons": "assay_lessons",
     }
+    LEGACY_TABLES = {
+        "candidates": "interviu_candidates",
+        "runs": "interviu_runs",
+        "events": "interviu_events",
+        "scorecards": "interviu_scorecards",
+        "lessons": "interviu_lessons",
+    }
+    CORE_TABLES = ("candidates", "runs", "events", "scorecards")
 
     def __init__(self, url: str, key: str):
         try:
@@ -385,138 +393,169 @@ class SupabaseStore(DataStore):
         except ImportError as exc:
             raise RuntimeError("Install the 'supabase' Python package to use Supabase persistence.") from exc
         self.client = create_client(url, key)
+        self.tables = dict(self.DEFAULT_TABLES)
+        self._available_tables: set[str] = set(self.tables)
+        self._tenant_tables: set[str] = set(self.tables)
+        self._schema_checked = False
 
     def init(self) -> None:
         # Supabase schema is managed by supabase/migrations/*.sql.
+        self._ensure_schema()
         self.client.table(self.tables["candidates"]).select("id").limit(1).execute()
 
     def health(self) -> dict[str, Any]:
+        self._ensure_schema()
         table_status: dict[str, Any] = {}
         for logical_name, table in self.tables.items():
+            if logical_name not in self._available_tables:
+                table_status[logical_name] = {
+                    "table": table,
+                    "available": False,
+                    "count": None,
+                }
+                continue
             response = self.client.table(table).select("*", count="exact").limit(1).execute()
             table_status[logical_name] = {
                 "table": table,
+                "available": True,
+                "tenant_scoped": logical_name in self._tenant_tables,
                 "count": response.count,
             }
         return {
             "backend": self.name,
-            "ok": True,
+            "ok": all(table in self._available_tables for table in self.CORE_TABLES),
+            "schema": "legacy-interviu" if self.tables["candidates"].startswith("interviu_") else "assay",
             "tables": table_status,
         }
 
     def save_candidate(self, candidate: CandidateConfig) -> CandidateConfig:
+        self._ensure_schema()
         candidate = _with_current_tenant(candidate)
         self._upsert(
-            self.tables["candidates"],
-            {
+            "candidates",
+            self._with_tenant(
+                "candidates",
+                {
                 "id": candidate.id,
-                "tenant_id": candidate.tenant_id,
                 "payload": candidate.model_dump(mode="json"),
                 "created_at": candidate.created_at.isoformat(),
-            },
+                },
+                candidate.tenant_id,
+            ),
             "id",
         )
         return candidate
 
     def list_candidates(self) -> list[CandidateConfig]:
-        rows = self._select(self.tables["candidates"], order="created_at", desc=True)
+        self._ensure_schema()
+        rows = self._select("candidates", order="created_at", desc=True)
         return [_load_candidate(row["payload"]) for row in rows]
 
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
-        row = self._single(self.tables["candidates"], "id", candidate_id)
+        self._ensure_schema()
+        row = self._single("candidates", "id", candidate_id)
         return _load_candidate(row["payload"]) if row else None
 
     def save_run(self, run: RunRecord) -> RunRecord:
+        self._ensure_schema()
         run = _with_current_tenant(run)
         run.updated_at = utc_now()
         self._upsert(
-            self.tables["runs"],
-            {
+            "runs",
+            self._with_tenant(
+                "runs",
+                {
                 "id": run.id,
-                "tenant_id": run.tenant_id,
                 "candidate_id": run.candidate_id,
                 "exam_pack_id": run.exam_pack_id,
                 "status": run.status,
                 "payload": run.model_dump(mode="json"),
                 "created_at": run.created_at.isoformat(),
                 "updated_at": run.updated_at.isoformat(),
-            },
+                },
+                run.tenant_id,
+            ),
             "id",
         )
         return run
 
     def list_runs(self) -> list[RunRecord]:
-        rows = self._select(self.tables["runs"], order="created_at", desc=True)
+        self._ensure_schema()
+        rows = self._select("runs", order="created_at", desc=True)
         return [RunRecord.model_validate(row["payload"]) for row in rows]
 
     def get_run(self, run_id: str) -> RunRecord | None:
-        row = self._single(self.tables["runs"], "id", run_id)
+        self._ensure_schema()
+        row = self._single("runs", "id", run_id)
         return RunRecord.model_validate(row["payload"]) if row else None
 
     def save_event(self, event: RunEvent) -> RunEvent:
+        self._ensure_schema()
         event = _with_current_tenant(event)
         self._upsert(
-            self.tables["events"],
-            {
+            "events",
+            self._with_tenant(
+                "events",
+                {
                 "span_id": event.span_id,
-                "tenant_id": event.tenant_id,
                 "run_id": event.run_id,
                 "sequence": event.sequence,
                 "payload": event.model_dump(mode="json"),
                 "created_at": event.started_at.isoformat(),
-            },
+                },
+                event.tenant_id,
+            ),
             "span_id",
         )
         return event
 
     def list_events(self, run_id: str) -> list[RunEvent]:
-        response = (
-            self.client.table(self.tables["events"])
-            .select("payload")
-            .eq("run_id", run_id)
-            .eq("tenant_id", current_tenant_id())
-            .order("sequence")
-            .execute()
-        )
+        self._ensure_schema()
+        query = self.client.table(self.tables["events"]).select("payload").eq("run_id", run_id)
+        response = self._with_tenant_filter("events", query).order("sequence").execute()
         return [RunEvent.model_validate(row["payload"]) for row in response.data or []]
 
     def save_scorecard(self, scorecard: Scorecard) -> Scorecard:
+        self._ensure_schema()
         scorecard = _with_current_tenant(scorecard)
         self._upsert(
-            self.tables["scorecards"],
-            {
+            "scorecards",
+            self._with_tenant(
+                "scorecards",
+                {
                 "run_id": scorecard.run_id,
-                "tenant_id": scorecard.tenant_id,
                 "payload": scorecard.model_dump(mode="json"),
                 "created_at": scorecard.created_at.isoformat(),
-            },
+                },
+                scorecard.tenant_id,
+            ),
             "run_id",
         )
         return scorecard
 
     def get_scorecard(self, run_id: str) -> Scorecard | None:
-        row = self._single(self.tables["scorecards"], "run_id", run_id)
+        self._ensure_schema()
+        row = self._single("scorecards", "run_id", run_id)
         return Scorecard.model_validate(row["payload"]) if row else None
 
     def list_runs_for_candidate(self, candidate_id: str) -> list[RunRecord]:
-        response = (
-            self.client.table(self.tables["runs"])
-            .select("payload")
-            .eq("candidate_id", candidate_id)
-            .eq("tenant_id", current_tenant_id())
-            .order("created_at")
-            .execute()
-        )
+        self._ensure_schema()
+        query = self.client.table(self.tables["runs"]).select("payload").eq("candidate_id", candidate_id)
+        response = self._with_tenant_filter("runs", query).order("created_at").execute()
         return [RunRecord.model_validate(row["payload"]) for row in response.data or []]
 
     def save_lesson(self, lesson: DiagnosticLesson) -> DiagnosticLesson:
+        self._ensure_schema()
+        if "lessons" not in self._available_tables:
+            return lesson
         lesson = _with_current_tenant(lesson)
         lesson.updated_at = utc_now()
         self._upsert(
-            self.tables["lessons"],
-            {
+            "lessons",
+            self._with_tenant(
+                "lessons",
+                {
                 "id": lesson.id,
-                "tenant_id": lesson.tenant_id,
                 "candidate_id": lesson.candidate_id,
                 "exam_pack_id": lesson.exam_pack_id,
                 "competency": lesson.competency,
@@ -524,7 +563,9 @@ class SupabaseStore(DataStore):
                 "payload": lesson.model_dump(mode="json"),
                 "created_at": lesson.created_at.isoformat(),
                 "updated_at": lesson.updated_at.isoformat(),
-            },
+                },
+                lesson.tenant_id,
+            ),
             "id",
         )
         return lesson
@@ -536,12 +577,11 @@ class SupabaseStore(DataStore):
         competencies: list[str] | None = None,
         active_only: bool = True,
     ) -> list[DiagnosticLesson]:
-        query = (
-            self.client.table(self.tables["lessons"])
-            .select("payload")
-            .eq("tenant_id", current_tenant_id())
-            .eq("candidate_id", candidate_id)
-        )
+        self._ensure_schema()
+        if "lessons" not in self._available_tables:
+            return []
+        query = self.client.table(self.tables["lessons"]).select("payload").eq("candidate_id", candidate_id)
+        query = self._with_tenant_filter("lessons", query)
         if exam_pack_id is not None:
             query = query.eq("exam_pack_id", exam_pack_id)
         if competencies:
@@ -552,33 +592,72 @@ class SupabaseStore(DataStore):
         return [DiagnosticLesson.model_validate(row["payload"]) for row in response.data or []]
 
     def get_lesson(self, lesson_id: str) -> DiagnosticLesson | None:
-        row = self._single(self.tables["lessons"], "id", lesson_id)
+        self._ensure_schema()
+        if "lessons" not in self._available_tables:
+            return None
+        row = self._single("lessons", "id", lesson_id)
         return DiagnosticLesson.model_validate(row["payload"]) if row else None
 
-    def _upsert(self, table: str, row: dict[str, Any], on_conflict: str) -> None:
-        self.client.table(table).upsert(row, on_conflict=on_conflict).execute()
+    def _upsert(self, logical_table: str, row: dict[str, Any], on_conflict: str) -> None:
+        if logical_table not in self._available_tables:
+            return
+        self.client.table(self.tables[logical_table]).upsert(row, on_conflict=on_conflict).execute()
 
-    def _select(self, table: str, order: str, desc: bool = False) -> list[dict[str, Any]]:
-        response = (
-            self.client.table(table)
-            .select("payload")
-            .eq("tenant_id", current_tenant_id())
-            .order(order, desc=desc)
-            .execute()
-        )
+    def _select(self, logical_table: str, order: str, desc: bool = False) -> list[dict[str, Any]]:
+        if logical_table not in self._available_tables:
+            return []
+        query = self.client.table(self.tables[logical_table]).select("payload")
+        response = self._with_tenant_filter(logical_table, query).order(order, desc=desc).execute()
         return response.data or []
 
-    def _single(self, table: str, column: str, value: str) -> dict[str, Any] | None:
-        response = (
-            self.client.table(table)
-            .select("payload")
-            .eq(column, value)
-            .eq("tenant_id", current_tenant_id())
-            .limit(1)
-            .execute()
-        )
+    def _single(self, logical_table: str, column: str, value: str) -> dict[str, Any] | None:
+        if logical_table not in self._available_tables:
+            return None
+        query = self.client.table(self.tables[logical_table]).select("payload").eq(column, value)
+        response = self._with_tenant_filter(logical_table, query).limit(1).execute()
         rows = response.data or []
         return rows[0] if rows else None
+
+    def _with_tenant_filter(self, logical_table: str, query: Any) -> Any:
+        if logical_table in self._tenant_tables:
+            query = query.eq("tenant_id", current_tenant_id())
+        return query
+
+    def _with_tenant(self, logical_table: str, row: dict[str, Any], tenant_id: str) -> dict[str, Any]:
+        if logical_table in self._tenant_tables:
+            return {**row, "tenant_id": tenant_id}
+        return row
+
+    def _ensure_schema(self) -> None:
+        if self._schema_checked:
+            return
+        configured_prefix = os.environ.get("ASSAY_SUPABASE_TABLE_PREFIX", "").strip().lower()
+        if configured_prefix == "interviu":
+            self.tables = dict(self.LEGACY_TABLES)
+        elif configured_prefix == "assay":
+            self.tables = dict(self.DEFAULT_TABLES)
+        elif not self._can_select(self.tables["candidates"], "id"):
+            legacy_candidates = self.LEGACY_TABLES["candidates"]
+            if self._can_select(legacy_candidates, "id"):
+                self.tables = dict(self.LEGACY_TABLES)
+        self._available_tables = {
+            logical_name
+            for logical_name, table in self.tables.items()
+            if self._can_select(table, "payload")
+        }
+        self._tenant_tables = {
+            logical_name
+            for logical_name, table in self.tables.items()
+            if logical_name in self._available_tables and self._can_select(table, "tenant_id")
+        }
+        self._schema_checked = True
+
+    def _can_select(self, table: str, column: str) -> bool:
+        try:
+            self.client.table(table).select(column).limit(1).execute()
+        except Exception:
+            return False
+        return True
 
 
 def db_path() -> Path:

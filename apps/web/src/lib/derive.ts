@@ -76,6 +76,21 @@ export function downloadJson(filename: string, payload: unknown) {
   URL.revokeObjectURL(url);
 }
 
+export function downloadText(filename: string, text: string, mime = "text/markdown") {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function errorMessage(exc: unknown) {
   return exc instanceof Error ? exc.message : "Unknown Assay error";
 }

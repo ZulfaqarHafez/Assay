@@ -41,7 +41,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   const reviewers = reviewersQuery.data ?? proofBundle?.product_review ?? null;
   const events = trace?.events ?? proofBundle?.events ?? [];
   const agentSpec = proofBundle?.agent_spec ?? null;
-  const candidateId = proofBundle?.candidate?.id ?? scorecard?.run_id ?? null;
+  const candidateId = proofBundle?.candidate?.id ?? proofBundle?.run?.candidate_id ?? null;
   const candidateName = proofBundle?.candidate?.name ?? "Candidate";
 
   // Gate the analytics on the fast scorecard, not the ~8s proof-bundle assembly.

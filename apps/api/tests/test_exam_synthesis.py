@@ -188,3 +188,68 @@ def test_tailored_run_registers_pack_and_marks_status(monkeypatch) -> None:
     listed = next(r for r in runs_list if r["id"] == run["id"])
     assert listed["qualification_status"] == "tailored"
     assert listed["role_brief_summary"]
+
+
+def _enable_tailored(monkeypatch) -> None:
+    monkeypatch.setenv("ASSAY_TAILORED_EXAMS_ENABLED", "1")
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+    monkeypatch.setattr(role_qualification, "resolve_openai_key", lambda: "k")
+    monkeypatch.setattr(role_qualification, "_run_brief", lambda key, mode, agent_md, job_scope: {
+        "model": "gpt-4.1",
+        "role_summary": "A support triage agent.",
+        "should_do": [], "must_not_do": [], "risks": [],
+        "competencies": [
+            {"key": "refund_policy", "label": "Refund policy", "why": "issues refunds",
+             "difficulty": "standard", "seed_keywords": ["policy", "escalate"], "forbidden": []},
+            {"key": "data_privacy", "label": "Data privacy", "why": "handles PII",
+             "difficulty": "adversarial", "seed_keywords": ["redact"], "forbidden": []},
+        ],
+        "sources": [],
+    })
+    monkeypatch.setattr(exam_synthesis, "resolve_openai_key", lambda: "k")
+    monkeypatch.setattr(exam_synthesis, "_generate_items", lambda key, brief, run: _GOOD_ITEMS)
+
+
+def _failing_grade(item, response, threshold, **_kwargs):
+    from assay_api.scoring import GradeResult
+
+    return GradeResult(
+        score=0.2, passed=False,
+        panel_scores={"rubric": 0.2, "consistency": 0.2},
+        matched_checks=[], missed_checks=[c.id for c in item.expected_checks],
+        forbidden_hits=[], feedback="needs work",
+    )
+
+
+def test_tailored_reruns_carry_lessons_across_distinct_generated_packs(monkeypatch) -> None:
+    """Each tailored run gets a per-run gen-* pack id, yet the closed learning
+    loop must still carry lessons across reruns of the same candidate (keyed by
+    the stable source pack), so prior diagnostics apply on the second run."""
+    _enable_tailored(monkeypatch)
+    monkeypatch.setattr("assay_api.orchestrator.grade_response", _failing_grade)
+
+    with TestClient(app) as client:
+        candidate_id = client.get("/candidates").json()[0]["id"]
+
+        run_a = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        client.post(f"/runs/{run_a['id']}/start")
+        fetched_a = client.get(f"/runs/{run_a['id']}").json()
+        lessons_after_a = client.get(f"/candidates/{candidate_id}/lessons").json()
+
+        run_b = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        scorecard_b = client.post(f"/runs/{run_b['id']}/start").json()
+        fetched_b = client.get(f"/runs/{run_b['id']}").json()
+
+    # Two tailored runs => two DISTINCT generated pack ids...
+    assert fetched_a["exam_pack_id"] == f"gen-{run_a['id']}"
+    assert fetched_b["exam_pack_id"] == f"gen-{run_b['id']}"
+    assert fetched_a["exam_pack_id"] != fetched_b["exam_pack_id"]
+    # ...but both share the stable source pack the lessons are keyed by.
+    assert fetched_a["source_pack_id"] == "hr-v1"
+    assert fetched_b["source_pack_id"] == "hr-v1"
+    # Run A seeded the library; lessons are stored under the source pack, not gen-*.
+    assert lessons_after_a
+    assert {lesson["exam_pack_id"] for lesson in lessons_after_a} == {"hr-v1"}
+    # Run B applies them and links the baseline — the loop survived tailoring.
+    assert scorecard_b["lessons_applied"]
+    assert scorecard_b["prior_run_id"] == run_a["id"]

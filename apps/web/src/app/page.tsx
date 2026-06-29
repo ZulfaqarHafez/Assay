@@ -205,6 +205,57 @@ export default function Home() {
     setRun(null);
   }
 
+  // Kick off a fresh run for an already-registered candidate (no intake step).
+  async function startRunForCandidate(candidateId: string) {
+    setError(null);
+    resetRunArtifacts();
+    runStream.reset();
+    setRun(null);
+    try {
+      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
+      const createdRun = await assayApi.createRun(candidateId, packId, null);
+      const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
+      setRun(createdRun);
+      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
+    } catch (exc) {
+      setError(errorMessage(exc));
+    }
+  }
+
+  // Rerun the SAME agent: the closed learning loop feeds prior-run lessons back
+  // in, so the agent gets another shot and the run-over-run comparison shows movement.
+  function rerunAgent() {
+    if (!selectedCandidateId) return;
+    void startRunForCandidate(selectedCandidateId);
+  }
+
+  // Apply Assay's auto-refined agent.md and test it as a new candidate (history kept).
+  async function testImproved() {
+    const refined = agentSpec?.agent_markdown?.trim();
+    if (!refined) return;
+    setError(null);
+    resetRunArtifacts();
+    runStream.reset();
+    setRun(null);
+    setIntakeSubmitting(true);
+    try {
+      const intake = await assayApi.candidateFromMarkdown(refined, `${candidate?.name ?? "Agent"} v2`);
+      const created = intake.candidate;
+      setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
+      setSelectedCandidateId(created.id);
+      void candidatesQuery.refetch();
+      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
+      const createdRun = await assayApi.createRun(created.id, packId, null);
+      const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
+      setRun(createdRun);
+      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
+    } catch (exc) {
+      setError(errorMessage(exc));
+    } finally {
+      setIntakeSubmitting(false);
+    }
+  }
+
   async function openTraceDrawer() {
     const runId = scorecard?.run_id ?? run?.id;
     if (!runId) {
@@ -278,6 +329,8 @@ export default function Home() {
             agentName={candidate?.name ?? scorecard.run_id}
             onViewTrace={openTraceDrawer}
             onTestAnother={testAnother}
+            onRerun={rerunAgent}
+            onTestImproved={testImproved}
           />
         )}
         {error && phase !== "verdict" && (

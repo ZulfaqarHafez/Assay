@@ -184,6 +184,10 @@ class RunRecord(BaseModel):
     # pack itself lives in the in-process registry and is re-derivable from the
     # persisted ``role_qualified`` event.
     generated_pack_id: str | None = None
+    # The originally-requested exam pack, captured before a tailored run overwrites
+    # ``exam_pack_id`` with its per-run ``gen-*`` id. Diagnostics/lessons key off
+    # this so the closed learning loop carries across reruns even in tailored mode.
+    source_pack_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

@@ -2376,6 +2376,108 @@ pre {
   margin: 0 0 10px;
 }
 
+/* Secondary "Test improved version" — accent-tinted variant of the run button. */
+.assay-run-button.ghost-accent {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  box-shadow: none;
+}
+.assay-run-button.ghost-accent:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+  filter: brightness(0.97);
+}
+
+/* Quiet "Test a different agent" link-style action. */
+.assay-text-button {
+  background: none;
+  border: none;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.assay-text-button:hover { color: var(--color-fg); }
+
+.assay-demo-note { font-size: 12.5px; margin: 0 0 12px; }
+.assay-verdict-comparison { margin-top: 4px; }
+
+/* How-to-improve panel (Agent Refinery coaching output). */
+.assay-improve {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--color-surface, var(--color-bg));
+  padding: 18px 18px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: assay-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both;
+}
+.assay-improve-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.assay-improve-head .assay-section-label { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.assay-improve-readiness {
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: var(--radius-pill, 999px);
+  padding: 3px 11px;
+  white-space: nowrap;
+}
+.assay-improve-readiness.pass { color: var(--color-pass); background: var(--color-pass-bg, var(--color-accent-subtle)); }
+.assay-improve-readiness.warn { color: var(--color-warn); background: var(--color-warn-bg, var(--color-accent-subtle)); }
+.assay-improve-headline { margin: -4px 0 0; color: var(--color-fg); font-size: 14px; }
+.assay-improve-block { display: flex; flex-direction: column; gap: 7px; }
+.assay-improve-block h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-fg);
+}
+.assay-improve-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
+.assay-improve-list li { font-size: 13.5px; color: var(--color-fg); }
+.assay-improve-list.muted li { color: var(--color-fg-muted); }
+.assay-improve-subagents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.assay-improve-subagents li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 2px solid var(--color-accent);
+  padding-left: 10px;
+}
+.assay-improve-subagents strong { font-size: 13.5px; }
+.assay-improve-subagents span { font-size: 12.5px; color: var(--color-fg-muted); }
+.assay-improve-subagents small { font-size: 12px; color: var(--color-fg-muted); opacity: 0.85; }
+.assay-improve-refined { border-top: 1px solid var(--color-border); padding-top: 12px; }
+.assay-improve-refined summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  list-style: revert;
+}
+.assay-improve-refined-actions { display: flex; gap: 8px; margin: 10px 0; }
+.assay-improve-md {
+  max-height: 320px;
+  overflow: auto;
+  background: var(--color-bg-subtle, rgba(0,0,0,0.04));
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .assay-fix-list {
   list-style: none;
   margin: 0;

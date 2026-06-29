@@ -55,6 +55,11 @@ class RunOrchestrator:
 
     async def start(self, run: RunRecord, candidate: CandidateConfig) -> Scorecard:
         run.status = "running"
+        # Capture the originally-requested pack before a tailored run repoints
+        # exam_pack_id at its per-run gen-* id, so the learning loop keys off a
+        # stable id and lessons carry across reruns in tailored mode too.
+        if not run.source_pack_id:
+            run.source_pack_id = run.exam_pack_id
         save_run(run)
         adapter = adapter_for(candidate)
 
@@ -202,7 +207,8 @@ class RunOrchestrator:
         prior runs on the same pack, grouped by competency for outcome tracking.
         """
         competencies = sorted({item.competency for item in pack.items})
-        prior = list_lessons_for_candidate(candidate.id, pack.id, competencies, active_only=True)
+        lesson_key = run.source_pack_id or run.exam_pack_id
+        prior = list_lessons_for_candidate(candidate.id, lesson_key, competencies, active_only=True)
         by_comp: dict[str, list[DiagnosticLesson]] = defaultdict(list)
         for lesson in prior:
             by_comp[lesson.competency].append(lesson)
@@ -212,11 +218,12 @@ class RunOrchestrator:
     @staticmethod
     def _prior_run_id(run: RunRecord, candidate: CandidateConfig) -> str | None:
         """Most recent prior completed run for this candidate on the same pack."""
+        run_key = run.source_pack_id or run.exam_pack_id
         prior_runs = [
             record
             for record in list_runs_for_candidate(candidate.id)
             if record.id != run.id
-            and record.exam_pack_id == run.exam_pack_id
+            and (record.source_pack_id or record.exam_pack_id) == run_key
             and record.status == "completed"
         ]
         return prior_runs[-1].id if prior_runs else None
@@ -283,7 +290,8 @@ class RunOrchestrator:
         """Persist one diagnostic per competency that failed this run, deduped by
         (competency, text) against the candidate's existing library so re-runs do
         not multiply rows."""
-        existing = list_lessons_for_candidate(candidate.id, pack.id, active_only=False)
+        lesson_key = run.source_pack_id or run.exam_pack_id
+        existing = list_lessons_for_candidate(candidate.id, lesson_key, active_only=False)
         existing_keys = {(lesson.competency, lesson.text) for lesson in existing}
         for competency, passed in scorecard.pass_at_k.items():
             if passed:
@@ -293,7 +301,7 @@ class RunOrchestrator:
                 continue
             lesson = DiagnosticLesson(
                 candidate_id=candidate.id,
-                exam_pack_id=pack.id,
+                exam_pack_id=lesson_key,
                 competency=competency,
                 text=text,
                 origin_run_id=run.id,
