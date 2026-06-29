@@ -67,6 +67,29 @@ class TokenCounts(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ToolSpec(BaseModel):
+    """A tool/function the agent under test can call. Parsed from the user's
+    `tools.py` (signatures + docstrings) or supplied as an OpenAI function schema.
+    `parameters` is a JSON Schema object ready to hand to OpenAI function-calling.
+    """
+    name: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+    description: str = Field(default="", max_length=2000)
+    signature: str = Field(default="", max_length=400)
+    parameters: dict[str, Any] = Field(default_factory=lambda: {"type": "object", "properties": {}})
+    dangerous: bool = False
+
+    model_config = ConfigDict(extra="forbid")
+
+    def to_openai_tool(self) -> dict[str, Any]:
+        """Shape for the Responses API `tools=[...]` parameter."""
+        return {
+            "type": "function",
+            "name": self.name,
+            "description": self.description or self.signature or self.name,
+            "parameters": self.parameters or {"type": "object", "properties": {}},
+        }
+
+
 class CandidateConfig(BaseModel):
     id: str = Field(default_factory=lambda: f"cand_{uuid4().hex[:10]}")
     tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
@@ -77,6 +100,7 @@ class CandidateConfig(BaseModel):
     system_prompt: str | None = None
     command: list[str] | None = None
     mcp_server_url: HttpUrl | None = None
+    tools: list[ToolSpec] = Field(default_factory=list, max_length=32)
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)
 

@@ -26,6 +26,7 @@ from .database import (
 )
 from .progress import candidate_progress, lesson_library, run_comparison
 from .agent_intake import detect_agent_facts
+from .tool_parser import parse_tools
 from .agent_refinery import agent_spec_payload
 from .agent_research import load_local_env, research_agent_spec, resolve_openai_key
 from .exam_packs import (
@@ -58,6 +59,7 @@ from .tenancy import REQUIRE_TENANT_ENV, require_tenant, tenant_required
 
 _MAX_ROLE_SCOPE_CHARS = 8000
 _MAX_AGENT_MD_CHARS = 20000
+_MAX_TOOLS_CODE_CHARS = 60000
 
 _DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
@@ -96,10 +98,17 @@ class RoleAnalysisRequest(BaseModel):
 
 
 class AgentMarkdownRequest(BaseModel):
-    """An agent definition (``agent.md`` / ``AGENTS.md``) submitted as a candidate."""
+    """An agent definition (``agent.md`` / ``AGENTS.md``) submitted as a candidate.
+
+    Optionally include the agent's tools — either Python source (``tools.py``,
+    parsed by signature, never executed) or an OpenAI function-schema JSON — so
+    Assay can evaluate tool use, not just prose.
+    """
 
     markdown: str = Field(min_length=1, max_length=_MAX_AGENT_MD_CHARS)
     name: str | None = None
+    tools_code: str | None = Field(default=None, max_length=_MAX_TOOLS_CODE_CHARS)
+    tools_format: Literal["python", "json-schema"] = "python"
 
     model_config = ConfigDict(extra="forbid")
 
@@ -337,6 +346,10 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
     markdown = request.markdown[:_MAX_AGENT_MD_CHARS]
     detected = detect_agent_facts(markdown)
 
+    # Parse the agent's real tools (signatures only — never executed) so the exam
+    # can evaluate tool use. Falls back to the markdown-scraped tool names.
+    tools = parse_tools(request.tools_code, request.tools_format) if request.tools_code else []
+
     live = bool(resolve_openai_key())
     mode = "live" if live else "demo"
     adapter_type = "openai-compatible" if live else "mock"
@@ -345,6 +358,7 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
         name=request.name or detected["title"],
         adapter_type=adapter_type,
         system_prompt=markdown,
+        tools=tools,
         metadata={"source": "agent-md", **detected},
     )
     saved = save_candidate(candidate)
@@ -355,9 +369,13 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
         "detected": {
             "role": detected["role"],
             "title": detected["title"],
-            "tools": detected["tools"],
-            "tool_count": detected["tool_count"],
+            "tools": [tool.name for tool in tools] or detected["tools"],
+            "tool_count": len(tools) or detected["tool_count"],
             "token_estimate": detected["token_estimate"],
+            "tool_specs": [
+                {"name": t.name, "signature": t.signature, "dangerous": t.dangerous}
+                for t in tools
+            ],
         },
     }
 
