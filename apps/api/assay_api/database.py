@@ -14,6 +14,50 @@ from .tenancy import current_tenant_id
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "assay.db"
 
+# Each logical table belongs to a product. Per-product prefixes let one product's
+# storage move to its own namespace without touching the others. Defaults keep
+# every table under the shared "assay" prefix, so existing deployments and the
+# local SQLite schema are unchanged.
+_TABLE_PRODUCTS = {
+    "candidates": "agents",
+    "runs": "runs",
+    "events": "runs",
+    "scorecards": "runs",
+    "lessons": "diagnostics",
+}
+_PRODUCT_PREFIX_ENVS = {
+    "agents": "ASSAY_SUPABASE_PREFIX_AGENTS",
+    "runs": "ASSAY_SUPABASE_PREFIX_RUNS",
+    "diagnostics": "ASSAY_SUPABASE_PREFIX_DIAGNOSTICS",
+}
+_DEFAULT_TABLE_PREFIX = "assay"
+_LEGACY_TABLE_PREFIX = "interviu"
+
+
+def resolve_supabase_tables(
+    global_prefix: str = _DEFAULT_TABLE_PREFIX,
+    *,
+    per_product: bool = True,
+) -> dict[str, str]:
+    """Map each logical table to its physical Supabase table name.
+
+    Every logical table is prefixed by its product's prefix, which defaults to
+    ``global_prefix``. When ``per_product`` is set, a product's prefix can be
+    overridden via ``ASSAY_SUPABASE_PREFIX_<PRODUCT>`` (AGENTS / RUNS /
+    DIAGNOSTICS) so that product's storage can live in its own namespace. With no
+    overrides and the default prefix this yields the historical
+    ``assay_<table>`` names, so behavior is unchanged unless a deployment opts in.
+    """
+    tables: dict[str, str] = {}
+    for logical, product in _TABLE_PRODUCTS.items():
+        prefix = global_prefix
+        if per_product:
+            override = os.environ.get(_PRODUCT_PREFIX_ENVS[product], "").strip().lower()
+            if override:
+                prefix = override
+        tables[logical] = f"{prefix}_{logical}"
+    return tables
+
 
 class DataStore(ABC):
     name: str
@@ -371,20 +415,6 @@ class SQLiteStore(DataStore):
 class SupabaseStore(DataStore):
     name = "supabase"
 
-    DEFAULT_TABLES = {
-        "candidates": "assay_candidates",
-        "runs": "assay_runs",
-        "events": "assay_events",
-        "scorecards": "assay_scorecards",
-        "lessons": "assay_lessons",
-    }
-    LEGACY_TABLES = {
-        "candidates": "interviu_candidates",
-        "runs": "interviu_runs",
-        "events": "interviu_events",
-        "scorecards": "interviu_scorecards",
-        "lessons": "interviu_lessons",
-    }
     CORE_TABLES = ("candidates", "runs", "events", "scorecards")
 
     def __init__(self, url: str, key: str):
@@ -393,7 +423,7 @@ class SupabaseStore(DataStore):
         except ImportError as exc:
             raise RuntimeError("Install the 'supabase' Python package to use Supabase persistence.") from exc
         self.client = create_client(url, key)
-        self.tables = dict(self.DEFAULT_TABLES)
+        self.tables = resolve_supabase_tables()
         self._available_tables: set[str] = set(self.tables)
         self._tenant_tables: set[str] = set(self.tables)
         self._schema_checked = False
@@ -424,7 +454,7 @@ class SupabaseStore(DataStore):
         return {
             "backend": self.name,
             "ok": all(table in self._available_tables for table in self.CORE_TABLES),
-            "schema": "legacy-interviu" if self.tables["candidates"].startswith("interviu_") else "assay",
+            "schema": "legacy-interviu" if self.tables["candidates"].startswith(f"{_LEGACY_TABLE_PREFIX}_") else "assay",
             "tables": table_status,
         }
 
@@ -632,14 +662,20 @@ class SupabaseStore(DataStore):
         if self._schema_checked:
             return
         configured_prefix = os.environ.get("ASSAY_SUPABASE_TABLE_PREFIX", "").strip().lower()
-        if configured_prefix == "interviu":
-            self.tables = dict(self.LEGACY_TABLES)
-        elif configured_prefix == "assay":
-            self.tables = dict(self.DEFAULT_TABLES)
-        elif not self._can_select(self.tables["candidates"], "id"):
-            legacy_candidates = self.LEGACY_TABLES["candidates"]
-            if self._can_select(legacy_candidates, "id"):
-                self.tables = dict(self.LEGACY_TABLES)
+        if configured_prefix == _LEGACY_TABLE_PREFIX:
+            # The legacy interviu schema predates per-product prefixes: keep it flat.
+            self.tables = resolve_supabase_tables(_LEGACY_TABLE_PREFIX, per_product=False)
+        elif configured_prefix == _DEFAULT_TABLE_PREFIX:
+            self.tables = resolve_supabase_tables(_DEFAULT_TABLE_PREFIX)
+        else:
+            # Auto-detect: default to the assay namespace (honoring any per-product
+            # prefix overrides), but fall back to the flat legacy schema when only
+            # it exists.
+            self.tables = resolve_supabase_tables(_DEFAULT_TABLE_PREFIX)
+            if not self._can_select(self.tables["candidates"], "id"):
+                legacy = resolve_supabase_tables(_LEGACY_TABLE_PREFIX, per_product=False)
+                if self._can_select(legacy["candidates"], "id"):
+                    self.tables = legacy
         self._available_tables = {
             logical_name
             for logical_name, table in self.tables.items()

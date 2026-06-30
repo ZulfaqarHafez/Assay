@@ -4,7 +4,13 @@ import json
 
 import pytest
 
-from assay_api.database import SupabaseStore, database_backend_name, reset_store_cache, store
+from assay_api.database import (
+    SupabaseStore,
+    database_backend_name,
+    reset_store_cache,
+    resolve_supabase_tables,
+    store,
+)
 
 
 def test_default_database_backend_is_sqlite() -> None:
@@ -68,6 +74,95 @@ def test_supabase_store_builds_rows_without_sqlite(monkeypatch: pytest.MonkeyPat
     assert calls[0][1]["id"] == "cand_x"
     assert calls[0][2] == "id"
     assert store_instance.health()["backend"] == "supabase"
+
+
+def test_resolve_supabase_tables_defaults_to_assay(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No per-product overrides -> the historical shared assay_<table> names.
+    for env in ("ASSAY_SUPABASE_PREFIX_AGENTS", "ASSAY_SUPABASE_PREFIX_RUNS", "ASSAY_SUPABASE_PREFIX_DIAGNOSTICS"):
+        monkeypatch.delenv(env, raising=False)
+
+    assert resolve_supabase_tables() == {
+        "candidates": "assay_candidates",
+        "runs": "assay_runs",
+        "events": "assay_events",
+        "scorecards": "assay_scorecards",
+        "lessons": "assay_lessons",
+    }
+    # The legacy schema resolves flat (no per-product overrides applied).
+    monkeypatch.setenv("ASSAY_SUPABASE_PREFIX_DIAGNOSTICS", "diag")
+    assert resolve_supabase_tables("interviu", per_product=False)["lessons"] == "interviu_lessons"
+
+
+def test_resolve_supabase_tables_per_product_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Overriding one product's prefix moves only that product's tables; the rest
+    # stay on the shared default so a product's storage can move independently.
+    monkeypatch.setenv("ASSAY_SUPABASE_PREFIX_DIAGNOSTICS", "diag")
+    monkeypatch.setenv("ASSAY_SUPABASE_PREFIX_AGENTS", "agents")
+    monkeypatch.delenv("ASSAY_SUPABASE_PREFIX_RUNS", raising=False)
+
+    tables = resolve_supabase_tables()
+    assert tables["lessons"] == "diag_lessons"  # diagnostics product moved
+    assert tables["candidates"] == "agents_candidates"  # agents product moved
+    assert tables["runs"] == "assay_runs"  # runs product unchanged
+    assert tables["events"] == "assay_events"
+    assert tables["scorecards"] == "assay_scorecards"
+
+
+def test_supabase_store_honors_per_product_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, dict, str]] = []
+
+    class FakeQuery:
+        def __init__(self, table: str):
+            self.table = table
+
+        def upsert(self, row: dict, on_conflict: str):
+            calls.append((self.table, row, on_conflict))
+            return self
+
+        def select(self, *_args, **_kwargs):
+            return self
+
+        def eq(self, *_args, **_kwargs):
+            return self
+
+        def in_(self, *_args, **_kwargs):
+            return self
+
+        def order(self, *_args, **_kwargs):
+            return self
+
+        def limit(self, *_args, **_kwargs):
+            return self
+
+        def execute(self):
+            return type("Response", (), {"data": [], "count": 0})()
+
+    class FakeClient:
+        def table(self, table: str):
+            return FakeQuery(table)
+
+    monkeypatch.setenv("ASSAY_SUPABASE_PREFIX_DIAGNOSTICS", "diag")
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "supabase",
+        type("FakeSupabase", (), {"create_client": lambda url, key: FakeClient()}),
+    )
+    store_instance = SupabaseStore("https://project.supabase.co", "server-key")
+
+    from assay_api.models import DiagnosticLesson
+
+    store_instance.save_lesson(
+        DiagnosticLesson(
+            candidate_id="cand_x",
+            exam_pack_id="hr-v1",
+            competency="compliance",
+            text="t",
+            origin_run_id="run_1",
+        )
+    )
+
+    # Diagnostics product is namespaced; the other products stay on assay_*.
+    assert calls[0][0] == "diag_lessons"
 
 
 def test_sqlite_lessons_round_trip() -> None:

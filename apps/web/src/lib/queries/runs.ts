@@ -1,22 +1,10 @@
 "use client";
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type UseMutationOptions,
-  type UseQueryOptions
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assayApi } from "@/lib/api";
 import type {
   AgentSpec,
-  CandidateConfig,
-  CandidateProgress,
-  Connector,
-  ConnectorProbe,
-  DatabaseHealth,
   DiagnosticLesson,
-  ExamPack,
   JobScope,
   ProductReview,
   ProofBundle,
@@ -26,102 +14,9 @@ import type {
   Scorecard,
   TracePayload
 } from "@/types/assay";
-
-type HealthPayload = { ok: boolean; tracerazor_importable: boolean; database_backend: string; openai_configured?: boolean };
-
-/**
- * Centralized query-key factory. Downstream components and mutations reuse these
- * so invalidation stays consistent across the app.
- */
-export const queryKeys = {
-  health: () => ["health"] as const,
-  databaseHealth: () => ["health", "database"] as const,
-  examPacks: () => ["exam-packs"] as const,
-  connectors: () => ["connectors"] as const,
-  connectorProbes: () => ["connectors", "probe"] as const,
-  candidates: () => ["candidates"] as const,
-  runs: () => ["runs"] as const,
-  run: (runId: string) => ["runs", runId] as const,
-  scorecard: (runId: string) => ["runs", runId, "scorecard"] as const,
-  trace: (runId: string) => ["runs", runId, "trace"] as const,
-  events: (runId: string) => ["runs", runId, "events"] as const,
-  proofBundle: (runId: string) => ["runs", runId, "proof-bundle"] as const,
-  agentSpec: (runId: string) => ["runs", runId, "agent-spec"] as const,
-  reviewers: (runId: string) => ["runs", runId, "reviewers"] as const,
-  runComparison: (runId: string, baseline?: string) =>
-    ["runs", runId, "comparison", baseline ?? null] as const,
-  runLessonsApplied: (runId: string) => ["runs", runId, "lessons-applied"] as const,
-  candidateProgress: (candidateId: string) => ["candidates", candidateId, "progress"] as const,
-  candidateLessons: (candidateId: string, examPackId?: string) =>
-    ["candidates", candidateId, "lessons", examPackId ?? null] as const
-} as const;
-
-/** Options forwarded to a query hook, minus the fields the hook owns. */
-type QueryOpts<T> = Omit<UseQueryOptions<T, Error, T>, "queryKey" | "queryFn">;
+import { queryKeys, type MutationOpts, type QueryOpts } from "./keys";
 
 // --- Read queries -----------------------------------------------------------
-
-export function useHealth(options?: QueryOpts<HealthPayload>) {
-  return useQuery({
-    queryKey: queryKeys.health(),
-    queryFn: () => assayApi.health(),
-    ...options
-  });
-}
-
-export function useDatabaseHealth(options?: QueryOpts<DatabaseHealth>) {
-  return useQuery({
-    queryKey: queryKeys.databaseHealth(),
-    queryFn: () => assayApi.databaseHealth(),
-    ...options
-  });
-}
-
-export function useExamPacks(options?: QueryOpts<ExamPack[]>) {
-  return useQuery({
-    queryKey: queryKeys.examPacks(),
-    queryFn: () => assayApi.examPacks(),
-    ...options
-  });
-}
-
-export function useImportExamPackFile(
-  options?: MutationOpts<ExamPack, { content: string; format: "json" | "yaml" | "yml" }>
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ content, format }) => assayApi.importExamPackFile(content, format),
-    ...options,
-    onSettled: (...args) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.examPacks() });
-      options?.onSettled?.(...args);
-    }
-  });
-}
-
-export function useConnectors(options?: QueryOpts<Connector[]>) {
-  return useQuery({
-    queryKey: queryKeys.connectors(),
-    queryFn: () => assayApi.connectors(),
-    ...options
-  });
-}
-
-export function useConnectorProbes(options?: QueryOpts<ConnectorProbe[]>) {
-  return useQuery({
-    queryKey: queryKeys.connectorProbes(),
-    queryFn: () => assayApi.connectorProbes(),
-    ...options
-  });
-}
-
-export function useCandidates(options?: QueryOpts<CandidateConfig[]>) {
-  return useQuery({
-    queryKey: queryKeys.candidates(),
-    queryFn: () => assayApi.candidates(),
-    ...options
-  });
-}
 
 export function useRuns(options?: QueryOpts<RunRecord[]>) {
   return useQuery({
@@ -203,31 +98,6 @@ export function useReviewers(runId: string | null | undefined, options?: QueryOp
   });
 }
 
-export function useCandidateProgress(
-  candidateId: string | null | undefined,
-  options?: QueryOpts<CandidateProgress>
-) {
-  return useQuery({
-    queryKey: queryKeys.candidateProgress(candidateId ?? ""),
-    queryFn: () => assayApi.candidateProgress(candidateId as string),
-    enabled: Boolean(candidateId),
-    ...options
-  });
-}
-
-export function useCandidateLessons(
-  candidateId: string | null | undefined,
-  examPackId?: string,
-  options?: QueryOpts<DiagnosticLesson[]>
-) {
-  return useQuery({
-    queryKey: queryKeys.candidateLessons(candidateId ?? "", examPackId),
-    queryFn: () => assayApi.candidateLessons(candidateId as string, examPackId),
-    enabled: Boolean(candidateId),
-    ...options
-  });
-}
-
 export function useRunComparison(
   runId: string | null | undefined,
   baseline?: string,
@@ -254,25 +124,6 @@ export function useRunLessonsApplied(
 }
 
 // --- Mutations --------------------------------------------------------------
-
-type MutationOpts<TData, TVars> = Omit<
-  UseMutationOptions<TData, Error, TVars>,
-  "mutationFn"
->;
-
-export function useCreateCandidate(
-  options?: MutationOpts<CandidateConfig, Partial<CandidateConfig>>
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (candidate: Partial<CandidateConfig>) => assayApi.createCandidate(candidate),
-    ...options,
-    onSettled: (...args) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.candidates() });
-      options?.onSettled?.(...args);
-    }
-  });
-}
 
 export type CreateRunVars = {
   candidateId: string;

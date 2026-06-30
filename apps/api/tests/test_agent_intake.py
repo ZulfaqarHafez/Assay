@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from assay_api import main
 from assay_api.agent_intake import detect_agent_facts
 from assay_api.main import app
 
@@ -48,7 +47,7 @@ def test_detect_helper_falls_back_to_role_field_then_default() -> None:
 
 def test_from_markdown_demo_mode_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
     # No OpenAI key -> deterministic demo, stored as a mock candidate.
-    monkeypatch.setattr(main, "resolve_openai_key", lambda: "")
+    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
 
     with TestClient(app) as client:
         response = client.post(
@@ -74,7 +73,7 @@ def test_from_markdown_demo_mode_without_key(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_from_markdown_live_mode_uses_openai_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
     # With a key present the candidate is registered to run live (no network call here).
-    monkeypatch.setattr(main, "resolve_openai_key", lambda: "test-key")
+    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "test-key")
 
     with TestClient(app) as client:
         response = client.post(

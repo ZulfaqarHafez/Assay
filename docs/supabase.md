@@ -17,6 +17,45 @@ Every persisted customer artifact also has a `tenant_id` column. Local mode uses
 the default `local` tenant; hosted mode can require `X-Assay-Tenant` via
 `ASSAY_REQUIRE_TENANT=1`.
 
+## Per-product table namespaces
+
+Each logical table belongs to a product:
+
+| Product | Logical tables |
+| --- | --- |
+| agents | `candidates` |
+| runs | `runs`, `events`, `scorecards` |
+| diagnostics | `lessons` |
+
+By default every table resolves to the shared `assay_<table>` name, so nothing
+changes unless you opt in. To move a product's storage into its own namespace —
+for example to split it onto a separate project later — set a per-product prefix:
+
+```powershell
+$env:ASSAY_SUPABASE_PREFIX_AGENTS="agents"        # -> agents_candidates
+$env:ASSAY_SUPABASE_PREFIX_RUNS="runs"            # -> runs_runs / runs_events / runs_scorecards
+$env:ASSAY_SUPABASE_PREFIX_DIAGNOSTICS="diag"     # -> diag_lessons
+```
+
+`SupabaseStore` resolves table names through `resolve_supabase_tables()`, applying
+these overrides over the global default. The global `ASSAY_SUPABASE_TABLE_PREFIX`
+(`assay` | `interviu`) still selects the base namespace and the legacy fallback.
+
+This is configuration only — it does not move existing data. Before pointing a
+product at a new prefix, create and back-fill its tables (and apply the same RLS
++ service-role policies the core migration uses), e.g.:
+
+```sql
+-- opt-in: move the diagnostics product to its own namespace
+create table public.diag_lessons (like public.assay_lessons including all);
+insert into public.diag_lessons select * from public.assay_lessons;
+alter table public.diag_lessons enable row level security;
+-- re-create the assay_lessons service-role policies on diag_lessons here
+```
+
+Keep the old table readable until the cutover is verified; the resolver reads
+exactly one physical table per logical name, so the switch is atomic per deploy.
+
 ## Security Model
 
 - RLS is enabled on every Assay table.

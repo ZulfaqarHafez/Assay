@@ -294,7 +294,7 @@ def test_unexpected_error_returns_safe_envelope(monkeypatch: pytest.MonkeyPatch)
     with TestClient(app, raise_server_exceptions=False) as client:
         # Patch after startup so the lifespan hook (which also lists candidates)
         # runs cleanly; only the request path raises.
-        monkeypatch.setattr("assay_api.main.list_candidates", _boom)
+        monkeypatch.setattr("assay_api.routers.candidates.list_candidates", _boom)
         response = client.get("/candidates")
 
     assert response.status_code == 500

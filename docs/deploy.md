@@ -95,6 +95,9 @@ with RLS + service-role policies. The `SupabaseStore` auto-detects the table pre
 transparently falls back to legacy `interviu_*` tables if a project predates the rename;
 force one with `ASSAY_SUPABASE_TABLE_PREFIX=assay|interviu`. `assay_lessons` powers the
 closed learning loop — without it, runs still complete but lessons don't persist.
+Each product's tables can optionally move to their own namespace via per-product
+prefixes (`ASSAY_SUPABASE_PREFIX_AGENTS|RUNS|DIAGNOSTICS`); see
+[docs/supabase.md](supabase.md#per-product-table-namespaces).
 
 Apply pending migrations with the Supabase CLI (`supabase db push`) or the dashboard SQL
 editor. `GET /health` reports the resolved backend and (for Supabase) the detected schema
