@@ -10,6 +10,7 @@ from .adapters import CandidateAdapterError, adapter_for
 from .database import save_run, save_scorecard
 from .diagnostics import load_prior_diagnostics, persist_new_lessons, record_lesson_outcomes
 from .exam_packs import get_exam_pack
+from .exam_prep import qualify, resolve_pack
 from .models import (
     CandidateConfig,
     CandidateResponse,
@@ -21,20 +22,6 @@ from .scoring import GradeResult, grade_response, panel_disagreement
 from .trace_audit import TraceAuditService
 
 
-def _flag_enabled(name: str) -> bool:
-    return (os.environ.get(name) or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def tailored_exams_enabled() -> bool:
-    """Master switch for the role-qualification / tailored-exam stage."""
-    return _flag_enabled("ASSAY_TAILORED_EXAMS_ENABLED")
-
-
-def qualify_mode() -> str:
-    mode = (os.environ.get("ASSAY_QUALIFY_MODE") or "fast").strip().lower()
-    return mode if mode in ("fast", "deep") else "fast"
-
-
 def _run_concurrency() -> int:
     """How many exam (item, trial) units to evaluate at once. Bounded so we don't
     hammer the model API; 1 restores fully-sequential behavior."""
@@ -44,13 +31,6 @@ def _run_concurrency() -> int:
     except ValueError:
         value = 5
     return max(1, min(16, value))
-
-
-class PackResolution(NamedTuple):
-    """Outcome of resolving which exam pack a run grades against."""
-
-    pack: Any
-    qualification_status: str
 
 
 class RunItemsResult(NamedTuple):
@@ -87,8 +67,8 @@ class RunOrchestrator:
             # Qualify the judge: research what this agent should be, then build a
             # tailored exam from that brief. Both degrade to the static pack when
             # the stage is off or OpenAI is unavailable.
-            role_brief = self._qualify(run, candidate)
-            pack, qualification_status = self._resolve_pack(run, role_brief)
+            role_brief = qualify(run, candidate, self._recorder)
+            pack, qualification_status = resolve_pack(run, role_brief, self._recorder)
             # Closed learning loop: seed this run with diagnostics retained from the
             # candidate's prior runs on this pack, so prior lessons are applied from
             # the very first question. Within-run lessons still accumulate on top.
@@ -166,53 +146,6 @@ class RunOrchestrator:
             raise
         finally:
             await adapter.aclose()
-
-    # --- Judge qualification (research what the agent should be) ------------
-
-    def _qualify(self, run: RunRecord, candidate: CandidateConfig) -> Any:
-        """Research the role and record a brief, when the stage is enabled.
-
-        Phase 1 surfaces the brief as a ``role_qualified`` event without changing
-        the exam or grading. Returns the :class:`RoleBrief` (or ``None`` when the
-        stage is off) so callers can denormalize its summary onto the scorecard.
-        """
-        if not tailored_exams_enabled():
-            return None
-        from .role_qualification import build_role_brief
-
-        brief = build_role_brief(run, candidate, mode=qualify_mode())
-        self._recorder.event(run.id, "system", "role_qualified", brief.model_dump(mode="json", by_alias=True))
-        return brief
-
-    def _resolve_pack(self, run: RunRecord, role_brief: Any) -> PackResolution:
-        """Pick the exam pack for this run: a tailored pack synthesized from the
-        brief, or the run's already-selected static pack.
-
-        Returns ``(pack, qualification_status)``. When a tailored pack is built
-        it is registered and ``run.exam_pack_id`` is repointed at it so the rest
-        of the run (grading, lessons, ``get_exam_pack`` in ``_grade``) is
-        consistent. Synthesis failures fall back to the static pack.
-        """
-        if role_brief is None:
-            return PackResolution(get_exam_pack(run.exam_pack_id), "deterministic")
-        from .exam_synthesis import synthesize_exam_pack
-
-        pack, status = synthesize_exam_pack(role_brief, run)
-        if status == "tailored":
-            run.exam_pack_id = pack.id
-            run.generated_pack_id = pack.id
-            save_run(run)
-            self._recorder.event(
-                run.id,
-                "examiner",
-                "tailored_exam_generated",
-                {
-                    "pack_id": pack.id,
-                    "item_count": len(pack.items),
-                    "competencies": sorted({item.competency for item in pack.items}),
-                },
-            )
-        return PackResolution(pack, status)
 
     async def _ask_candidate(
         self,
