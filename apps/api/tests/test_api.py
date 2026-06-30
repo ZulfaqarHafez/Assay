@@ -233,7 +233,7 @@ def test_role_analysis_openai_endpoint_reports_extraction(monkeypatch) -> None:
             extraction="openai-fast",
         )
 
-    monkeypatch.setattr("assay_api.main.extract_job_scope_openai", fake_extract)
+    monkeypatch.setattr("assay_api.routers.role.extract_job_scope_openai", fake_extract)
 
     with TestClient(app) as client:
         analysis = client.post(
