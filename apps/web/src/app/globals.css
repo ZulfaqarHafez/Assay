@@ -4960,3 +4960,26 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
   color: var(--color-warn);
 }
 .reviewer-next-step strong { font-weight: 700; }
+
+/* Honest demo mode + zero-input sample run (P1-3/P1-4). */
+.assay-demo-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 9px 13px;
+  font-size: 12.5px;
+  color: var(--color-fg);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 26%, var(--color-border));
+  border-radius: var(--radius-md);
+}
+.assay-demo-notice strong { font-weight: 700; }
+.assay-judging-demo {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
+}

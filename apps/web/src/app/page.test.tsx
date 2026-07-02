@@ -416,7 +416,7 @@ describe("Assay page", () => {
     const { container } = renderHome();
     // Brand now lives in the global TopNav (layout); the page leads with the hero.
     await screen.findByRole("heading", { name: /find out where it breaks/i });
-    expect(screen.getByRole("button", { name: /run the litmus test/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /run.*litmus test/i })).toBeDisabled();
     expect(screen.getByText(/find out where it breaks/i)).toBeInTheDocument();
     // A starter template is offered as the fallback.
     expect(screen.getByText(/HR screener \(hardened\)/i)).toBeInTheDocument();
@@ -426,6 +426,11 @@ describe("Assay page", () => {
     expect(accept).toContain(".json");
     expect(accept).toContain(".yaml");
     expect(accept).toContain(".toml");
+    // With no OpenAI key the demo framing is honest up front (not a post-run reveal).
+    expect(screen.getByText(/runs a/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /run demo litmus test/i })).toBeInTheDocument();
+    // Zero-input path: a one-click sample run is offered on the hero.
+    expect(screen.getByRole("button", { name: /run the sample agent/i })).toBeInTheDocument();
   });
 
   it("runs an uploaded agent.md and lands on a verdict", async () => {
@@ -433,7 +438,7 @@ describe("Assay page", () => {
     renderHome();
     const template = await screen.findByText(/HR screener \(hardened\)/i);
     await user.click(template);
-    const runButton = screen.getByRole("button", { name: /run the litmus test/i });
+    const runButton = screen.getByRole("button", { name: /run.*litmus test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
     await user.click(runButton);
     // Lands on the verdict hero with the ranked "what to fix" list.
@@ -453,7 +458,7 @@ describe("Assay page", () => {
     renderHome();
     const template = await screen.findByText(/HR screener \(hardened\)/i);
     await user.click(template);
-    const runButton = screen.getByRole("button", { name: /run the litmus test/i });
+    const runButton = screen.getByRole("button", { name: /run.*litmus test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
     await user.click(runButton);
     await screen.findByText("What to fix", undefined, { timeout: 10000 });

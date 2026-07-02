@@ -335,6 +335,7 @@ export default function Home() {
             totalExpected={runStream.totalExpected}
             progress={runStream.progress}
             agentName={candidate?.name ?? "your agent"}
+            demoMode={!health?.openai_configured}
             onCancel={cancelRun}
           />
         )}

@@ -51,6 +51,9 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
   const isStructured = Boolean(filename && STRUCTURED_EXTENSIONS.test(filename)) || markdown.trimStart().startsWith("{");
   const facts = React.useMemo(() => detectAgentFacts(isStructured ? "" : markdown), [markdown, isStructured]);
   const hasContent = markdown.trim().length > 0;
+  // The zero-input path: one click runs a real sample so a first-time visitor
+  // sees the full intake -> judging -> verdict flow without typing anything.
+  const sampleTemplate = templates[0] ?? null;
 
   const readFile = React.useCallback((file: File) => {
     const reader = new FileReader();
@@ -157,6 +160,13 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         </div>
       )}
 
+      {!liveMode && (
+        <p className="assay-demo-notice" role="note">
+          <Sparkles size={14} /> No OpenAI key detected — this runs a <strong>deterministic demo</strong>,
+          not your real agent. Add a key to grade the real thing.
+        </p>
+      )}
+
       <div className="assay-intake-actions">
         <button
           type="button"
@@ -165,11 +175,25 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           disabled={!hasContent || submitting}
         >
           <FlaskConical size={18} />
-          {submitting ? "Running the litmus test…" : `Run the litmus test`}
+          {submitting
+            ? liveMode ? "Running the litmus test…" : "Running the demo…"
+            : liveMode ? "Run the litmus test" : "Run demo litmus test"}
         </button>
+        {sampleTemplate && (
+          <button
+            type="button"
+            className="assay-ghost-button"
+            disabled={submitting}
+            onClick={() =>
+              onRun(sampleTemplate.markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 })
+            }
+          >
+            <Zap size={16} /> Run the sample agent
+          </button>
+        )}
         <button
           type="button"
-          className="assay-ghost-button"
+          className="assay-text-button"
           onClick={() =>
             document.querySelector('[aria-label="How it works"]')?.scrollIntoView({ behavior: "smooth", block: "start" })
           }
