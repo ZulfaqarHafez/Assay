@@ -1,5 +1,5 @@
-name: Assay Assay
-description: Run an agent.md through Assay Assay and publish proof artifacts.
+name: Assay
+description: Run an agent through the Assay pre-deployment interview loop and publish proof artifacts.
 
 inputs:
   agent-md:
@@ -14,17 +14,21 @@ inputs:
     required: false
     default: ""
   pass-threshold:
-    description: Minimum mean competency score.
+    description: Minimum held-out competency threshold.
     required: false
     default: "0.8"
   k:
     description: Trials per seen/held-out item.
     required: false
-    default: "1"
+    default: "3"
   require-trace:
     description: Whether TraceRazor audit availability should block the check.
     required: false
-    default: "false"
+    default: "true"
+  policy:
+    description: strict, advisory, or path to assay.policy.yaml/json.
+    required: false
+    default: strict
   python-version:
     description: Python version used for the Assay runner.
     required: false
@@ -37,6 +41,10 @@ inputs:
     description: Proof bundle JSON output path.
     required: false
     default: artifacts/assay/proof-bundle.json
+  gate-out:
+    description: Deployability gate JSON output path.
+    required: false
+    default: artifacts/assay/gate.json
   summary-out:
     description: Markdown summary output path.
     required: false
@@ -71,15 +79,16 @@ runs:
       shell: bash
       run: python -m pip install -r apps/api/requirements-dev.txt
 
-    - name: Run assay
+    - name: Run assay interview and gate
       id: assay
       shell: bash
       run: |
         set +e
         args=(
-          run
-          --agent-md "${{ inputs.agent-md }}"
+          interview
+          --agent "${{ inputs.agent-md }}"
           --pack "${{ inputs.pack }}"
+          --policy "${{ inputs.policy }}"
           --pass-threshold "${{ inputs.pass-threshold }}"
           --k "${{ inputs.k }}"
           --json-out "${{ inputs.json-out }}"
@@ -91,10 +100,21 @@ runs:
         fi
         if [ "${{ inputs.require-trace }}" = "true" ]; then
           args+=(--require-trace)
+        else
+          args+=(--no-require-trace)
         fi
         PYTHONPATH=apps/api python -m assay_api.cli "${args[@]}"
-        status=$?
-        echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+        interview_status=$?
+        gate_status=$interview_status
+        if [ -f "${{ inputs.json-out }}" ]; then
+          run_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["run_id"])' "${{ inputs.json-out }}")"
+          PYTHONPATH=apps/api python -m assay_api.cli gate \
+            --run "$run_id" \
+            --policy "${{ inputs.policy }}" \
+            --json-out "${{ inputs.gate-out }}"
+          gate_status=$?
+        fi
+        echo "exit_code=$gate_status" >> "$GITHUB_OUTPUT"
         exit 0
 
     - name: Add summary to job
@@ -113,6 +133,7 @@ runs:
         path: |
           ${{ inputs.json-out }}
           ${{ inputs.proof-out }}
+          ${{ inputs.gate-out }}
           ${{ inputs.summary-out }}
         if-no-files-found: warn
 

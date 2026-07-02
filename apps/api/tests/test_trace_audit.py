@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from assay_api.models import CandidateConfig
-from assay_api.trace_audit import TraceAuditService, _audit_slice
+from assay_api.trace_audit import TraceAuditService, _audit_slice, tracerazor_doctor
 
 
 def test_trace_audit_reports_insufficient_steps() -> None:
@@ -103,3 +103,34 @@ def test_audit_slice_keeps_short_traces_unchanged() -> None:
     steps = [{"id": index} for index in range(7)]
 
     assert _audit_slice(steps, 24) == steps
+
+
+def test_tracerazor_doctor_runs_synthetic_smoke(monkeypatch) -> None:
+    class FakeReport:
+        trace_id = "trace_doctor"
+        tas_score = 93.0
+        grade = "Excellent"
+        passes = True
+        total_steps = 5
+        total_tokens = 500
+        metrics = {}
+        savings = {}
+        fixes = []
+        raw = {}
+
+    class FakeClient:
+        def __init__(self, threshold: float):
+            self.threshold = threshold
+
+        def analyse(self, trace):
+            assert len(trace["steps"]) == 5
+            return FakeReport()
+
+    monkeypatch.setattr("assay_api.trace_audit._load_tracerazor_client", lambda: FakeClient)
+
+    payload = tracerazor_doctor()
+
+    assert payload["schema"] == "assay.tracerazor_doctor.v1"
+    assert payload["installed"] is True
+    assert payload["status"] == "passed"
+    assert payload["summary"]["tas_score"] == 93.0

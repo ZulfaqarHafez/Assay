@@ -120,6 +120,19 @@ export function RunComparison({ runId, baseline, comparison: provided, className
     <Card className={className}>
       {header}
       <CardBody>
+        <div className="comparison-summary" aria-label="Improvement summary">
+          <strong>
+            {comparison.regressed > 0
+              ? "Regression found"
+              : comparison.improved > 0
+                ? "Improved"
+                : "No score movement yet"}
+          </strong>
+          <span>
+            {comparison.improved} improved, {comparison.regressed} regressed, {comparison.unchanged} unchanged.
+            {comparison.certified_changed ? " Certification changed." : ""}
+          </span>
+        </div>
         <table className="comparison-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <caption className="sr-only">
             Competency scores comparing run {comparison.run_id} against baseline {comparison.baseline_run_id}

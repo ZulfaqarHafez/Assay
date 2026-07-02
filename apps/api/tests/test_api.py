@@ -62,8 +62,16 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert bundle["database"]["backend"] == "sqlite"
     assert any(probe["id"] == "tracerazor" for probe in bundle["connector_probes"])
     assert reviewers["schema"] == "assay.product_review.v1"
-    assert [reviewer["key"] for reviewer in reviewers["reviewers"]] == ["experience", "runtime", "evidence"]
+    assert [reviewer["key"] for reviewer in reviewers["reviewers"]] == [
+        "role_analyst",
+        "security_interviewer",
+        "tool_auditor",
+        "tracerazor_auditor",
+        "release_manager",
+    ]
     assert bundle["product_review"]["schema"] == "assay.product_review.v1"
+    assert bundle["deployability"]["schema"] == "assay.deployability_decision.v1"
+    assert bundle["summary"]["deployability_label"] in {"Ship", "Probation", "Do not ship"}
 
 
 def test_agent_spec_endpoint_and_export(monkeypatch) -> None:

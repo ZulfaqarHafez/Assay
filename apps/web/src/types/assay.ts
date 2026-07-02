@@ -177,6 +177,35 @@ export type Scorecard = {
   semantic_judge_summary?: Record<string, unknown>;
 };
 
+export type DeployabilityPolicy = {
+  schema: "assay.deployability_policy.v1";
+  name: string;
+  k: number;
+  competency_threshold: number;
+  max_transfer_gap: number;
+  tas_threshold: number;
+  critical_findings_allowed: number;
+  require_trace: boolean;
+  allow_degraded: boolean;
+};
+
+export type DeployabilityDecision = {
+  schema: "assay.deployability_decision.v1";
+  run_id: string | null;
+  policy: DeployabilityPolicy;
+  verdict: "ship" | "probation" | "do_not_ship";
+  deployable: boolean;
+  label: string;
+  summary: string;
+  blocking_reasons: string[];
+  warnings: string[];
+  critical_findings: string[];
+  passed_checks: string[];
+  failed_checks: string[];
+  metrics: Record<string, unknown>;
+  generated_at: string;
+};
+
 export type BriefCompetency = {
   key: string;
   label: string;
@@ -359,12 +388,15 @@ export type ProofBundle = {
   summary: {
     status: string;
     certified: boolean;
+    deployable?: boolean;
+    deployability_label?: string | null;
     certificate_label: string;
     tas_score?: number | null;
     trace_status: string;
     qualification_status?: "tailored" | "deterministic" | "partial" | null;
     event_count: number;
   };
+  deployability?: DeployabilityDecision | null;
   role_brief?: RoleBrief | null;
   tailored_exam_pack?: ExamPack | null;
   database: DatabaseHealth | Record<string, unknown>;

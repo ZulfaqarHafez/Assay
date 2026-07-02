@@ -90,6 +90,57 @@ class TraceAuditService:
         )
 
 
+def tracerazor_doctor(threshold: float = 70) -> dict[str, Any]:
+    """Run an end-to-end synthetic TraceRazor audit for CLI/API diagnostics."""
+
+    client_cls = _load_tracerazor_client()
+    installed = client_cls is not None
+    candidate = CandidateConfig(name="TraceRazor doctor", adapter_type="mock")
+    steps = [
+        {
+            "id": index + 1,
+            "type": "reasoning" if index % 2 == 0 else "tool_call",
+            "content": (
+                "Inspect candidate answer, compare against held-out rubric, "
+                "record policy-safe evidence, and avoid leaking canaries."
+            ),
+            "tokens": 80 + index,
+            "metadata": {
+                "competency": "doctor_trace",
+                "variant": "held_out" if index % 2 else "seen",
+            },
+        }
+        for index in range(5)
+    ]
+    summary = TraceAuditService(threshold=threshold).analyse(
+        candidate=candidate,
+        trace_steps=steps,
+        task_value_score=0.92,
+    )
+    if not installed:
+        status = "missing"
+        next_step = "Install tracerazor>=1.0.3 or set TRACERAZOR_REPO to a local checkout."
+    elif summary.status == "ok" and summary.passes:
+        status = "passed"
+        next_step = "TraceRazor is ready for strict deploy gates."
+    elif summary.status == "insufficient_steps":
+        status = "insufficient_steps"
+        next_step = "Capture at least five candidate reasoning/tool steps before audit."
+    elif summary.status == "error":
+        status = "failed"
+        next_step = "Check TraceRazor install, timeout, and native dependencies."
+    else:
+        status = "warning"
+        next_step = "TraceRazor is importable but did not pass the synthetic audit."
+    return {
+        "schema": "assay.tracerazor_doctor.v1",
+        "installed": installed,
+        "status": status,
+        "next_step": next_step,
+        "summary": summary.model_dump(mode="json"),
+    }
+
+
 def _load_tracerazor_client() -> Any | None:
     try:
         from tracerazor import TraceRazorClient

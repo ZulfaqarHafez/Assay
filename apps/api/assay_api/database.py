@@ -814,6 +814,14 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
             break
     tailored_exam_pack = _tailored_pack_payload(run.generated_pack_id)
     qualification_status = scorecard.qualification_status if scorecard else None
+    deployability = None
+    if scorecard is not None:
+        try:
+            from .deployability import evaluate_scorecard
+
+            deployability = evaluate_scorecard(scorecard).model_dump(mode="json", by_alias=True)
+        except Exception:
+            deployability = None
     return {
         "schema": "assay.proof_bundle.v1",
         "product": "Assay",
@@ -828,12 +836,15 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
         "summary": {
             "status": run.status,
             "certified": scorecard.certified if scorecard else False,
+            "deployable": bool(deployability.get("deployable")) if deployability else False,
+            "deployability_label": deployability.get("label") if deployability else "Pending",
             "certificate_label": scorecard.certificate_label if scorecard else "Internal capability bar only",
             "tas_score": scorecard.trace_audit.tas_score if scorecard else None,
             "trace_status": scorecard.trace_audit.status if scorecard else "pending",
             "qualification_status": qualification_status,
             "event_count": len(events),
         },
+        "deployability": deployability,
         "product_review": product_review.model_dump(mode="json") if product_review else None,
     }
 

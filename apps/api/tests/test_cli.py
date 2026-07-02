@@ -59,8 +59,11 @@ def test_assay_cli_run_writes_artifacts_and_exits_zero(tmp_path: Path, monkeypat
     assert status == 0
     assert payload["schema"] == "assay.scorecard.v1"
     assert payload["passed"] is True
+    assert payload["deployability"]["schema"] == "assay.deployability_decision.v1"
+    assert payload["deployability"]["verdict"] == "ship"
     assert proof["schema"] == "assay.proof_bundle.v1"
-    assert "Assay verdict: PASS" in summary_md.read_text(encoding="utf-8")
+    assert proof["deployability"]["deployable"] is True
+    assert "Assay deployability: Ship" in summary_md.read_text(encoding="utf-8")
 
 
 def test_assay_cli_exits_one_for_failing_scorecard(tmp_path: Path, monkeypatch) -> None:
@@ -126,3 +129,66 @@ def test_assay_cli_exits_one_for_failing_scorecard(tmp_path: Path, monkeypatch) 
     assert status == 1
     assert payload["passed"] is False
     assert payload["blocking_failure_reasons"]
+
+
+def test_assay_cli_scan_research_threat_and_make_loop(tmp_path: Path) -> None:
+    agent_md = tmp_path / "AGENTS.md"
+    tools_py = tmp_path / "tools.py"
+    scan_json = tmp_path / "scan.json"
+    role_json = tmp_path / "role.json"
+    threat_json = tmp_path / "threat.json"
+    loop_json = tmp_path / "loop.json"
+    agent_md.write_text("# Refund Support Agent\n\nTools: `refund_order`", encoding="utf-8")
+    tools_py.write_text(
+        'def refund_order(order_id: str, amount: float):\n    """Refund a customer order."""\n    return {"ok": True}\n',
+        encoding="utf-8",
+    )
+
+    assert cli.main(["scan", "--agent", str(agent_md), "--tools", str(tools_py), "--out", str(scan_json)]) == 0
+    assert cli.main(
+        [
+            "research-role",
+            "--agent",
+            str(agent_md),
+            "--role",
+            "refund support agent",
+            "--research",
+            "off",
+            "--out",
+            str(role_json),
+        ]
+    ) == 0
+    assert cli.main(
+        [
+            "threat-model",
+            "--agent",
+            str(agent_md),
+            "--tools",
+            str(tools_py),
+            "--role-brief",
+            str(role_json),
+            "--out",
+            str(threat_json),
+        ]
+    ) == 0
+    assert cli.main(
+        [
+            "make-loop",
+            "--role-brief",
+            str(role_json),
+            "--threat-model",
+            str(threat_json),
+            "--out",
+            str(loop_json),
+        ]
+    ) == 0
+
+    scan = json.loads(scan_json.read_text(encoding="utf-8"))
+    threat = json.loads(threat_json.read_text(encoding="utf-8"))
+    loop = json.loads(loop_json.read_text(encoding="utf-8"))
+
+    assert scan["schema"] == "assay.agent_source.v1"
+    assert scan["tool_contracts"][0]["dangerous"] is True
+    assert "privileged_side_effects" in threat["categories"]
+    assert loop["schema"] == "assay.interview_loop.v1"
+    assert loop["rounds"]

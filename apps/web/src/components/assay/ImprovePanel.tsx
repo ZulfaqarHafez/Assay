@@ -20,15 +20,17 @@ const READINESS: Record<AgentSpec["readiness"], { label: string; tone: string }>
 export type ImprovePanelProps = {
   agentSpec: AgentSpec | null;
   agentName: string;
+  originalMarkdown?: string;
 };
 
-export function ImprovePanel({ agentSpec, agentName }: ImprovePanelProps) {
+export function ImprovePanel({ agentSpec, agentName, originalMarkdown = "" }: ImprovePanelProps) {
   const [copied, setCopied] = React.useState(false);
 
   if (!agentSpec) return null;
 
   const readiness = READINESS[agentSpec.readiness] ?? READINESS.refine;
   const refined = agentSpec.agent_markdown?.trim() ?? "";
+  const diffPreview = refined ? previewDiff(originalMarkdown, refined) : [];
   const fileSlug = agentName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "agent";
 
   async function copyRefined() {
@@ -90,8 +92,12 @@ export function ImprovePanel({ agentSpec, agentName }: ImprovePanelProps) {
       )}
 
       {refined && (
-        <details className="assay-improve-refined">
-          <summary>View the refined agent.md ({refined.split(/\n/).length} lines)</summary>
+        <div className="assay-improve-refined">
+          <div className="assay-improve-diff-head">
+            <strong>Diff first</strong>
+            <span>{diffPreview.length} changed lines previewed</span>
+          </div>
+          <pre className="assay-improve-diff"><code>{diffPreview.join("\n") || "+ Refined agent instructions generated from this run."}</code></pre>
           <div className="assay-improve-refined-actions">
             <button type="button" className="assay-ghost-button slim" onClick={copyRefined}>
               {copied ? <Check size={14} /> : <Copy size={14} />} {copied ? "Copied" : "Copy"}
@@ -104,11 +110,25 @@ export function ImprovePanel({ agentSpec, agentName }: ImprovePanelProps) {
               <Download size={14} /> Download .md
             </button>
           </div>
-          <pre className="assay-improve-md"><code>{refined}</code></pre>
-        </details>
+          <details>
+            <summary>View full refined AGENTS.md ({refined.split(/\n/).length} lines)</summary>
+            <pre className="assay-improve-md"><code>{refined}</code></pre>
+          </details>
+        </div>
       )}
     </section>
   );
+}
+
+function previewDiff(original: string, refined: string) {
+  const before = new Set((original || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+  const lines = refined.split(/\r?\n/);
+  const added = lines
+    .filter((line) => line.trim() && !before.has(line.trim()))
+    .slice(0, 18)
+    .map((line) => `+ ${line}`);
+  if (added.length > 0) return added;
+  return lines.slice(0, 12).map((line) => `  ${line}`);
 }
 
 export default ImprovePanel;
