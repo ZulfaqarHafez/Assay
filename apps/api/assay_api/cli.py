@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import difflib
 import json
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
+from .agent_diff import unified_diff_text
 from .agent_intake import detect_agent_facts
 from .agent_refinery import agent_spec_payload
 from .agent_research import resolve_openai_key
@@ -537,15 +537,7 @@ def _improvement_markdown(patch: ImprovementPatch) -> str:
 
 
 def _unified_diff(original: str, refined: str) -> str:
-    return "\n".join(
-        difflib.unified_diff(
-            original.splitlines(),
-            refined.splitlines(),
-            fromfile="original/agent.md",
-            tofile="refined/AGENTS.md",
-            lineterm="",
-        )
-    )
+    return unified_diff_text(original, refined)
 
 
 def _pct(value: Any) -> str:

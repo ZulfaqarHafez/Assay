@@ -54,7 +54,12 @@ def _ok_audit(passes: bool = True, tas: float = 88.0, fixes=None) -> TraceAuditS
 
 def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
     run = RunRecord(id="run_ready", candidate_id="cand_x", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_x", name="Solid Agent", adapter_type="mock")
+    candidate = CandidateConfig(
+        id="cand_x",
+        name="Solid Agent",
+        adapter_type="mock",
+        system_prompt="# Solid Agent\n\nBe helpful and follow policy.",
+    )
     pack = get_exam_pack("hr-v1")
     scorecard = _scorecard(
         run.id,
@@ -70,6 +75,8 @@ def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
     assert spec.readiness == "ready"
     assert spec.strengths  # at least one verified competency
     assert spec.gaps == []
+    # The uploaded definition rides on the spec for before/after diffs.
+    assert spec.original_markdown == "# Solid Agent\n\nBe helpful and follow policy."
     assert "# Solid Agent - Operating Notes" in spec.agent_markdown
     assert "## Guardrails" in spec.agent_markdown
     assert "READY" in spec.agent_markdown

@@ -470,6 +470,64 @@ def test_coding_agent_pack_lists_exports_and_runs(monkeypatch) -> None:
     assert "secret_handling" in scorecard["pass_at_k"]
 
 
+def test_agent_spec_diff_endpoint(monkeypatch) -> None:
+    class FakeAudit:
+        def __init__(self, threshold: float):
+            self.threshold = threshold
+
+        def analyse(self, candidate, trace_steps, task_value_score):
+            from assay_api.models import TraceAuditSummary
+
+            return TraceAuditSummary(
+                status="ok",
+                trace_id="trace_test",
+                tas_score=88,
+                grade="Good",
+                passes=True,
+                total_steps=len(trace_steps),
+                total_tokens=1000,
+            )
+
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
+    # Force offline registration so the uploaded candidate runs on the mock
+    # adapter even when the developer's .env carries a live OpenAI key.
+    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: None)
+
+    original_md = "# Diffable Agent\n\nAnswer support questions using company policy.\n"
+    with TestClient(app) as client:
+        uploaded = client.post(
+            "/candidates/from-markdown",
+            json={"markdown": original_md, "name": "Diffable Agent"},
+        ).json()
+        run = client.post("/runs", json={"candidate_id": uploaded["candidate"]["id"]}).json()
+
+        pending = client.get(f"/runs/{run['id']}/agent-spec/diff")
+        client.post(f"/runs/{run['id']}/start")
+        diff = client.get(f"/runs/{run['id']}/agent-spec/diff").json()
+        spec = client.get(f"/runs/{run['id']}/agent-spec").json()
+
+        # The seeded demo candidate has no stored original definition.
+        all_candidates = client.get("/candidates").json()
+        demo_id = next(c["id"] for c in all_candidates if c["name"] == "Demo Candidate")
+        demo_run = client.post("/runs", json={"candidate_id": demo_id}).json()
+        client.post(f"/runs/{demo_run['id']}/start")
+        demo_diff = client.get(f"/runs/{demo_run['id']}/agent-spec/diff").json()
+
+        missing = client.get("/runs/run_missing/agent-spec/diff")
+
+    assert pending.status_code == 409
+    assert diff["schema"] == "assay.agent_diff.v1"
+    assert diff["original_available"] is True
+    assert diff["hunks"]
+    assert diff["added"] > 0
+    assert any(line["op"] == "-" for hunk in diff["hunks"] for line in hunk["lines"])
+    assert "--- original/agent.md" in diff["unified"]
+    assert spec["original_markdown"] == original_md
+    assert demo_diff["original_available"] is False
+    assert demo_diff["added"] > 0
+    assert missing.status_code == 404
+
+
 def test_deployability_endpoint_reflects_run_policy(monkeypatch) -> None:
     class FakeAudit:
         def __init__(self, threshold: float):

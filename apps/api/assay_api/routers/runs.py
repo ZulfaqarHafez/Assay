@@ -4,6 +4,7 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..agent_diff import diff_payload
 from ..agent_refinery import agent_spec_payload
 from ..agent_research import research_agent_spec
 from ..connectors import connector_probes, connector_registry
@@ -222,6 +223,20 @@ def run_agent_spec(run_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Run not found")
     try:
         payload = agent_spec_payload(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
+    if payload is None:
+        raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
+    return payload
+
+
+@router.get("/runs/{run_id}/agent-spec/diff")
+def run_agent_spec_diff(run_id: str) -> dict:
+    """Structured before/after diff between the uploaded and refined agent md."""
+    if get_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    try:
+        payload = diff_payload(run_id)
     except KeyError as exc:
         raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
     if payload is None:

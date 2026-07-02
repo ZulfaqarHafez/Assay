@@ -219,6 +219,7 @@ def build_agent_spec(
         readiness=readiness,
         headline=headline,
         agent_markdown=agent_markdown,
+        original_markdown=candidate.system_prompt or None,
         strengths=strengths,
         gaps=gap_lines,
         tracerazor_actions=tracerazor_actions,
