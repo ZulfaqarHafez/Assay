@@ -2,6 +2,8 @@
   "name": "assay",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "author": "Zulfaqar Hafez",
   "workspaces": [
     "apps/web"
   ],

@@ -216,3 +216,9 @@ path, and Supabase boundary are in
 > **Note:** the package, API module, and many env vars still use the original
 > `assay` name internally; **Assay** is the product name. Renaming the code
 > namespace is intentionally deferred to avoid churn.
+
+## License
+
+Assay is released under the [MIT License](LICENSE). Contributions are welcome —
+see [CONTRIBUTING.md](CONTRIBUTING.md); security reports go through
+[SECURITY.md](SECURITY.md).
