@@ -41,6 +41,10 @@ class RunItemsResult(NamedTuple):
     panel_results: list[dict[str, float]]
     lesson_feedback: dict[str, str]
     judge_results: list[dict[str, Any]]
+    # Structured critical findings (e.g. a forbidden/canary phrase actually
+    # emitted), so the deployability gate keys off real signals instead of
+    # substring-scanning human-readable failure prose.
+    critical_findings: list[str]
 
 
 class RunOrchestrator:
@@ -98,13 +102,18 @@ class RunOrchestrator:
                     "role_scope_applied",
                     analyze_job_scope(run.job_scope).model_dump(mode="json"),
                 )
-            seen_scores, held_scores, panel_results, lesson_feedback, judge_results = await self._run_items(
+            run_items = await self._run_items(
                 run,
                 adapter,
                 candidate,
                 pack,
                 lessons,
             )
+            seen_scores = run_items.seen_scores
+            held_scores = run_items.held_scores
+            panel_results = run_items.panel_results
+            lesson_feedback = run_items.lesson_feedback
+            judge_results = run_items.judge_results
 
             scorecard = self._assemble_scorecard(
                 run,
@@ -114,6 +123,7 @@ class RunOrchestrator:
                 held_scores,
                 panel_results,
                 judge_results,
+                run_items.critical_findings,
             )
             scorecard.lessons_applied = applied_lesson_ids
             scorecard.prior_run_id = run.baseline_run_id or prior_run_id
@@ -223,6 +233,9 @@ class RunOrchestrator:
         panel_results: list[dict[str, float]] = []
         lesson_feedback: dict[str, str] = {}
         judge_results: list[dict[str, Any]] = []
+        # (competency, variant, phrase) → structured critical finding, deduped
+        # across the k trials.
+        critical_by_key: dict[tuple[str, str, str], str] = {}
 
         # Evaluate (item, trial) units concurrently with a bounded pool. Prior-run
         # lessons (the seed) apply to every unit; within-run lesson accumulation
@@ -252,7 +265,18 @@ class RunOrchestrator:
         # regardless of completion order.
         results = await asyncio.gather(*(evaluate(item, trial) for item, trial in units))
 
+        def record_criticals(competency: str, variant: str, grade: Any) -> None:
+            for phrase in getattr(grade, "forbidden_hits", None) or []:
+                key = (competency, variant, str(phrase))
+                critical_by_key.setdefault(
+                    key,
+                    f"CRITICAL forbidden_content: {competency} ({variant}) emitted a "
+                    f"forbidden phrase — {phrase!r}.",
+                )
+
         for item, _trial, seen_grade, held_grade in results:
+            record_criticals(item.competency, "seen", seen_grade)
+            record_criticals(item.competency, "held_out", held_grade)
             seen_scores[item.competency].append(seen_grade.score)
             panel_results.append(seen_grade.panel_scores)
             if seen_grade.judge is not None:
@@ -276,7 +300,10 @@ class RunOrchestrator:
                 self._recorder.event(run.id, "lesson_library", "lesson_added",
                             {"competency": item.competency, "lesson": lesson})
 
-        return RunItemsResult(seen_scores, held_scores, panel_results, lesson_feedback, judge_results)
+        return RunItemsResult(
+            seen_scores, held_scores, panel_results, lesson_feedback, judge_results,
+            list(critical_by_key.values()),
+        )
 
     def _grade(
         self,
@@ -321,6 +348,7 @@ class RunOrchestrator:
         held_scores: dict[str, list[float]],
         panel_results: list[dict[str, float]],
         judge_results: list[dict[str, Any]] | None = None,
+        critical_findings: list[str] | None = None,
     ) -> Scorecard:
         seen_mean = {key: round(mean(values), 3) for key, values in seen_scores.items()}
         held_mean = {key: round(mean(values), 3) for key, values in held_scores.items()}
@@ -346,6 +374,9 @@ class RunOrchestrator:
         )
 
         failures: list[str] = []
+        # Structured critical findings (real forbidden/canary emissions) lead the
+        # list so the deployability gate blocks on them explicitly.
+        failures.extend(critical_findings or [])
         for competency, passed in pass_at_k.items():
             if not passed:
                 failures.append(f"{competency} failed pass^{run.k} on held-out variants")
