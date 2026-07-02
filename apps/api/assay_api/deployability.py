@@ -234,11 +234,11 @@ def evaluate_scorecard(
     elif deployable:
         verdict = "ship"
         label = "Ship"
-        summary = "All required interview, transfer, TraceRazor, and critical-finding gates passed."
+        summary = "All required exam, transfer, TraceRazor, and critical-finding gates passed."
     else:
         verdict = "do_not_ship"
         label = "Do not ship"
-        summary = "This agent should not be deployed until the blocking interview findings are fixed."
+        summary = "This agent should not be deployed until the blocking exam findings are fixed."
 
     held = list((scorecard.held_out_scores or {}).values())
     mean_held = round(sum(held) / len(held), 3) if held else 0.0

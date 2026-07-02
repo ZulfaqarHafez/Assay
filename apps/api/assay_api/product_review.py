@@ -39,7 +39,7 @@ def _role_analyst(scorecard: Scorecard | None) -> ProductReviewer:
             label="ready",
             summary="Waiting to qualify what this agent is supposed to do.",
             evidence=["No scorecard has been created yet."],
-            next_step="Run an interview loop to qualify the role and exam pack.",
+            next_step="Run an exam to qualify the role and pack.",
             sprite="candidate-document",
         )
     if scorecard.qualification_status == "tailored":
@@ -62,7 +62,7 @@ def _role_analyst(scorecard: Scorecard | None) -> ProductReviewer:
         label=scorecard.qualification_status,
         summary="The run used deterministic role qualification; acceptable offline, weaker than researched loops.",
         evidence=[scorecard.role_brief_summary or "No role-specific researched brief was recorded."],
-        next_step="Use `assay research-role --research fast|deep` for a stronger interview loop.",
+        next_step="Use `assay research-role --research fast|deep` for a stronger exam loop.",
         sprite="candidate-review",
     )
 
@@ -74,9 +74,9 @@ def _security_interviewer(scorecard: Scorecard | None) -> ProductReviewer:
             name="Security Interviewer",
             status="wait",
             label="waiting",
-            summary="Waiting for adversarial interview evidence.",
+            summary="Waiting for adversarial exam evidence.",
             evidence=["No scorecard has been created yet."],
-            next_step="Run an interview loop with adversarial rounds.",
+            next_step="Run an exam with adversarial rounds.",
             sprite="candidate-alert",
         )
     failures = [
@@ -90,7 +90,7 @@ def _security_interviewer(scorecard: Scorecard | None) -> ProductReviewer:
             name="Security Interviewer",
             status="warn",
             label="blocked",
-            summary="Security or policy interview rounds found deploy-blocking behavior.",
+            summary="Security or policy exam rounds found deploy-blocking behavior.",
             evidence=failures[:3],
             next_step="Patch the agent rules, rerun held-out variants, and compare before shipping.",
             sprite="candidate-alert",
@@ -115,7 +115,7 @@ def _tool_auditor(scorecard: Scorecard | None, event_count: int) -> ProductRevie
             label="waiting",
             summary="Waiting for tool-call and event evidence.",
             evidence=["No completed run is available yet."],
-            next_step="Run an interview loop to capture candidate and tool events.",
+            next_step="Run an exam to capture agent and tool events.",
             sprite="candidate-audit",
         )
     toolish_failures = [
@@ -166,7 +166,7 @@ def _trace_auditor(scorecard: Scorecard | None, db: dict[str, Any]) -> ProductRe
             label="waiting",
             summary="Waiting for trace audit evidence.",
             evidence=["No scorecard has been created yet."],
-            next_step="Run an interview loop to capture trace steps.",
+            next_step="Run an exam to capture trace steps.",
             sprite="candidate-audit",
         )
     if trace.status != "ok":
@@ -211,7 +211,7 @@ def _release_manager(run: RunRecord, scorecard: Scorecard | None, event_count: i
             label="waiting",
             summary="Waiting for the deployability decision.",
             evidence=["No scorecard has been created yet."],
-            next_step="Run an interview loop and gate it with strict policy.",
+            next_step="Run an exam and gate it with strict policy.",
             sprite="candidate-document",
         )
     decision = evaluate_scorecard(scorecard, policy_for_run(run))
@@ -236,6 +236,6 @@ def _release_manager(run: RunRecord, scorecard: Scorecard | None, event_count: i
         label="blocked",
         summary=decision.summary,
         evidence=decision.blocking_reasons[:3] or ["Deployability policy blocked this run."],
-        next_step="Improve the agent, rerun the interview loop, then compare against this baseline.",
+        next_step="Improve the agent, rerun the exam, then compare against this baseline.",
         sprite="candidate-review",
     )
