@@ -3,11 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, XCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard, Sparkles } from "lucide-react";
-import { deriveVerdict, deriveFixes, deriveCategoryScores, type FixSeverity } from "@/lib/assay";
+import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, type FixSeverity } from "@/lib/assay";
 import RoleBriefCard from "@/components/assay/RoleBriefCard";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import RunComparison from "@/components/scorecard/RunComparison";
-import type { Scorecard, AgentSpec } from "@/types/assay";
+import type { Scorecard, AgentSpec, DeployabilityDecision } from "@/types/assay";
 
 /**
  * The payoff screen. One verdict, one score, one biggest-problem sentence
@@ -20,6 +20,8 @@ export type VerdictPanelProps = {
   scorecard: Scorecard;
   agentSpec: AgentSpec | null;
   agentName: string;
+  deployability?: DeployabilityDecision | null;
+  originalMarkdown?: string;
   onViewTrace: () => void;
   onTestAnother: () => void;
   onRerun: () => void;
@@ -42,12 +44,14 @@ export function VerdictPanel({
   scorecard,
   agentSpec,
   agentName,
+  deployability = null,
+  originalMarkdown,
   onViewTrace,
   onTestAnother,
   onRerun,
   onTestImproved
 }: VerdictPanelProps) {
-  const verdict = React.useMemo(() => deriveVerdict(scorecard), [scorecard]);
+  const verdict = React.useMemo(() => deriveVerdict(scorecard, deployability), [scorecard, deployability]);
   const fixes = React.useMemo(() => deriveFixes(scorecard, agentSpec), [scorecard, agentSpec]);
   const categories = React.useMemo(() => deriveCategoryScores(scorecard), [scorecard]);
   const Icon = VERDICT_ICON[verdict.verdict];
@@ -88,12 +92,24 @@ export function VerdictPanel({
           aria-label={`Litmus score ${verdict.score} of 100 on the fail-to-ship scale`}
         >
           <span className="knob" style={{ left: `${Math.min(98, Math.max(2, verdict.score))}%` }} />
+          {deployability && (
+            <span
+              className="threshold-tick"
+              style={{ left: `${Math.round(deployability.policy.competency_threshold * 100)}%` }}
+              title={`Policy bar: every competency ≥${Math.round(deployability.policy.competency_threshold * 100)}% held-out`}
+            />
+          )}
         </div>
         <div className="scale" aria-hidden="true">
           <span>Fail</span>
           <span>Risky</span>
           <span>Ship</span>
         </div>
+        {deployability && (
+          <p className="assay-policy-rule">
+            Judged against: {policyRuleSentence(deployability.policy)}
+          </p>
+        )}
       </div>
 
       <div className="assay-verdict-actions">
@@ -122,7 +138,14 @@ export function VerdictPanel({
 
       <RoleBriefCard runId={scorecard.run_id} />
 
-      <ImprovePanel agentSpec={agentSpec} agentName={agentName} />
+      <ImprovePanel
+        agentSpec={agentSpec}
+        agentName={agentName}
+        runId={scorecard.run_id}
+        originalMarkdown={originalMarkdown}
+        traceAudit={scorecard.trace_audit}
+        validation={agentSpec?.agent_markdown?.trim() ? { state: "pending" } : null}
+      />
 
       <div className="assay-fixes">
         <h3 className="assay-section-label">What to fix</h3>

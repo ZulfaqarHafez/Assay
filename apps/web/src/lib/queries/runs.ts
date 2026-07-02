@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assayApi } from "@/lib/api";
 import type {
+  AgentDiff,
   AgentSpec,
+  DeployabilityDecision,
   DiagnosticLesson,
   JobScope,
   ProductReview,
@@ -89,6 +91,27 @@ export function useAgentSpec(runId: string | null | undefined, options?: QueryOp
   });
 }
 
+export function useAgentSpecDiff(runId: string | null | undefined, options?: QueryOpts<AgentDiff>) {
+  return useQuery({
+    queryKey: queryKeys.agentSpecDiff(runId ?? ""),
+    queryFn: () => assayApi.agentSpecDiff(runId as string),
+    enabled: Boolean(runId),
+    ...options
+  });
+}
+
+export function useDeployability(
+  runId: string | null | undefined,
+  options?: QueryOpts<DeployabilityDecision>
+) {
+  return useQuery({
+    queryKey: queryKeys.deployability(runId ?? ""),
+    queryFn: () => assayApi.deployability(runId as string),
+    enabled: Boolean(runId),
+    ...options
+  });
+}
+
 export function useReviewers(runId: string | null | undefined, options?: QueryOpts<ProductReview>) {
   return useQuery({
     queryKey: queryKeys.reviewers(runId ?? ""),
@@ -130,13 +153,25 @@ export type CreateRunVars = {
   examPackId?: string;
   jobScope?: JobScope | null;
   baselineRunId?: string | null;
+  policyName?: "strict" | "advisory";
+  competencyThreshold?: number;
 };
 
 export function useCreateRun(options?: MutationOpts<RunRecord, CreateRunVars>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ candidateId, examPackId = "hr-v1", jobScope = null, baselineRunId = null }: CreateRunVars) =>
-      assayApi.createRun(candidateId, examPackId, jobScope, baselineRunId),
+    mutationFn: ({
+      candidateId,
+      examPackId = "hr-v1",
+      jobScope = null,
+      baselineRunId = null,
+      policyName,
+      competencyThreshold
+    }: CreateRunVars) =>
+      assayApi.createRun(candidateId, examPackId, jobScope, baselineRunId, {
+        policyName,
+        competencyThreshold
+      }),
     ...options,
     onSettled: (...args) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
@@ -158,6 +193,9 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.trace(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.proofBundle(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.reviewers(runId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deployability(runId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentSpec(runId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentSpecDiff(runId) });
       options?.onSettled?.(data, error, runId, ...rest);
     }
   });

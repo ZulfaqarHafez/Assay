@@ -20,6 +20,8 @@ export {
   useEvents,
   useProofBundle,
   useAgentSpec,
+  useAgentSpecDiff,
+  useDeployability,
   useReviewers,
   useRunComparison,
   useRunLessonsApplied,

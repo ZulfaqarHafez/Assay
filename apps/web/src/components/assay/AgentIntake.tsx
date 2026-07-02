@@ -20,18 +20,26 @@ export type AgentTemplate = {
   markdown: string;
 };
 
+/** Deploy-gate choice made at intake; the run is judged against exactly this. */
+export type IntakePolicy = {
+  name: "strict" | "advisory";
+  competencyThreshold: number;
+};
+
 export type AgentIntakeProps = {
   examPackName: string;
   /** True when an LLM key is configured, so the upload runs for real. */
   liveMode: boolean;
   submitting: boolean;
   templates: AgentTemplate[];
-  onRun: (markdown: string, roleScopeText?: string) => void;
+  onRun: (markdown: string, roleScopeText?: string, policy?: IntakePolicy) => void;
 };
 
 export function AgentIntake({ examPackName, liveMode, submitting, templates, onRun }: AgentIntakeProps) {
   const [markdown, setMarkdown] = React.useState("");
   const [roleScopeText, setRoleScopeText] = React.useState("");
+  const [policyName, setPolicyName] = React.useState<IntakePolicy["name"]>("strict");
+  const [thresholdPct, setThresholdPct] = React.useState(80);
   const [dragging, setDragging] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -133,7 +141,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <button
           type="button"
           className="assay-run-button"
-          onClick={() => onRun(markdown, roleScopeText)}
+          onClick={() => onRun(markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 })}
           disabled={!hasContent || submitting}
         >
           <FlaskConical size={18} />
@@ -162,7 +170,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
       </div>
 
       <details className="assay-advanced">
-        <summary>Role scope</summary>
+        <summary>Role scope &amp; deploy policy</summary>
         <textarea
           className="assay-scope-textarea"
           value={roleScopeText}
@@ -171,6 +179,47 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           aria-label="Role scope"
           rows={3}
         />
+        <div className="assay-policy" aria-label="Deploy policy">
+          <div className="assay-policy-toggle" role="radiogroup" aria-label="Deployability policy">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={policyName === "strict"}
+              className={policyName === "strict" ? "active" : ""}
+              onClick={() => setPolicyName("strict")}
+            >
+              Strict
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={policyName === "advisory"}
+              className={policyName === "advisory" ? "active" : ""}
+              onClick={() => setPolicyName("advisory")}
+            >
+              Advisory
+            </button>
+          </div>
+          <small className="assay-policy-hint">
+            {policyName === "strict"
+              ? "Strict: trace-audit and degraded-mode findings block the verdict."
+              : "Advisory: trace-audit and degraded-mode findings warn instead of block."}
+          </small>
+          <label className="assay-policy-slider">
+            <span>
+              Pass bar <strong>{thresholdPct}%</strong> — every competency must score at least {thresholdPct}% on all held-out trials (not 100).
+            </span>
+            <input
+              type="range"
+              min={50}
+              max={95}
+              step={5}
+              value={thresholdPct}
+              onChange={(event) => setThresholdPct(Number(event.target.value))}
+              aria-label="Competency pass threshold percent"
+            />
+          </label>
+        </div>
       </details>
         </div>
         <aside className="assay-hero-aside">

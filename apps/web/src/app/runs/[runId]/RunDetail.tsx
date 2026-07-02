@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   ShieldCheck,
+  TrendingUp,
+  TrendingDown,
   UserRoundSearch,
   Swords,
   Wrench,
@@ -16,12 +18,16 @@ import {
   Rocket
 } from "lucide-react";
 import {
+  useDeployability,
   useProofBundle,
   useReviewers,
+  useRunComparison,
+  useRuns,
   useScorecard,
   useTrace
 } from "@/lib/queries";
-import { downloadJson, errorMessage, maxTransferGap, traceScoreLabel } from "@/lib/derive";
+import { policyRuleSentence } from "@/lib/assay";
+import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import TraceDrawer from "@/components/trace/TraceDrawer";
 import CompetencyRadar from "@/components/scorecard/CompetencyRadar";
 import RunComparison from "@/components/scorecard/RunComparison";
@@ -42,6 +48,9 @@ export default function RunDetail({ runId }: { runId: string }) {
   const traceQuery = useTrace(runId);
   const scorecardQuery = useScorecard(runId);
   const reviewersQuery = useReviewers(runId);
+  // Fast, policy-honest decision (no ~8s proof-bundle wait); bundle is fallback.
+  const deployabilityQuery = useDeployability(runId, { retry: false });
+  const runsQuery = useRuns();
 
   // Drawer open/closed driven by the URL so the view is deep-linkable.
   const [drawer, setDrawer] = useQueryState(
@@ -53,7 +62,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   const proofBundle = proofBundleQuery.data ?? null;
   const trace = traceQuery.data ?? null;
   const scorecard = scorecardQuery.data ?? proofBundle?.scorecard ?? null;
-  const deployability = proofBundle?.deployability ?? null;
+  const deployability = deployabilityQuery.data ?? proofBundle?.deployability ?? null;
   const reviewers = reviewersQuery.data ?? proofBundle?.product_review ?? null;
   const events = trace?.events ?? proofBundle?.events ?? [];
   const agentSpec = proofBundle?.agent_spec ?? null;
@@ -61,6 +70,10 @@ export default function RunDetail({ runId }: { runId: string }) {
   const candidateName = proofBundle?.candidate?.name ?? "Candidate";
   // Rerun against the originally-requested pack (a tailored run repoints exam_pack_id at a gen-* id).
   const rerunPackId = proofBundle?.run?.source_pack_id ?? proofBundle?.run?.exam_pack_id ?? "hr-v1";
+  // This run tested a refined agent when it carries a baseline; conversely a
+  // later run pointing back here means this run's refinery output was validated.
+  const baselineRunId = proofBundle?.run?.baseline_run_id ?? null;
+  const validationRun = (runsQuery.data ?? []).find((item) => item.baseline_run_id === runId) ?? null;
 
   // Gate the analytics on the fast scorecard, not the ~8s proof-bundle assembly.
   const isLoading = scorecardQuery.isLoading && !scorecard;
@@ -126,6 +139,10 @@ export default function RunDetail({ runId }: { runId: string }) {
         </div>
       ) : null}
 
+      {scorecard && baselineRunId ? (
+        <ImprovementBanner runId={runId} baselineRunId={baselineRunId} deployable={deployable} />
+      ) : null}
+
       {scorecard ? (
         <div className="rd-cockpit">
           <DeployabilityMeter decision={deployability} scorecard={scorecard} />
@@ -137,7 +154,16 @@ export default function RunDetail({ runId }: { runId: string }) {
         <ImprovePanel
           agentSpec={agentSpec}
           agentName={candidateName}
-          originalMarkdown={proofBundle?.candidate?.system_prompt ?? ""}
+          runId={runId}
+          originalMarkdown={proofBundle?.candidate?.system_prompt || undefined}
+          traceAudit={scorecard?.trace_audit ?? null}
+          validation={
+            validationRun
+              ? { state: "validated", runId: validationRun.id }
+              : agentSpec.agent_markdown?.trim()
+                ? { state: "pending" }
+                : null
+          }
         />
       ) : null}
 
@@ -206,6 +232,8 @@ function DeployabilityMeter({
   const warnings = decision?.warnings ?? [];
   const tone = verdict === "ship" ? "ship" : verdict === "probation" ? "probation" : "hold";
   const passValues = Object.values(scorecard.pass_at_k ?? {});
+  const traceFixCount = scorecard.trace_audit?.fixes?.length ?? 0;
+  const tokensSaved = scorecard.trace_audit?.savings?.tokens_saved;
 
   return (
     <section className={`rd-meter ${tone}`} aria-label="Deployability meter">
@@ -214,12 +242,23 @@ function DeployabilityMeter({
         <strong>{label}</strong>
       </header>
       <p>{decision?.summary ?? "Shared deployability policy has not been attached to this proof bundle yet."}</p>
+      {decision && <p className="rd-meter-rule">Gate: {policyRuleSentence(decision.policy)}</p>}
       <div className="rd-meter-grid">
         <Metric label="pass^k" value={`${passValues.filter(Boolean).length}/${passValues.length}`} />
         <Metric label="threshold" value={`${Math.round((scorecard.thresholds.competency ?? 0.8) * 100)}%`} />
         <Metric label="TraceRazor" value={traceScoreLabel(scorecard)} />
         <Metric label="max gap" value={maxTransferGap(scorecard).toFixed(2)} />
       </div>
+      {decision && (decision.passed_checks.length > 0 || decision.failed_checks.length > 0) && (
+        <div className="rd-meter-checks" aria-label="Policy checks">
+          {decision.failed_checks.map((check) => (
+            <span className="rd-check-chip fail" key={`fail-${check}`}>{formatCheck(check)}</span>
+          ))}
+          {decision.passed_checks.map((check) => (
+            <span className="rd-check-chip pass" key={`pass-${check}`}>{formatCheck(check)}</span>
+          ))}
+        </div>
+      )}
       {(blocked.length > 0 || warnings.length > 0) && (
         <ul className="rd-meter-findings">
           {[...blocked.slice(0, 3), ...warnings.slice(0, Math.max(0, 3 - blocked.length))].map((item, index) => (
@@ -227,7 +266,58 @@ function DeployabilityMeter({
           ))}
         </ul>
       )}
+      {traceFixCount > 0 && (
+        <p className="rd-meter-tracefixes">
+          <Activity size={13} /> {traceFixCount} TraceRazor fix{traceFixCount === 1 ? "" : "es"} available
+          {typeof tokensSaved === "number" && tokensSaved > 0 ? ` (~${tokensSaved.toLocaleString()} tokens/run)` : ""} — see &ldquo;How to improve&rdquo;.
+        </p>
+      )}
     </section>
+  );
+}
+
+/** "compliance:pass^k" → "Compliance pass^k"; bare check ids stay readable. */
+function formatCheck(check: string): string {
+  const [head, tail] = check.split(":");
+  if (!tail) return labelize(head);
+  return `${labelize(head)} ${tail.replace(/_/g, " ")}`;
+}
+
+function ImprovementBanner({
+  runId,
+  baselineRunId,
+  deployable
+}: {
+  runId: string;
+  baselineRunId: string;
+  deployable: boolean;
+}) {
+  const comparisonQuery = useRunComparison(runId, baselineRunId);
+  const comparison = comparisonQuery.data ?? null;
+  if (!comparison) return null;
+
+  const deltas = comparison.competencies
+    .map((item) => item.delta)
+    .filter((delta): delta is number => typeof delta === "number");
+  const meanDelta = deltas.length
+    ? Math.round((deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length) * 100)
+    : 0;
+  const improved = meanDelta > 0 || comparison.improved > comparison.regressed;
+  const Icon = improved ? TrendingUp : TrendingDown;
+
+  return (
+    <div className={`rd-improvement ${improved ? "up" : "down"}`} role="status">
+      <Icon size={16} />
+      <span>
+        <strong>Refined agent vs baseline&nbsp;<code>{baselineRunId}</code>:</strong>{" "}
+        {comparison.improved} competenc{comparison.improved === 1 ? "y" : "ies"} improved,{" "}
+        {comparison.regressed} regressed{deltas.length ? ` · mean held-out ${meanDelta >= 0 ? "+" : ""}${meanDelta} pts` : ""}
+        {comparison.certified_changed ? " · certification flipped" : ""} · now {deployable ? "deployable" : "still blocked"}.
+      </span>
+      <Link href={`/runs/${baselineRunId}`} className="rd-improvement-link">
+        View baseline
+      </Link>
+    </div>
   );
 }
 
