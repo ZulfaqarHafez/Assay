@@ -141,21 +141,6 @@ export function VerdictPanel({
         </button>
       </div>
 
-      {scorecard.prior_run_id && (
-        <RunComparison runId={scorecard.run_id} className="assay-verdict-comparison" />
-      )}
-
-      <RoleBriefCard runId={scorecard.run_id} />
-
-      <ImprovePanel
-        agentSpec={agentSpec}
-        agentName={agentName}
-        runId={scorecard.run_id}
-        originalMarkdown={originalMarkdown}
-        traceAudit={scorecard.trace_audit}
-        validation={agentSpec?.agent_markdown?.trim() ? { state: "pending" } : null}
-      />
-
       <div className="assay-fixes">
         <h3 className="assay-section-label">What to fix</h3>
         <ol className="assay-fix-list">
@@ -192,6 +177,28 @@ export function VerdictPanel({
           {categories.length === 0 && <p className="assay-muted">No competency breakdown for this run.</p>}
         </div>
       </div>
+
+      {/* The coaching depth lives one disclosure down so the 5-second path is
+          verdict → score → biggest problem → top fixes, not a wall of panels. */}
+      <details className="assay-improve-more">
+        <summary>
+          <Sparkles size={15} /> How to improve — refined agent.md, coaching, and run comparison
+        </summary>
+        <div className="assay-improve-more-body">
+          {scorecard.prior_run_id && (
+            <RunComparison runId={scorecard.run_id} className="assay-verdict-comparison" />
+          )}
+          <RoleBriefCard runId={scorecard.run_id} />
+          <ImprovePanel
+            agentSpec={agentSpec}
+            agentName={agentName}
+            runId={scorecard.run_id}
+            originalMarkdown={originalMarkdown}
+            traceAudit={scorecard.trace_audit}
+            validation={agentSpec?.agent_markdown?.trim() ? { state: "pending" } : null}
+          />
+        </div>
+      </details>
 
       <button type="button" className="assay-evidence-link" onClick={onViewTrace}>
         See the adversarial prompts and the judge&rsquo;s reasoning <ArrowRight size={14} />

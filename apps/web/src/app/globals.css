@@ -4995,3 +4995,35 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
 }
+
+/* "How to improve" disclosure — coaching depth one click down (P1-7). */
+.assay-improve-more {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+}
+.assay-improve-more > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-fg);
+  user-select: none;
+}
+.assay-improve-more > summary::-webkit-details-marker { display: none; }
+.assay-improve-more > summary::after {
+  content: "\25B8";
+  margin-left: auto;
+  color: var(--color-fg-muted);
+  transition: transform 160ms ease;
+}
+.assay-improve-more[open] > summary::after { transform: rotate(90deg); }
+.assay-improve-more-body {
+  display: grid;
+  gap: 18px;
+  padding: 0 18px 18px;
+}
