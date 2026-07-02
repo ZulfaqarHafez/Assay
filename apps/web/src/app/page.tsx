@@ -156,7 +156,7 @@ export default function Home() {
   // Assay primary flow: take an uploaded/authored agent.md, register it as the
   // candidate under test (live LLM when a key is set, deterministic demo when
   // not), then immediately run the adversarial exam and stream the judging.
-  async function runAgentMarkdown(markdown: string, roleScopeText?: string, policy?: IntakePolicy) {
+  async function runAgentMarkdown(markdown: string, roleScopeText?: string, policy?: IntakePolicy, filename?: string) {
     if (!markdown.trim()) return;
     setError(null);
     resetRunArtifacts();
@@ -166,7 +166,7 @@ export default function Home() {
     setSubmittedMarkdown(markdown);
     setRunPolicy(policy ?? null);
     try {
-      const intake = await assayApi.candidateFromMarkdown(markdown);
+      const intake = await assayApi.candidateFromMarkdown(markdown, null, filename ?? null);
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);

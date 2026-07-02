@@ -413,13 +413,19 @@ afterEach(() => {
 
 describe("Assay page", () => {
   it("leads with the Assay agent.md intake as the first screen", async () => {
-    renderHome();
+    const { container } = renderHome();
     // Brand now lives in the global TopNav (layout); the page leads with the hero.
     await screen.findByRole("heading", { name: /find out where it breaks/i });
     expect(screen.getByRole("button", { name: /run the litmus test/i })).toBeDisabled();
     expect(screen.getByText(/find out where it breaks/i)).toBeInTheDocument();
     // A starter template is offered as the fallback.
     expect(screen.getByText(/HR screener \(hardened\)/i)).toBeInTheDocument();
+    // Intake accepts structured agent configs, not just markdown.
+    const fileInput = container.querySelector('input[type="file"]');
+    const accept = fileInput?.getAttribute("accept") ?? "";
+    expect(accept).toContain(".json");
+    expect(accept).toContain(".yaml");
+    expect(accept).toContain(".toml");
   });
 
   it("runs an uploaded agent.md and lands on a verdict", async () => {

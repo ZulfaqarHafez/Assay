@@ -52,10 +52,14 @@ export const assayApi = {
       method: "POST",
       body: JSON.stringify(candidate)
     }),
-  candidateFromMarkdown: (markdown: string, name?: string | null) =>
+  candidateFromMarkdown: (markdown: string, name?: string | null, filename?: string | null) =>
     request<AgentIntakeResponse>("/candidates/from-markdown", {
       method: "POST",
-      body: JSON.stringify({ markdown, name: name ?? null })
+      body: JSON.stringify(
+        filename
+          ? { content: markdown, filename, name: name ?? null }
+          : { markdown, name: name ?? null }
+      )
     }),
   createRun: (
     candidateId: string,

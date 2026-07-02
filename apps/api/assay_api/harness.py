@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .agent_formats import normalize_agent_definition
 from .agent_intake import detect_agent_facts
 from .exam_packs import get_exam_pack
 from .models import JobScope, ToolSpec, utc_now
@@ -100,8 +101,9 @@ class ImprovementPatch(BaseModel):
 
 def scan_agent(agent_path: str | Path, tools_path: str | Path | None = None) -> AgentSource:
     path = Path(agent_path)
-    markdown = path.read_text(encoding="utf-8")
-    facts = detect_agent_facts(markdown)
+    normalized = normalize_agent_definition(path.read_text(encoding="utf-8"), filename=path.name)
+    markdown = normalized.markdown
+    facts = {**detect_agent_facts(markdown), **normalized.facts_overrides}
     tools = _parse_tools_file(tools_path)
     warnings = _scan_warnings(markdown, tools)
     return AgentSource(

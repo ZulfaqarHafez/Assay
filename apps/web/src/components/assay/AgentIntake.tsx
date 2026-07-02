@@ -32,23 +32,32 @@ export type AgentIntakeProps = {
   liveMode: boolean;
   submitting: boolean;
   templates: AgentTemplate[];
-  onRun: (markdown: string, roleScopeText?: string, policy?: IntakePolicy) => void;
+  onRun: (markdown: string, roleScopeText?: string, policy?: IntakePolicy, filename?: string) => void;
 };
+
+const STRUCTURED_EXTENSIONS = /\.(json|ya?ml|toml)$/i;
 
 export function AgentIntake({ examPackName, liveMode, submitting, templates, onRun }: AgentIntakeProps) {
   const [markdown, setMarkdown] = React.useState("");
+  const [filename, setFilename] = React.useState<string | undefined>(undefined);
   const [roleScopeText, setRoleScopeText] = React.useState("");
   const [policyName, setPolicyName] = React.useState<IntakePolicy["name"]>("strict");
   const [thresholdPct, setThresholdPct] = React.useState(80);
   const [dragging, setDragging] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const facts = React.useMemo(() => detectAgentFacts(markdown), [markdown]);
+  // Structured configs (JSON/YAML/TOML) are normalized server-side; the local
+  // facts mirror only understands markdown, so skip it for those.
+  const isStructured = Boolean(filename && STRUCTURED_EXTENSIONS.test(filename)) || markdown.trimStart().startsWith("{");
+  const facts = React.useMemo(() => detectAgentFacts(isStructured ? "" : markdown), [markdown, isStructured]);
   const hasContent = markdown.trim().length > 0;
 
   const readFile = React.useCallback((file: File) => {
     const reader = new FileReader();
-    reader.onload = () => setMarkdown(String(reader.result ?? ""));
+    reader.onload = () => {
+      setMarkdown(String(reader.result ?? ""));
+      setFilename(file.name);
+    };
     reader.readAsText(file);
   }, []);
 
@@ -93,7 +102,10 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <textarea
           className="assay-textarea"
           value={markdown}
-          onChange={(event) => setMarkdown(event.target.value)}
+          onChange={(event) => {
+            setMarkdown(event.target.value);
+            setFilename(undefined);
+          }}
           placeholder={"# Support Triage Agent\n\nYou are a customer-support agent. Stay within policy, never reveal\ninternal notes, and escalate refunds over $100.\n\n## Tools\n- `lookup_order`\n- `issue_refund`\n- `escalate`"}
           spellCheck={false}
           aria-label="Agent definition markdown"
@@ -106,7 +118,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <input
           ref={fileInputRef}
           type="file"
-          accept=".md,.markdown,.txt,text/markdown,text/plain"
+          accept=".md,.markdown,.txt,.json,.yaml,.yml,.toml,text/markdown,text/plain,application/json,application/yaml,application/toml"
           hidden
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -121,7 +133,15 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         )}
       </div>
 
-      {hasContent && (
+      {hasContent && isStructured && (
+        <div className="assay-detected" aria-live="polite">
+          <span className="assay-detected-lead">Detected</span>
+          <span className="assay-chip">
+            <FileText size={13} /> {filename ?? "Structured config"} — normalized on the server
+          </span>
+        </div>
+      )}
+      {hasContent && !isStructured && (
         <div className="assay-detected" aria-live="polite">
           <span className="assay-detected-lead">Detected</span>
           <span className="assay-chip">
@@ -141,7 +161,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <button
           type="button"
           className="assay-run-button"
-          onClick={() => onRun(markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 })}
+          onClick={() => onRun(markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 }, filename)}
           disabled={!hasContent || submitting}
         >
           <FlaskConical size={18} />

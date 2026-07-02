@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .agent_diff import unified_diff_text
+from .agent_formats import normalize_agent_definition
 from .agent_intake import detect_agent_facts
 from .agent_refinery import agent_spec_payload
 from .agent_research import resolve_openai_key
@@ -255,8 +256,11 @@ async def _interview_async(args: argparse.Namespace, agent_path: Path) -> int:
     )
     pack_id = _pack_id_from_args(args)
     pack = get_exam_pack(pack_id)
-    markdown = agent_path.read_text(encoding="utf-8")
-    detected = detect_agent_facts(markdown)
+    normalized = normalize_agent_definition(
+        agent_path.read_text(encoding="utf-8"), filename=agent_path.name
+    )
+    markdown = normalized.markdown
+    detected = {**detect_agent_facts(markdown), **normalized.facts_overrides}
     loop_payload = load_json_file(args.loop) if args.loop else None
     init_db()
 
@@ -268,6 +272,7 @@ async def _interview_async(args: argparse.Namespace, agent_path: Path) -> int:
         metadata={
             "source": "assay-cli",
             "agent_path": str(agent_path),
+            "source_format": normalized.format,
             "interview_loop": loop_payload,
             **detected,
         },
