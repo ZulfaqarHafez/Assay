@@ -7,6 +7,7 @@ import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, t
 import RoleBriefCard from "@/components/assay/RoleBriefCard";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import RunComparison from "@/components/scorecard/RunComparison";
+import { VERDICT_SCALE } from "@/lib/verdict";
 import type { Scorecard, AgentSpec, DeployabilityDecision } from "@/types/assay";
 
 /**
@@ -101,9 +102,9 @@ export function VerdictPanel({
           )}
         </div>
         <div className="scale" aria-hidden="true">
-          <span>Fail</span>
-          <span>Risky</span>
-          <span>Ship</span>
+          {VERDICT_SCALE.map((band) => (
+            <span key={band}>{band}</span>
+          ))}
         </div>
         {deployability && (
           <p className="assay-policy-rule">

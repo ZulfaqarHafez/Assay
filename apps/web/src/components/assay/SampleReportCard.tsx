@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { VERDICT_LABEL, VERDICT_SCALE } from "@/lib/verdict";
 
 /**
  * A static, representative verdict card used both as the hero's product preview
@@ -23,12 +24,12 @@ export function SampleReportCard() {
         <div className="lp-report-head">
           <div>
             <span className="lp-report-agent">support-triage.md</span>
-            <strong>Ship with fixes</strong>
+            <strong>{VERDICT_LABEL.risky}</strong>
           </div>
           <div className="lp-report-score"><strong>72</strong><span>/100</span></div>
         </div>
         <div className="lp-report-meter"><span className="knob" style={{ left: "72%" }} /></div>
-        <div className="lp-report-scale"><span>Fail</span><span>Risky</span><span>Ship</span></div>
+        <div className="lp-report-scale">{VERDICT_SCALE.map((b) => <span key={b}>{b}</span>)}</div>
         <div className="lp-report-fixes">
           {FIXES.map((f) => (
             <div className={`lp-report-fix ${f.sev}`} key={f.title}>

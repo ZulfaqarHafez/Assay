@@ -27,6 +27,7 @@ import {
   useTrace
 } from "@/lib/queries";
 import { policyRuleSentence } from "@/lib/assay";
+import { VERDICT_LABEL, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import TraceDrawer from "@/components/trace/TraceDrawer";
 import CompetencyRadar from "@/components/scorecard/CompetencyRadar";
@@ -83,7 +84,11 @@ export default function RunDetail({ runId }: { runId: string }) {
   const passTotal = passEntries.length;
   const certified = scorecard?.certified ?? false;
   const deployable = deployability?.deployable ?? certified;
-  const verdictLabel = deployability?.label ?? (certified ? "Ship" : "Do not ship");
+  const verdictLabel = deployability
+    ? decisionLabel(deployability.verdict)
+    : certified
+      ? VERDICT_LABEL.ship
+      : VERDICT_LABEL.hold;
 
   return (
     <main className="rd-shell">
@@ -208,8 +213,8 @@ function DeployabilityMeter({
   decision: DeployabilityDecision | null;
   scorecard: Scorecard;
 }) {
-  const label = decision?.label ?? (scorecard.certified ? "Ship" : "Do not ship");
   const verdict = decision?.verdict ?? (scorecard.certified ? "ship" : "do_not_ship");
+  const label = decisionLabel(verdict);
   const blocked = decision?.blocking_reasons ?? scorecard.failure_reasons ?? [];
   const warnings = decision?.warnings ?? [];
   const tone = verdict === "ship" ? "ship" : verdict === "probation" ? "probation" : "hold";
@@ -351,7 +356,7 @@ function InterviewTimeline({
       icon: <Rocket size={15} />,
       label: "Release gate",
       state: decision?.deployable ? "pass" : "warn",
-      detail: decision?.label ?? (scorecard.certified ? "Ship" : "Do not ship")
+      detail: decisionLabel(decision?.verdict ?? (scorecard.certified ? "ship" : "do_not_ship"))
     }
   ];
 

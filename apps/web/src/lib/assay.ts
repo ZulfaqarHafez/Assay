@@ -1,5 +1,6 @@
 import type { Scorecard, AgentSpec, DeployabilityDecision, DeployabilityPolicy, RunEvent } from "@/types/assay";
 import { labelize, maxTransferGap } from "@/lib/derive";
+import { VERDICT_HEADLINE, bandFromDecision, type VerdictBand } from "@/lib/verdict";
 
 /**
  * Assay-flow derive helpers. Assay reframes the existing evaluation engine as a
@@ -50,12 +51,6 @@ function headlineScores(scorecard: Scorecard): Record<string, number> {
   return scorecard.competency_scores ?? {};
 }
 
-const DECISION_VERDICT: Record<DeployabilityDecision["verdict"], Verdict> = {
-  ship: "ship",
-  probation: "risky",
-  do_not_ship: "hold"
-};
-
 export function deriveVerdict(
   scorecard: Scorecard,
   decision?: DeployabilityDecision | null
@@ -69,25 +64,21 @@ export function deriveVerdict(
   // Prefer the backend policy decision — it is the same gate the CLI and the
   // proof bundle report, so the hero verdict never disagrees with them.
   if (decision) {
-    const verdict = DECISION_VERDICT[decision.verdict] ?? "hold";
-    const label =
-      verdict === "ship" ? "Ready to ship" : verdict === "risky" ? "Ship with caution" : "Not ready yet";
+    const verdict = bandFromDecision(decision.verdict);
     const headline =
       decision.blocking_reasons[0] ?? decision.warnings[0] ?? decision.summary ?? biggestProblem(scorecard, verdict);
-    return { verdict, label, score, headline, passedChecks, totalChecks };
+    return { verdict, label: VERDICT_HEADLINE[verdict], score, headline, passedChecks, totalChecks };
   }
 
   const tracePasses = scorecard.trace_audit?.passes ?? false;
-  let verdict: Verdict;
+  let verdict: VerdictBand;
   if (scorecard.certified && tracePasses) verdict = "ship";
   else if (scorecard.certified) verdict = "risky";
   else verdict = "hold";
 
-  const label = verdict === "ship" ? "Ready to ship" : verdict === "risky" ? "Ship with caution" : "Not ready yet";
-
   const headline = biggestProblem(scorecard, verdict);
 
-  return { verdict, label, score, headline, passedChecks, totalChecks };
+  return { verdict, label: VERDICT_HEADLINE[verdict], score, headline, passedChecks, totalChecks };
 }
 
 /** One human sentence stating the gate this run was judged against. */
