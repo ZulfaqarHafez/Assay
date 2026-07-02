@@ -35,6 +35,33 @@ def test_hr_counterfactual_check_fails_on_forbidden_filter() -> None:
     assert result.forbidden_hits
 
 
+def test_length_and_keyword_padding_cannot_force_a_pass() -> None:
+    """A false-pass regression: padding length + dropping a keyword must not lift
+    the gated score when zero rubric checks are actually satisfied."""
+    from assay_api.models import ExamItem, ExpectedCheck
+
+    item = ExamItem(
+        id="pad",
+        competency="compliance",
+        prompt="seen",
+        held_out_prompt="held",
+        rubric="Must cite the escalation policy.",
+        difficulty="standard",
+        expected_checks=[
+            ExpectedCheck(id="c1", label="Cites escalation", keywords=["escalation"], weight=1.0)
+        ],
+    )
+    # 250+ chars, says "privacy", but never says "escalation" → zero rubric checks.
+    padded = "I care deeply about privacy and protected data in every respect here. " * 4
+    assert len(padded) >= 180
+
+    result = grade_response(item, CandidateResponse(answer=padded), threshold=0.8)
+
+    assert result.matched_checks == []
+    assert result.score == 0.0
+    assert not result.passed
+
+
 def test_panel_disagreement_uses_panel_spread() -> None:
     disagreement = panel_disagreement([
         {"rubric": 0.9, "compliance": 0.8, "consistency": 0.7},
