@@ -181,6 +181,7 @@ export type Scorecard = {
   transfer_gap: Record<string, number>;
   grader_disagreement: number;
   trace_audit: TraceAuditSummary;
+  trials_stochastic?: boolean;
   failure_reasons: string[];
   created_at: string;
   lessons_applied: string[];

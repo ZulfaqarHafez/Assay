@@ -54,6 +54,9 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
 
     assert scorecard["run_id"] == run["id"]
     assert db_health["backend"] == "sqlite"
+    # A deterministic mock run answers identically every trial, so pass^k is
+    # honestly flagged as non-stochastic rather than sold as resampling.
+    assert scorecard["trials_stochastic"] is False
     assert scorecard["trace_audit"]["tas_score"] == 88
     assert events
     assert trace["scorecard"]["run_id"] == run["id"]

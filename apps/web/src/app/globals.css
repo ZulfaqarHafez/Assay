@@ -4983,3 +4983,15 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
   border-radius: var(--radius-pill);
   padding: 3px 9px;
 }
+
+/* Honesty note when pass^k trials are deterministic (P0-1). */
+.assay-trials-note {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-fg-muted);
+  background: var(--color-bg-subtle, rgba(0,0,0,0.03));
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}

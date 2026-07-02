@@ -85,6 +85,10 @@ class Scorecard(BaseModel):
     transfer_gap: dict[str, float]
     grader_disagreement: float
     trace_audit: TraceAuditSummary
+    # False when the candidate answered deterministically (mock/demo, or a live
+    # run that degraded), so the k trials are identical and pass^k is a single
+    # held-out check rather than a reliability-under-resampling measure.
+    trials_stochastic: bool = True
     failure_reasons: list[str] = Field(default_factory=list)
     lessons_applied: list[str] = Field(default_factory=list)
     prior_run_id: str | None = None

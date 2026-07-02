@@ -86,6 +86,14 @@ export function VerdictPanel({
         </div>
       </div>
 
+      {scorecard.trials_stochastic === false && (
+        <p className="assay-trials-note" role="note">
+          Deterministic run — the {scorecard.k} trials per probe are identical, so this is a single
+          held-out check, not a pass^{scorecard.k} resampling measure. Run live (with an OpenAI key)
+          to certify reliability across varied trials.
+        </p>
+      )}
+
       <div className="assay-verdict-meter">
         <div
           className="assay-litmus-meter"

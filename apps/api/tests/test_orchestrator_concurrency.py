@@ -24,7 +24,7 @@ class _CountingAdapter:
         self.current = 0
         self.peak = 0
 
-    async def ask(self, context: str, question: str) -> CandidateResponse:
+    async def ask(self, context: str, question: str, trial: int = 1) -> CandidateResponse:
         self.current += 1
         self.peak = max(self.peak, self.current)
         await asyncio.sleep(0.02)  # hold the slot so overlap is observable

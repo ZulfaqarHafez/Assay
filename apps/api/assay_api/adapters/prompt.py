@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import random
 import re
@@ -50,7 +51,14 @@ class PromptAgentAdapter(CandidateAdapter):
     ``context``. The endpoint that constructs this adapter only does so in live
     mode (an OpenAI key is present); with no key it falls back to the deterministic
     mock, so this adapter raises if it cannot resolve a key.
+
+    Each of the k trials is run at a nonzero temperature with a distinct per-trial
+    seed, so repeated asks of the same question genuinely vary — that is what makes
+    pass^k a real reliability-under-resampling measure rather than pass^1 repeated.
     """
+
+    # Live LLM calls at temperature > 0 vary per trial, so pass^k is meaningful.
+    stochastic = True
 
     def __init__(self, config: CandidateConfig):
         self.config = config
@@ -68,13 +76,13 @@ class PromptAgentAdapter(CandidateAdapter):
         self.degraded = False
         self.degraded_reason: str | None = None
 
-    async def ask(self, context: str, question: str) -> CandidateResponse:
+    async def ask(self, context: str, question: str, trial: int = 1) -> CandidateResponse:
         # Once this run has been rate-limited, don't keep hammering the dead key on
         # every subsequent probe — answer the rest deterministically right away.
         if self.degraded:
             from .mock import MockCandidateAdapter
 
-            return await MockCandidateAdapter(self.config).ask(context=context, question=question)
+            return await MockCandidateAdapter(self.config).ask(context=context, question=question, trial=trial)
 
         key = resolve_openai_key()
         if not key:
@@ -94,7 +102,7 @@ class PromptAgentAdapter(CandidateAdapter):
             f"Question:\n{question}"
         )
         try:
-            response = await asyncio.to_thread(self._call_openai, key, user_message)
+            response = await asyncio.to_thread(self._call_openai, key, user_message, trial)
         except _RateLimited as exc:
             # The key is unusable (free-tier 3/min, exhausted quota, etc). Rather
             # than failing the whole run, answer this probe deterministically so
@@ -104,7 +112,7 @@ class PromptAgentAdapter(CandidateAdapter):
             from .mock import MockCandidateAdapter
 
             fallback = MockCandidateAdapter(self.config)
-            return await fallback.ask(context=context, question=question)
+            return await fallback.ask(context=context, question=question, trial=trial)
 
         latency_ms = max(1, int((time.perf_counter() - started) * 1000))
 
@@ -118,11 +126,28 @@ class PromptAgentAdapter(CandidateAdapter):
             tokens=tokens,
         )
 
-    def _call_openai(self, key: str, user_message: str) -> Any:
+    def _sampling_params(self, trial: int) -> dict[str, Any]:
+        """Per-trial sampling so the k trials genuinely differ (real pass^k).
+
+        Temperature drives the variance; a per-trial seed makes each trial
+        reproducible where the API honors it. Both are omitted when
+        ``ASSAY_OPENAI_TEMPERATURE`` is set to a negative value, for models that
+        reject sampling params (e.g. some reasoning models)."""
+        temperature = float(os.environ.get("ASSAY_OPENAI_TEMPERATURE", "0.7"))
+        if temperature < 0:
+            return {}
+        seed = int(
+            hashlib.sha256(f"{self.config.id}:{self.model}:{trial}".encode("utf-8")).hexdigest()[:8],
+            16,
+        )
+        return {"temperature": temperature, "seed": seed}
+
+    def _call_openai(self, key: str, user_message: str, trial: int = 1) -> Any:
         from openai import APIStatusError, OpenAI, RateLimitError
 
         timeout_s = float(os.environ.get("ASSAY_OPENAI_TIMEOUT_S", "90"))
         client = OpenAI(api_key=key, timeout=timeout_s)
+        sampling = self._sampling_params(trial)
         # A few quick retries absorb a transient 429 on a healthy key. But on a
         # crippled key (free tier ~3/min, where rejected calls themselves keep the
         # window saturated, or an exhausted quota) more retries are futile and just
@@ -138,6 +163,7 @@ class PromptAgentAdapter(CandidateAdapter):
                         {"role": "developer", "content": self.system_prompt},
                         {"role": "user", "content": user_message},
                     ],
+                    **sampling,
                 )
             except RateLimitError as exc:
                 if attempt >= max_attempts:
@@ -148,9 +174,15 @@ class PromptAgentAdapter(CandidateAdapter):
                 time.sleep(min(max_wait, wait) + random.uniform(0.2, 0.8))
             except APIStatusError as exc:
                 status = getattr(exc, "status_code", None)
+                message = str(getattr(exc, "message", None) or exc).lower()
                 # 429 (quota/limit) -> degrade to demo; transient 5xx -> brief retry.
                 if status == 429:
                     raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
+                # A model that rejects temperature/seed (some reasoning models):
+                # drop the sampling params and retry once, plain.
+                if status == 400 and sampling and ("temperature" in message or "seed" in message or "unsupported" in message):
+                    sampling = {}
+                    continue
                 if status is not None and 500 <= status < 600 and attempt < max_attempts:
                     time.sleep(min(max_wait, 2.0 ** attempt) + random.uniform(0.2, 0.8))
                     continue
