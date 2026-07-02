@@ -5068,3 +5068,40 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
 }
 .trace-research-sources { margin: 0; padding-left: 16px; font-size: 12px; display: grid; gap: 3px; }
 .trace-research-sources a { color: var(--color-accent); }
+
+/* Run-detail proof-bundle assembling hint (P2-13). */
+.rd-bundle-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rd-bundle-hint::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  animation: rd-spin 0.8s linear infinite;
+}
+@keyframes rd-spin { to { transform: rotate(360deg); } }
+
+/* Failed-run recovery card on the primary flow (P2-14). */
+.assay-failcard {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+  border: 1px solid color-mix(in srgb, var(--color-fail) 40%, var(--color-border));
+  background: var(--color-fail-bg);
+  border-radius: var(--radius-lg);
+}
+.assay-failcard-head { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.assay-failcard-msg { margin: 0; font-size: 13px; color: var(--color-fg); }
+.assay-failcard-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Inline deploy-gate value in the intake disclosure summary (P2-3). */
+.assay-advanced > summary strong { color: var(--color-fg); font-weight: 700; }
+.assay-advanced-hint { color: var(--color-fg-muted); font-weight: 400; }

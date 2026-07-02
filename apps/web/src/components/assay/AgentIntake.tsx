@@ -214,7 +214,10 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
       </div>
 
       <details className="assay-advanced">
-        <summary>Role scope &amp; deploy policy</summary>
+        <summary>
+          Deploy gate: <strong>{policyName === "strict" ? "Strict" : "Advisory"} · {thresholdPct}%</strong>
+          <span className="assay-advanced-hint"> — edit role scope &amp; policy</span>
+        </summary>
         <textarea
           className="assay-scope-textarea"
           value={roleScopeText}

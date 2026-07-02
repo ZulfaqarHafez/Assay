@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import { assayApi } from "@/lib/api";
 import {
   useCandidates,
@@ -336,7 +337,7 @@ export default function Home() {
             />
           </>
         )}
-        {phase === "running" && (
+        {phase === "running" && !runEnded && (
           <JudgingWaterfall
             status={runStream.status}
             events={runStream.events}
@@ -347,6 +348,25 @@ export default function Home() {
             demoMode={!health?.openai_configured}
             onCancel={cancelRun}
           />
+        )}
+        {phase === "running" && runEnded && (
+          <div className="assay-failcard" role="alert">
+            <div className="assay-failcard-head">
+              <AlertTriangle size={18} />
+              {runStream.status === "canceled" ? "Run canceled" : "The run hit an error"}
+            </div>
+            {error && <p className="assay-failcard-msg">{error}</p>}
+            <div className="assay-failcard-actions">
+              {selectedCandidateId && runStream.status !== "canceled" && (
+                <button type="button" className="assay-run-button slim" onClick={rerunAgent}>
+                  <RotateCcw size={16} /> Try again
+                </button>
+              )}
+              <button type="button" className="assay-ghost-button" onClick={testAnother}>
+                Back to start
+              </button>
+            </div>
+          </div>
         )}
         {phase === "verdict" && scorecard && (
           <VerdictPanel
@@ -361,15 +381,8 @@ export default function Home() {
             onTestImproved={testImproved}
           />
         )}
-        {error && phase !== "verdict" && (
+        {error && phase === "intake" && (
           <p className="assay-error" role="alert">{error}</p>
-        )}
-        {runEnded && (
-          <div className="assay-retry">
-            <button type="button" className="assay-ghost-button" onClick={testAnother}>
-              Back to start
-            </button>
-          </div>
         )}
       </div>
 

@@ -111,8 +111,14 @@ async function startRunWithSignal(runId: string, signal: AbortSignal): Promise<S
  * fails for that reason, recover by polling the run until it settles, so a
  * completed run is never lost to a dropped connection.
  */
+// A live run fires k × items × 2 OpenAI calls inside one /start request; on a
+// free-tier ~3 RPM key a 10-item pack is ~20 min. The old 3-min cap declared
+// such runs "failed" while the orchestrator was still completing them — so the
+// recovery poller now waits up to 20 min for the run to actually settle.
+const RECOVERY_MAX_MS = 20 * 60_000;
+
 async function recoverRunResult(runId: string, signal: AbortSignal): Promise<Scorecard | "failed" | null> {
-  const deadline = Date.now() + 180_000;
+  const deadline = Date.now() + RECOVERY_MAX_MS;
   while (Date.now() < deadline && !signal.aborted) {
     try {
       const runResponse = await fetch(`${apiBaseUrl()}/runs/${runId}`, { signal });
