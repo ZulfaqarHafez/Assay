@@ -2,6 +2,11 @@
 
 # Assay
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)
+![Offline by default](https://img.shields.io/badge/runs-offline%20by%20default-3fa45b.svg)
+
 **Assay is a pre-deployment litmus test for AI agents.** Bring the `agent.md` /
 `AGENTS.md` definition you already have, and Assay runs it through an adversarial
 exam, grades it on the failure modes that get agents pulled from production, and
@@ -9,6 +14,17 @@ hands you a ranked list of what to fix before you ship — no SDK and no test
 harness to write.
 
 > Bring your agent.md. Find out where it breaks.
+
+**Gate your CI on a held-out verdict** — drop the CLI into a pipeline and fail the
+build before a broken agent ships:
+
+```powershell
+python -m assay_api.cli run --agent-md .\agent.md --pack hr-v1 --pass-threshold 0.8
+```
+
+The reusable GitHub Action lives at [`.github/actions/assay`](.github/actions/assay);
+full CI usage is in [Run Assay in CI](#run-assay-in-ci) below. Every completed run also
+emits an [embeddable status badge](#product-surface) you can drop in a README.
 
 ## What it does
 

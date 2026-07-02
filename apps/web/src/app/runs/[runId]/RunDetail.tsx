@@ -58,9 +58,11 @@ export default function RunDetail({ runId }: { runId: string }) {
   const [badgeCopied, setBadgeCopied] = React.useState(false);
 
   // Drawer open/closed driven by the URL so the view is deep-linkable.
+  // Only the trace inspector exists; the old spec/research values opened the
+  // same view with mismatched intent, so the enum is narrowed to what renders.
   const [drawer, setDrawer] = useQueryState(
     "drawer",
-    parseAsStringEnum(["trace", "spec", "research"]).withOptions({ history: "push" })
+    parseAsStringEnum(["trace"]).withOptions({ history: "push" })
   );
   const drawerOpen = drawer !== null;
 

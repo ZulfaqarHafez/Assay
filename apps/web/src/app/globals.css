@@ -1991,14 +1991,14 @@ pre {
   border-radius: var(--radius-md);
   padding: 14px 24px;
   cursor: pointer;
-  box-shadow: 0 12px 26px -10px rgba(158, 61, 116, 0.7);
+  box-shadow: 0 12px 26px -10px color-mix(in srgb, var(--color-accent) 70%, transparent);
   transition: filter 140ms ease, transform 140ms ease, opacity 140ms ease, box-shadow 140ms ease;
 }
 
 .assay-run-button:hover:not(:disabled) {
   transform: translateY(-1px);
   filter: brightness(1.07) saturate(1.05);
-  box-shadow: 0 16px 32px -10px rgba(158, 61, 116, 0.8);
+  box-shadow: 0 16px 32px -10px color-mix(in srgb, var(--color-accent) 80%, transparent);
 }
 
 .assay-run-button.slim {
@@ -3146,9 +3146,9 @@ body,
 /* A deliberate inverted band for editorial rhythm and to make the verdict card
    pop. Same dark treatment in both themes so it always reads as a focal moment. */
 .lp-band-dark {
-  border-top: 1px solid color-mix(in srgb, #d072a6 18%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
   background:
-    radial-gradient(80% 130% at 16% 0%, color-mix(in srgb, #d072a6 20%, transparent), transparent 55%),
+    radial-gradient(80% 130% at 16% 0%, color-mix(in srgb, var(--color-accent) 20%, transparent), transparent 55%),
     linear-gradient(180deg, #1b1622, #151019);
 }
 .lp-band-dark .lp-eyebrow { color: #db9ec3; }
@@ -3156,7 +3156,7 @@ body,
 .lp-band-dark .lp-preview-copy p { color: #c6bdb2; }
 .lp-band-dark .lp-link { color: #db9ec3; }
 .lp-band-dark .lp-report-card {
-  border-color: color-mix(in srgb, #d072a6 24%, #2a2331);
+  border-color: color-mix(in srgb, var(--color-accent) 24%, #2a2331);
   box-shadow: 0 34px 70px -30px rgba(0, 0, 0, 0.6);
 }
 
@@ -3438,9 +3438,9 @@ body,
 /* Closing CTA — a deliberate dark, accent-lit panel for premium rhythm contrast
    (the same in both themes, so it always reads as a focal moment). */
 .lp-cta-band {
-  border-top: 1px solid color-mix(in srgb, #d072a6 22%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
   background:
-    radial-gradient(120% 150% at 50% -10%, color-mix(in srgb, #d072a6 26%, transparent), transparent 60%),
+    radial-gradient(120% 150% at 50% -10%, color-mix(in srgb, var(--color-accent) 26%, transparent), transparent 60%),
     linear-gradient(180deg, #1b1622, #14101a);
 }
 .lp-cta { max-width: 720px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
@@ -3457,7 +3457,7 @@ body,
   margin-top: 6px;
   font-size: 16px;
   padding: 15px 28px;
-  background: #d072a6;
+  background: var(--color-accent);
   color: #1b0f18;
   font-weight: 700;
 }
@@ -5026,4 +5026,21 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
   display: grid;
   gap: 18px;
   padding: 0 18px 18px;
+}
+
+/* API-unreachable banner on intake (P2-8). */
+.assay-api-down {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-fail) 40%, var(--color-border));
+  background: var(--color-fail-bg);
+  color: var(--color-fg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.assay-api-down code {
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-fail) 12%, transparent);
 }

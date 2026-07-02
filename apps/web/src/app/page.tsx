@@ -44,6 +44,11 @@ export default function Home() {
     candidatesQuery.isLoading ||
     runsQuery.isLoading;
 
+  // The API is unreachable at boot when the core queries error out — surface
+  // that on the intake screen so the user isn't ambushed only after clicking Run.
+  const apiUnreachable =
+    healthQuery.isError && examPacksQuery.isError && candidatesQuery.isError;
+
   // Run-scoped state set imperatively once a run resolves.
   const [selectedExamPackId, setSelectedExamPackId] = useState("hr-v1");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
@@ -309,6 +314,13 @@ export default function Home() {
   return (
     <main className="assay-shell">
       <div className="assay-stage">
+        {phase === "intake" && apiUnreachable && (
+          <div className="assay-api-down" role="alert">
+            <strong>Can&rsquo;t reach the Assay API.</strong> Start the backend
+            (<code>.\scripts\start-dev.ps1</code> or <code>npm run dev:api</code>), then reload —
+            uploads won&rsquo;t run until it&rsquo;s up.
+          </div>
+        )}
         {phase === "intake" && (
           <>
             <AgentIntake
