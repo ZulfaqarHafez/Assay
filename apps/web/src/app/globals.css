@@ -4899,3 +4899,64 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
   white-space: nowrap;
 }
 .rd-improvement-link:hover { text-decoration: underline; }
+
+/* Preflight Council, made useful: flag count, expandable evidence, next steps. */
+.review-council-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.review-council-count { font-size: 12px; font-weight: 600; }
+.review-council-count.clear { color: var(--color-pass); }
+.review-council-count.flagged { color: var(--color-warn); }
+.review-council-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+.reviewer-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.reviewer-details > summary::-webkit-details-marker { display: none; }
+.reviewer-details > summary .reviewer-row { position: relative; padding-right: 18px; }
+.reviewer-details > summary .reviewer-row::after {
+  content: "\25B8";
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-fg-muted);
+  font-size: 11px;
+  transition: transform 160ms ease;
+}
+.reviewer-details[open] > summary .reviewer-row::after {
+  transform: translateY(-50%) rotate(90deg);
+}
+.reviewer-detail-body {
+  margin: 4px 0 10px 40px;
+  display: grid;
+  gap: 6px;
+}
+.reviewer-evidence {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  display: grid;
+  gap: 3px;
+}
+.reviewer-next-step {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-warn);
+}
+.reviewer-next-step strong { font-weight: 700; }

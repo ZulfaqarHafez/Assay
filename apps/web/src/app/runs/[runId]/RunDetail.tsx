@@ -35,7 +35,7 @@ import ProgressTrend from "@/components/progress/ProgressTrend";
 import DiagnosticLibrary from "@/components/library/DiagnosticLibrary";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import ImprovePanel from "@/components/assay/ImprovePanel";
-import Sprite from "@/components/ui/Sprite";
+import ReviewCouncil from "@/components/assay/ReviewCouncil";
 import type { DeployabilityDecision, RunEvent, Scorecard } from "@/types/assay";
 
 /**
@@ -150,6 +150,8 @@ export default function RunDetail({ runId }: { runId: string }) {
         </div>
       ) : null}
 
+      {reviewers ? <ReviewCouncil review={reviewers} decision={deployability} /> : null}
+
       {agentSpec ? (
         <ImprovePanel
           agentSpec={agentSpec}
@@ -184,26 +186,6 @@ export default function RunDetail({ runId }: { runId: string }) {
           <DiagnosticLibrary candidateId={candidateId} />
         </div>
       )}
-
-      {reviewers ? (
-        <section className="panel-section" aria-label="reviewers">
-          <h2 className="section-title">Preflight Council</h2>
-          <div className="reviewer-list">
-            {reviewers.reviewers.map((reviewer) => (
-              <div className={`reviewer-row ${reviewer.status}`} key={reviewer.key}>
-                <Sprite name={reviewer.sprite} aria-hidden="true" />
-                <span>
-                  <strong>{reviewer.name}</strong>
-                  <small>{reviewer.summary}</small>
-                </span>
-                <span className={`pill ${reviewer.status === "pass" ? "ready" : reviewer.status === "warn" ? "warn" : "planned"}`}>
-                  {reviewer.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <TraceDrawer
         events={events}
