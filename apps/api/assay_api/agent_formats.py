@@ -115,7 +115,10 @@ def _select_agent_mapping(data: dict[str, Any]) -> dict[str, Any]:
         name, first = next(iter(agents.items()))
         if isinstance(first, dict):
             merged = dict(first)
-            merged.setdefault("name", str(name))
+            # The map key is usually a slug (e.g. "triage"); only fall back to
+            # it when the agent has no human-readable name/title/role of its own.
+            if not any(key in merged for key in _TITLE_KEYS):
+                merged["name"] = str(name)
             return merged
     if isinstance(agents, list) and agents and isinstance(agents[0], dict):
         return agents[0]
