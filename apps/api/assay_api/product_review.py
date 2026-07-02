@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from .database import database_health, get_run, get_scorecard, list_events
-from .deployability import evaluate_scorecard
-from .models import ProductReview, ProductReviewer, Scorecard
+from .deployability import evaluate_scorecard, policy_for_run
+from .models import ProductReview, ProductReviewer, RunRecord, Scorecard
 
 
 def product_review_for_run(run_id: str) -> ProductReview | None:
@@ -25,7 +25,7 @@ def product_review_for_run(run_id: str) -> ProductReview | None:
             _security_interviewer(scorecard),
             _tool_auditor(scorecard, len(events)),
             _trace_auditor(scorecard, db),
-            _release_manager(scorecard, len(events)),
+            _release_manager(run, scorecard, len(events)),
         ],
     )
 
@@ -202,7 +202,7 @@ def _trace_auditor(scorecard: Scorecard | None, db: dict[str, Any]) -> ProductRe
     )
 
 
-def _release_manager(scorecard: Scorecard | None, event_count: int) -> ProductReviewer:
+def _release_manager(run: RunRecord, scorecard: Scorecard | None, event_count: int) -> ProductReviewer:
     if scorecard is None:
         return ProductReviewer(
             key="release_manager",
@@ -214,7 +214,7 @@ def _release_manager(scorecard: Scorecard | None, event_count: int) -> ProductRe
             next_step="Run an interview loop and gate it with strict policy.",
             sprite="candidate-document",
         )
-    decision = evaluate_scorecard(scorecard)
+    decision = evaluate_scorecard(scorecard, policy_for_run(run))
     if decision.deployable:
         return ProductReviewer(
             key="release_manager",

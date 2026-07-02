@@ -19,6 +19,7 @@ from ..database import (
     save_run,
     trace_payload,
 )
+from ..deployability import evaluate_scorecard, policy_for_run
 from ..exam_packs import get_exam_pack
 from ..exports import write_agent_spec_files
 from ..models import RunCreate, RunRecord
@@ -92,6 +93,7 @@ def create_run(payload: RunCreate) -> dict:
         competency_threshold=payload.competency_threshold,
         max_transfer_gap=payload.max_transfer_gap,
         tas_threshold=payload.tas_threshold,
+        policy_name=payload.policy_name,
         job_scope=payload.job_scope,
         baseline_run_id=payload.baseline_run_id,
     )
@@ -165,6 +167,25 @@ def run_reviewers(run_id: str) -> dict:
     if payload is None:
         raise HTTPException(status_code=404, detail="Run not found")
     return payload.model_dump(mode="json")
+
+
+@router.get("/runs/{run_id}/deployability")
+def run_deployability(run_id: str, policy: str | None = None) -> dict:
+    """The deployability decision for a run under its own policy.
+
+    ``policy`` optionally re-judges under a named policy (what-if view); only
+    built-in names are accepted — never file paths over HTTP.
+    """
+    run = get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if policy is not None and policy not in ("strict", "advisory"):
+        raise HTTPException(status_code=422, detail="policy must be 'strict' or 'advisory'")
+    scorecard = get_scorecard(run_id)
+    if scorecard is None:
+        raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
+    decision = evaluate_scorecard(scorecard, policy_for_run(run, policy))
+    return decision.model_dump(mode="json", by_alias=True)
 
 
 @router.get("/runs/{run_id}/trace")

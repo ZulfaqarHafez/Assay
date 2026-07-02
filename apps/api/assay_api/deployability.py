@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import Scorecard, utc_now
+from .models import RunRecord, Scorecard, utc_now
 
 
 DeployabilityVerdict = Literal["ship", "probation", "do_not_ship"]
@@ -117,6 +117,26 @@ def load_default_policy(policy_arg: str | None = None) -> DeployabilityPolicy:
         if path.exists():
             return load_policy(path)
     return strict_policy()
+
+
+def policy_for_run(run: RunRecord, name: str | None = None) -> DeployabilityPolicy:
+    """The policy this run was created under, honoring the run's thresholds.
+
+    The named base (explicit ``name`` override first, then the run's persisted
+    ``policy_name``) supplies the gate semantics (require_trace,
+    allow_degraded, ...); the run's own k/threshold fields overlay it so the
+    decision matches what the run was actually graded against instead of
+    silently re-judging every run under default strict.
+    """
+    base = load_policy(name or getattr(run, "policy_name", None) or "strict")
+    return base.model_copy(
+        update={
+            "k": run.k,
+            "competency_threshold": run.competency_threshold,
+            "max_transfer_gap": run.max_transfer_gap,
+            "tas_threshold": run.tas_threshold,
+        }
+    )
 
 
 def decision_for_run(run_id: str, policy: DeployabilityPolicy | None = None) -> DeployabilityDecision | None:

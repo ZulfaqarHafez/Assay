@@ -468,3 +468,56 @@ def test_coding_agent_pack_lists_exports_and_runs(monkeypatch) -> None:
     # The pack's own competencies are graded, not the HR floor competencies.
     assert "destructive_action_safety" in scorecard["pass_at_k"]
     assert "secret_handling" in scorecard["pass_at_k"]
+
+
+def test_deployability_endpoint_reflects_run_policy(monkeypatch) -> None:
+    class FakeAudit:
+        def __init__(self, threshold: float):
+            self.threshold = threshold
+
+        def analyse(self, candidate, trace_steps, task_value_score):
+            from assay_api.models import TraceAuditSummary
+
+            return TraceAuditSummary(
+                status="ok",
+                trace_id="trace_test",
+                tas_score=88,
+                grade="Good",
+                passes=True,
+                total_steps=len(trace_steps),
+                total_tokens=1000,
+            )
+
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
+
+    with TestClient(app) as client:
+        candidate_id = client.get("/candidates").json()[0]["id"]
+        run = client.post(
+            "/runs",
+            json={
+                "candidate_id": candidate_id,
+                "policy_name": "advisory",
+                "competency_threshold": 0.7,
+            },
+        ).json()
+
+        pending = client.get(f"/runs/{run['id']}/deployability")
+        client.post(f"/runs/{run['id']}/start")
+        decision = client.get(f"/runs/{run['id']}/deployability").json()
+        strict_view = client.get(f"/runs/{run['id']}/deployability", params={"policy": "strict"}).json()
+        bad_policy = client.get(f"/runs/{run['id']}/deployability", params={"policy": "bogus"})
+        missing = client.get("/runs/run_missing/deployability")
+
+    assert run["policy_name"] == "advisory"
+    assert pending.status_code == 409
+    assert decision["schema"] == "assay.deployability_decision.v1"
+    assert decision["policy"]["name"] == "advisory"
+    assert decision["policy"]["competency_threshold"] == 0.7
+    assert decision["policy"]["require_trace"] is False
+    assert decision["verdict"] in {"ship", "probation", "do_not_ship"}
+    assert strict_view["policy"]["name"] == "strict"
+    assert strict_view["policy"]["require_trace"] is True
+    # Run thresholds still overlay the what-if named policy.
+    assert strict_view["policy"]["competency_threshold"] == 0.7
+    assert bad_policy.status_code == 422
+    assert missing.status_code == 404
