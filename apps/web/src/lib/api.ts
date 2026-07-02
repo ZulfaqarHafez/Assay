@@ -88,6 +88,7 @@ export const assayApi = {
   reviewers: (runId: string) => request<ProductReview>(`/runs/${runId}/reviewers`),
   trace: (runId: string) => request<TracePayload>(`/runs/${runId}/trace`),
   proofBundle: (runId: string) => request<ProofBundle>(`/runs/${runId}/proof-bundle`),
+  badgeUrl: (runId: string) => `${apiBaseUrl()}/runs/${runId}/badge.svg`,
   agentSpec: (runId: string) => request<AgentSpec>(`/runs/${runId}/agent-spec`),
   agentSpecDiff: (runId: string) => request<AgentDiff>(`/runs/${runId}/agent-spec/diff`),
   deployability: (runId: string, policy?: "strict" | "advisory") =>

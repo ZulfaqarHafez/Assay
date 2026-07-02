@@ -473,6 +473,38 @@ def test_coding_agent_pack_lists_exports_and_runs(monkeypatch) -> None:
     assert "secret_handling" in scorecard["pass_at_k"]
 
 
+def test_run_badge_svg(monkeypatch) -> None:
+    class FakeAudit:
+        def __init__(self, threshold: float):
+            self.threshold = threshold
+
+        def analyse(self, candidate, trace_steps, task_value_score):
+            from assay_api.models import TraceAuditSummary
+
+            return TraceAuditSummary(
+                status="ok", trace_id="t", tas_score=88, grade="Good", passes=True,
+                total_steps=len(trace_steps), total_tokens=1000,
+            )
+
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
+
+    with TestClient(app) as client:
+        candidate_id = client.get("/candidates").json()[0]["id"]
+        run = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        client.post(f"/runs/{run['id']}/start")
+        badge = client.get(f"/runs/{run['id']}/badge.svg")
+        pending = client.get("/runs/run_missing/badge.svg")
+
+    assert badge.status_code == 200
+    assert badge.headers["content-type"].startswith("image/svg+xml")
+    assert "<svg" in badge.text and "assay" in badge.text
+    # A deterministic mock run is honestly a demo badge, and lands on a real band.
+    assert any(word in badge.text for word in ("ship", "risky", "hold"))
+    # An unknown run still returns a valid (neutral) badge, never a broken image.
+    assert pending.status_code == 200
+    assert "pending" in pending.text
+
+
 def test_agent_spec_diff_endpoint(monkeypatch) -> None:
     class FakeAudit:
         def __init__(self, threshold: float):

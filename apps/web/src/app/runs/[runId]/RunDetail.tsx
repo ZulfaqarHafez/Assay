@@ -1,8 +1,10 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useQueryState, parseAsStringEnum } from "nuqs";
 import {
+  BadgeCheck,
   ArrowLeft,
   PanelRightOpen,
   Save,
@@ -26,6 +28,7 @@ import {
   useScorecard,
   useTrace
 } from "@/lib/queries";
+import { assayApi } from "@/lib/api";
 import { policyRuleSentence } from "@/lib/assay";
 import { VERDICT_LABEL, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
@@ -52,6 +55,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   // Fast, policy-honest decision (no ~8s proof-bundle wait); bundle is fallback.
   const deployabilityQuery = useDeployability(runId, { retry: false });
   const runsQuery = useRuns();
+  const [badgeCopied, setBadgeCopied] = React.useState(false);
 
   // Drawer open/closed driven by the URL so the view is deep-linkable.
   const [drawer, setDrawer] = useQueryState(
@@ -127,6 +131,22 @@ export default function RunDetail({ runId }: { runId: string }) {
             onClick={() => proofBundle && downloadJson(`assay-${runId}-proof-bundle.json`, proofBundle)}
           >
             <Save size={16} /> Export proof
+          </button>
+          <button
+            type="button"
+            className="command-button"
+            title="Copy a Markdown status badge for your README or PR"
+            onClick={() => {
+              const url = assayApi.badgeUrl(runId);
+              const md = `[![Assay verdict](${url})](${typeof window !== "undefined" ? window.location.href : ""})`;
+              if (typeof navigator !== "undefined" && navigator.clipboard) {
+                void navigator.clipboard.writeText(md);
+                setBadgeCopied(true);
+                window.setTimeout(() => setBadgeCopied(false), 1800);
+              }
+            }}
+          >
+            <BadgeCheck size={16} /> {badgeCopied ? "Badge copied" : "Copy badge"}
           </button>
         </div>
       </header>
