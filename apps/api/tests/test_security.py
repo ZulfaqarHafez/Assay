@@ -99,6 +99,28 @@ def test_health_is_exempt_from_auth(monkeypatch: pytest.MonkeyPatch) -> None:
         assert client.get("/health/database").status_code == 200
 
 
+def test_badge_is_public_but_run_routes_stay_protected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The status badge is embedded as an <img> in READMEs/PRs, so it must work
+    without a key even when auth is on — while other run routes stay protected."""
+
+    monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
+    with TestClient(app) as client:
+        badge = client.get("/runs/run_any/badge.svg")
+        scorecard = client.get("/runs/run_any/scorecard")
+
+    assert badge.status_code == 200
+    assert badge.headers["content-type"].startswith("image/svg+xml")
+    assert scorecard.status_code == 401
+
+
+def test_badge_public_even_in_tenant_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
+    monkeypatch.setenv("ASSAY_REQUIRE_TENANT", "1")
+    with TestClient(app) as client:
+        badge = client.get("/runs/run_any/badge.svg")
+    assert badge.status_code == 200
+
+
 def test_cors_preflight_allowed_for_default_origin() -> None:
     with TestClient(app) as client:
         response = client.options(

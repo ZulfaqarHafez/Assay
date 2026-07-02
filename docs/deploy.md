@@ -61,6 +61,21 @@ repo root by default, which (a) can't import `assay_api` from `api/index.py` and
 python -m uvicorn assay_api.main:app --app-dir apps/api --host 0.0.0.0 --port $PORT
 ```
 
+**Container (recommended for Option B).** `apps/api/Dockerfile` builds a lean,
+non-root image that runs uvicorn on `$PORT`, with a `/health` container
+healthcheck and an optional TraceRazor install (degrades gracefully if no wheel
+exists for the platform):
+
+```bash
+docker build -t assay-api apps/api
+docker run -p 8000:8000 --env-file .env assay-api
+```
+
+`render.yaml` at the repo root is a one-click **Render Blueprint** for this image
+(New → Blueprint → point at the repo, then set the `sync:false` secrets in the
+dashboard). The same Dockerfile works on Railway, Fly.io, or any container host —
+they inject `$PORT`, which the image honors.
+
 Set these env vars on the API host (server-only), for either option:
 
 - `ASSAY_DB_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`

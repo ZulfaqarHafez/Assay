@@ -1,0 +1,31 @@
+# Render blueprint for the Assay API (long-lived host — use this for live OpenAI
+# runs). The web app deploys separately on Vercel (see docs/deploy.md).
+#
+# One-click: Render dashboard → New → Blueprint → point at this repo.
+# Set the secret env vars (marked sync:false) in the dashboard after import.
+services:
+  - type: web
+    name: assay-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ASSAY_ENV
+        value: production
+      - key: ASSAY_REQUIRE_HARDENING
+        value: "1"
+      - key: ASSAY_DB_BACKEND
+        value: supabase
+      # Secrets — set these in the Render dashboard, never in git.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ASSAY_API_KEYS
+        sync: false
+      - key: ASSAY_CORS_ORIGINS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
