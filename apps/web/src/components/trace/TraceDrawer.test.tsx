@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import TraceDrawer from "./TraceDrawer";
 import type { RunEvent, Scorecard, TracePayload } from "@/types/assay";
 
@@ -72,17 +73,20 @@ const scorecard: Scorecard = {
 const trace: TracePayload = { run_id: "run_1", events, scorecard };
 
 function renderDrawer(open = true, onOpenChange = vi.fn()) {
+  const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   return render(
-    <TraceDrawer
-      events={events}
-      trace={trace}
-      scorecard={scorecard}
-      proofBundle={null}
-      agentSpec={null}
-      agentResearch={null}
-      open={open}
-      onOpenChange={onOpenChange}
-    />
+    <QueryClientProvider client={queryClient}>
+      <TraceDrawer
+        events={events}
+        trace={trace}
+        scorecard={scorecard}
+        proofBundle={null}
+        agentSpec={null}
+        agentResearch={null}
+        open={open}
+        onOpenChange={onOpenChange}
+      />
+    </QueryClientProvider>
   );
 }
 

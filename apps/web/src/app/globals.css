@@ -5044,3 +5044,27 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
   border-radius: 4px;
   background: color-mix(in srgb, var(--color-fail) 12%, transparent);
 }
+
+/* Deep-research result inside the trace drawer (P2-6 — wired, was dead). */
+.trace-research {
+  border-top: 1px solid var(--color-border);
+  padding: 12px 16px;
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+.trace-research-summary { margin: 0; font-size: 12.5px; color: var(--color-fg); }
+.trace-research-brief {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--color-bg-subtle, rgba(0,0,0,0.03));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.trace-research-sources { margin: 0; padding-left: 16px; font-size: 12px; display: grid; gap: 3px; }
+.trace-research-sources a { color: var(--color-accent); }

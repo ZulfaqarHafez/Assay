@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Download, X } from "lucide-react";
+import { Download, X, Telescope } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Sprite from "@/components/ui/Sprite";
+import { useAgentResearch } from "@/lib/queries";
 import { downloadJson, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import type {
   AgentResearch,
@@ -79,6 +80,11 @@ export function TraceDrawer({
 
   const runId = trace?.run_id ?? proofBundle?.run.id ?? scorecard?.run_id ?? null;
   const audit = scorecard?.trace_audit;
+
+  // Deep research is a real backend capability (POST /runs/{id}/agent-spec/research);
+  // the drawer runs it on demand and shows the result, seeded from any prop value.
+  const researchMutation = useAgentResearch();
+  const research = researchMutation.data ?? agentResearch;
 
   const handleDownload = () => {
     if (!proofBundle) return;
@@ -183,10 +189,54 @@ export function TraceDrawer({
                 </Badge>
               </span>
             )}
-            {agentResearch && agentResearch.status === "ok" && (
-              <Badge variant="neutral">Research: {agentResearch.mode}</Badge>
+            {research && research.status === "ok" && (
+              <Badge variant="neutral">Research: {research.mode}</Badge>
+            )}
+            {runId && (
+              <Button
+                variant="ghost"
+                onClick={() => researchMutation.mutate({ runId, mode: "deep" })}
+                disabled={researchMutation.isPending}
+                title="Research what this agent should be (OpenAI web search)"
+                style={research && research.status === "ok" ? undefined : { marginLeft: "auto" }}
+              >
+                <Telescope size={14} />
+                {researchMutation.isPending ? "Researching…" : "Run deep research"}
+              </Button>
             )}
           </div>
+
+          {research && (
+            <div className="trace-research">
+              {research.status === "ok" ? (
+                <>
+                  {research.summary && <p className="trace-research-summary">{research.summary}</p>}
+                  {research.brief_markdown && (
+                    <pre className="trace-research-brief"><code>{research.brief_markdown}</code></pre>
+                  )}
+                  {research.sources.length > 0 && (
+                    <ul className="trace-research-sources">
+                      {research.sources.map((source, index) => (
+                        <li key={`src-${index}`}>
+                          <a href={source.url} target="_blank" rel="noreferrer">{source.title || source.url}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className="trace-research-summary">
+                  Deep research is {research.status}
+                  {research.message ? ` — ${research.message}` : " (add an OpenAI key to enable it)."}
+                </p>
+              )}
+            </div>
+          )}
+          {researchMutation.isError && (
+            <div className="trace-research">
+              <p className="trace-research-summary">Deep research failed — check the API and OpenAI key.</p>
+            </div>
+          )}
 
           {/* Two-pane body */}
           <div

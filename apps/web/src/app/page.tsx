@@ -17,7 +17,6 @@ import JudgingWaterfall from "@/components/assay/JudgingWaterfall";
 import VerdictPanel from "@/components/assay/VerdictPanel";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
-  AgentResearch,
   AgentSpec,
   CandidateConfig,
   ProofBundle,
@@ -59,7 +58,6 @@ export default function Home() {
   const [trace, setTrace] = useState<TracePayload | null>(null);
   const [proofBundle, setProofBundle] = useState<ProofBundle | null>(null);
   const [agentSpec, setAgentSpec] = useState<AgentSpec | null>(null);
-  const [agentResearch, setAgentResearch] = useState<AgentResearch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [intakeSubmitting, setIntakeSubmitting] = useState(false);
@@ -138,7 +136,6 @@ export default function Home() {
     setTrace(null);
     setProofBundle(null);
     setAgentSpec(null);
-    setAgentResearch(null);
   }
 
   async function hydrateRunArtifacts(runId: string) {
@@ -382,7 +379,7 @@ export default function Home() {
         scorecard={scorecard}
         proofBundle={proofBundle}
         agentSpec={agentSpec}
-        agentResearch={agentResearch}
+        agentResearch={null}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
       />
