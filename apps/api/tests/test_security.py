@@ -225,6 +225,20 @@ def test_hardening_warning_fires_for_insecure_production_env(monkeypatch: pytest
     assert warnings and "Production hardening is incomplete" in warnings[0]
 
 
+def test_hardening_ok_for_cors_locked_web_deploy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A browser-facing API is hardened by a locked CORS allowlist + rate limiting;
+    it must NOT require API keys, since the web app can't hold a secret key."""
+    from assay_api.main import production_hardening_findings
+
+    monkeypatch.setenv("ASSAY_ENV", "production")
+    monkeypatch.delenv("ASSAY_API_KEYS", raising=False)
+    monkeypatch.setenv("ASSAY_CORS_ORIGINS", "https://assay.example.app")
+    monkeypatch.setenv("ASSAY_RATE_LIMIT_ENABLED", "1")
+    monkeypatch.delenv("ASSAY_REQUIRE_TENANT", raising=False)
+
+    assert production_hardening_findings() == []
+
+
 def test_hardening_can_fail_loudly(monkeypatch: pytest.MonkeyPatch) -> None:
     from assay_api.main import _check_production_hardening
 

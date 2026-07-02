@@ -18,14 +18,16 @@ services:
         value: "1"
       - key: ASSAY_DB_BACKEND
         value: supabase
+      # Lock CORS to your Vercel web origin — this is the browser-facing
+      # protection (with rate limiting). Do NOT set ASSAY_API_KEYS on the
+      # web-facing host: the browser can't send a secret and it would 401 every
+      # call. Add ASSAY_API_KEYS only on a separate programmatic/CI API host.
+      - key: ASSAY_CORS_ORIGINS
+        sync: false
       # Secrets — set these in the Render dashboard, never in git.
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
-        sync: false
-      - key: ASSAY_API_KEYS
-        sync: false
-      - key: ASSAY_CORS_ORIGINS
         sync: false
       - key: OPENAI_API_KEY
         sync: false

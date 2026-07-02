@@ -80,10 +80,16 @@ Set these env vars on the API host (server-only), for either option:
 
 - `ASSAY_DB_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `ASSAY_ENV=production`
-- `ASSAY_API_KEYS=<comma-separated strong shared API keys>`
-- `ASSAY_REQUIRE_TENANT=1` for hosted multi-tenant mode; clients must send
-  `X-Assay-Tenant` on non-health routes
 - `ASSAY_CORS_ORIGINS=https://<your-web-host>` (comma-separated for multiple web origins)
+- `ASSAY_API_KEYS=<comma-separated strong shared API keys>` — **for programmatic /
+  CI clients only.** The browser web app cannot send a secret key
+  (`NEXT_PUBLIC_*` is public), so **do not set this on the API that serves the
+  web app** — a locked `ASSAY_CORS_ORIGINS` + rate limiting is the browser-facing
+  protection. Set keys on a *separate* API host that only the CLI / GitHub Action
+  calls, or leave unset for the web-facing host. The `/health` probe and the
+  `/runs/{id}/badge.svg` status badge are always public.
+- `ASSAY_REQUIRE_TENANT=1` for hosted multi-tenant mode; clients must send
+  `X-Assay-Tenant` on non-health routes (requires `ASSAY_API_KEYS`)
 - `ASSAY_RATE_LIMIT_ENABLED=1` (default) plus optional per-route limits such as `ASSAY_RATE_LIMIT_CREATE_RUN`
 - `ASSAY_REQUIRE_HARDENING=1` to fail startup instead of only warning when production hardening is incomplete
 - `OPENAI_API_KEY` (optional — enables the OpenAI research/extraction layer)

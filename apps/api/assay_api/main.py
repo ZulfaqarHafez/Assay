@@ -104,12 +104,19 @@ def production_hardening_findings() -> list[str]:
     if not _deployed_signal_present():
         return []
     findings: list[str] = []
-    if not configured_api_keys():
-        findings.append(f"{API_KEYS_ENV} is unset")
-    if tenant_required() and not configured_api_keys():
-        findings.append(f"{REQUIRE_TENANT_ENV} requires API keys")
-    if not os.environ.get("ASSAY_CORS_ORIGINS", "").strip():
+    cors_locked = bool(os.environ.get("ASSAY_CORS_ORIGINS", "").strip())
+    has_keys = bool(configured_api_keys())
+    # A browser frontend cannot hold a secret key (NEXT_PUBLIC_* is public), so a
+    # CORS-locked deployment is protected by its origin allowlist + rate limiting.
+    # Require API keys only when there is no locked CORS allowlist (a programmatic
+    # or wide-open API). Requiring both would 401 the web app whenever keys are set.
+    if not cors_locked:
         findings.append("ASSAY_CORS_ORIGINS is unset")
+        if not has_keys:
+            findings.append(f"{API_KEYS_ENV} is unset")
+    # Tenant attribution still needs keys regardless of the CORS posture.
+    if tenant_required() and not has_keys:
+        findings.append(f"{REQUIRE_TENANT_ENV} requires API keys")
     if not rate_limiting_enabled():
         findings.append(f"{RATE_LIMIT_ENABLED_ENV} disables rate limiting")
     return findings
