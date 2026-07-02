@@ -3,7 +3,10 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 
+from ..agent_diff import diff_payload
+from ..badge import agent_hash, badge_svg
 from ..agent_refinery import agent_spec_payload
 from ..agent_research import research_agent_spec
 from ..connectors import connector_probes, connector_registry
@@ -19,6 +22,7 @@ from ..database import (
     save_run,
     trace_payload,
 )
+from ..deployability import evaluate_scorecard, policy_for_run
 from ..exam_packs import get_exam_pack
 from ..exports import write_agent_spec_files
 from ..models import RunCreate, RunRecord
@@ -92,6 +96,7 @@ def create_run(payload: RunCreate) -> dict:
         competency_threshold=payload.competency_threshold,
         max_transfer_gap=payload.max_transfer_gap,
         tas_threshold=payload.tas_threshold,
+        policy_name=payload.policy_name,
         job_scope=payload.job_scope,
         baseline_run_id=payload.baseline_run_id,
     )
@@ -167,6 +172,51 @@ def run_reviewers(run_id: str) -> dict:
     return payload.model_dump(mode="json")
 
 
+@router.get("/runs/{run_id}/deployability")
+def run_deployability(run_id: str, policy: str | None = None) -> dict:
+    """The deployability decision for a run under its own policy.
+
+    ``policy`` optionally re-judges under a named policy (what-if view); only
+    built-in names are accepted — never file paths over HTTP.
+    """
+    run = get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if policy is not None and policy not in ("strict", "advisory"):
+        raise HTTPException(status_code=422, detail="policy must be 'strict' or 'advisory'")
+    scorecard = get_scorecard(run_id)
+    if scorecard is None:
+        raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
+    decision = evaluate_scorecard(scorecard, policy_for_run(run, policy))
+    return decision.model_dump(mode="json", by_alias=True)
+
+
+@router.get("/runs/{run_id}/badge.svg")
+def run_badge(run_id: str) -> Response:
+    """Embeddable SVG status badge for a run — a shareable proof artifact.
+
+    Always returns an SVG (200) so a README embed never shows a broken image:
+    an unknown/unscored run renders a neutral 'pending' badge.
+    """
+    run = get_run(run_id)
+    scorecard = get_scorecard(run_id) if run is not None else None
+    verdict = None
+    detail = ""
+    a_hash = None
+    if run is not None and scorecard is not None:
+        decision = evaluate_scorecard(scorecard, policy_for_run(run))
+        verdict = decision.verdict
+        detail = f"pass^{scorecard.k}" if scorecard.trials_stochastic else "demo"
+        candidate = get_candidate(run.candidate_id)
+        a_hash = agent_hash(candidate.system_prompt if candidate else None)
+    svg = badge_svg(verdict, detail=detail, agent_hash=a_hash)
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "max-age=60, public"},
+    )
+
+
 @router.get("/runs/{run_id}/trace")
 def run_trace(run_id: str) -> dict:
     if get_run(run_id) is None:
@@ -201,6 +251,20 @@ def run_agent_spec(run_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Run not found")
     try:
         payload = agent_spec_payload(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
+    if payload is None:
+        raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
+    return payload
+
+
+@router.get("/runs/{run_id}/agent-spec/diff")
+def run_agent_spec_diff(run_id: str) -> dict:
+    """Structured before/after diff between the uploaded and refined agent md."""
+    if get_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    try:
+        payload = diff_payload(run_id)
     except KeyError as exc:
         raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
     if payload is None:

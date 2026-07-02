@@ -190,6 +190,28 @@ def test_tailored_run_registers_pack_and_marks_status(monkeypatch) -> None:
     assert listed["role_brief_summary"]
 
 
+def test_deterministic_brief_recorded_when_tailored_disabled(monkeypatch) -> None:
+    """With the tailored stage off (the default), a grounded role brief is still
+    recorded so RoleBriefCard / waterfall / timeline populate — while grading
+    stays on the static pack (qualification_status 'deterministic')."""
+    monkeypatch.delenv("ASSAY_TAILORED_EXAMS_ENABLED", raising=False)
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+
+    with TestClient(app) as client:
+        candidate_id = client.get("/candidates").json()[0]["id"]
+        run = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        scorecard = client.post(f"/runs/{run['id']}/start").json()
+        events = client.get(f"/runs/{run['id']}/events").json()
+        bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
+
+    types = [e["event_type"] for e in events]
+    assert "role_qualified" in types  # the thesis is visible, not silently dead
+    assert "tailored_exam_generated" not in types  # but no tailored pack was built
+    assert scorecard["qualification_status"] == "deterministic"
+    assert scorecard["role_brief_summary"]  # denormalized onto the scorecard for the UI
+    assert bundle["role_brief"]["status"] == "deterministic"
+
+
 def _enable_tailored(monkeypatch) -> None:
     monkeypatch.setenv("ASSAY_TAILORED_EXAMS_ENABLED", "1")
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)

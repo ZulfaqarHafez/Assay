@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ..agent_formats import normalize_agent_definition
 from ..agent_intake import detect_agent_facts
 from ..agent_research import resolve_openai_key
 from ..database import get_candidate, list_candidates, save_candidate
@@ -19,19 +20,32 @@ _MAX_TOOLS_CODE_CHARS = 60000
 
 
 class AgentMarkdownRequest(BaseModel):
-    """An agent definition (``agent.md`` / ``AGENTS.md``) submitted as a candidate.
+    """An agent definition submitted as a candidate.
 
-    Optionally include the agent's tools — either Python source (``tools.py``,
-    parsed by signature, never executed) or an OpenAI function-schema JSON — so
-    Assay can evaluate tool use, not just prose.
+    ``markdown`` is the legacy field; ``content`` (+ optional ``filename`` /
+    ``format``) accepts any supported format — markdown, YAML-frontmatter
+    markdown, OpenAI Assistants / generic agent JSON, CrewAI-style YAML, or
+    TOML — normalized server-side into canonical markdown. Optionally include
+    the agent's tools — either Python source (``tools.py``, parsed by
+    signature, never executed) or an OpenAI function-schema JSON — so Assay
+    can evaluate tool use, not just prose.
     """
 
-    markdown: str = Field(min_length=1, max_length=_MAX_AGENT_MD_CHARS)
+    markdown: str | None = Field(default=None, min_length=1, max_length=_MAX_AGENT_MD_CHARS)
+    content: str | None = Field(default=None, min_length=1, max_length=_MAX_AGENT_MD_CHARS)
+    filename: str | None = Field(default=None, max_length=255)
+    format: Literal["markdown", "json", "yaml", "toml", "text"] | None = None
     name: str | None = None
     tools_code: str | None = Field(default=None, max_length=_MAX_TOOLS_CODE_CHARS)
     tools_format: Literal["python", "json-schema"] = "python"
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _exactly_one_body(self) -> "AgentMarkdownRequest":
+        if bool(self.markdown) == bool(self.content):
+            raise ValueError("Provide exactly one of 'markdown' or 'content'.")
+        return self
 
 
 @router.get("/candidates")
@@ -55,8 +69,10 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
     markdown without any network call.
     """
 
-    markdown = request.markdown[:_MAX_AGENT_MD_CHARS]
-    detected = detect_agent_facts(markdown)
+    raw = (request.content or request.markdown or "")[:_MAX_AGENT_MD_CHARS]
+    normalized = normalize_agent_definition(raw, filename=request.filename, format=request.format)
+    markdown = normalized.markdown[:_MAX_AGENT_MD_CHARS]
+    detected = {**detect_agent_facts(markdown), **normalized.facts_overrides}
 
     # Parse the agent's real tools (signatures only — never executed) so the exam
     # can evaluate tool use. Falls back to the markdown-scraped tool names.
@@ -66,18 +82,23 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
     mode = "live" if live else "demo"
     adapter_type = "openai-compatible" if live else "mock"
 
+    metadata: dict = {"source": "agent-md", "source_format": normalized.format, **detected}
+    if normalized.source_content != markdown:
+        metadata["source_content"] = normalized.source_content
+
     candidate = CandidateConfig(
         name=request.name or detected["title"],
         adapter_type=adapter_type,
         system_prompt=markdown,
         tools=tools,
-        metadata={"source": "agent-md", **detected},
+        metadata=metadata,
     )
     saved = save_candidate(candidate)
 
     return {
         "candidate": saved.model_dump(mode="json"),
         "mode": mode,
+        "format": normalized.format,
         "detected": {
             "role": detected["role"],
             "title": detected["title"],

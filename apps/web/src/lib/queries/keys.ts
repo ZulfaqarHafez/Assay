@@ -27,6 +27,8 @@ export const queryKeys = {
   events: (runId: string) => ["runs", runId, "events"] as const,
   proofBundle: (runId: string) => ["runs", runId, "proof-bundle"] as const,
   agentSpec: (runId: string) => ["runs", runId, "agent-spec"] as const,
+  agentSpecDiff: (runId: string) => ["runs", runId, "agent-spec", "diff"] as const,
+  deployability: (runId: string) => ["runs", runId, "deployability"] as const,
   reviewers: (runId: string) => ["runs", runId, "reviewers"] as const,
   runComparison: (runId: string, baseline?: string) =>
     ["runs", runId, "comparison", baseline ?? null] as const,

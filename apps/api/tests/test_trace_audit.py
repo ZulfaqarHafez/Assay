@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+import time
+
+import assay_api.trace_audit as trace_audit
 from assay_api.models import CandidateConfig
-from assay_api.trace_audit import TraceAuditService, _audit_slice, tracerazor_doctor
+from assay_api.trace_audit import (
+    TraceAuditService,
+    _audit_slice,
+    _ensure_tracerazor_bin,
+    tracerazor_doctor,
+)
 
 
 def test_trace_audit_reports_insufficient_steps() -> None:
@@ -103,6 +111,103 @@ def test_audit_slice_keeps_short_traces_unchanged() -> None:
     steps = [{"id": index} for index in range(7)]
 
     assert _audit_slice(steps, 24) == steps
+
+
+def test_trace_audit_times_out_slow_real_client(monkeypatch) -> None:
+    class SlowClient:
+        def __init__(self, threshold: float):
+            self.threshold = threshold
+
+        def analyse(self, trace):
+            time.sleep(5)
+
+    SlowClient.__module__ = "tracerazor._audit_client"
+    monkeypatch.setattr("assay_api.trace_audit._load_tracerazor_client", lambda: SlowClient)
+    monkeypatch.setenv("ASSAY_TRACERAZOR_TIMEOUT_S", "0.2")
+
+    service = TraceAuditService(threshold=70)
+    candidate = CandidateConfig(name="Demo", adapter_type="mock")
+    steps = [{"id": index + 1, "type": "reasoning", "content": "x", "tokens": 1} for index in range(5)]
+
+    summary = service.analyse(candidate, trace_steps=steps, task_value_score=0.9)
+
+    assert summary.status == "error"
+    assert "timed out" in (summary.message or "")
+
+
+def test_trace_audit_passes_timeout_to_real_client(monkeypatch) -> None:
+    seen: dict[str, float] = {}
+
+    class FakeReport:
+        trace_id = "trace_bounded"
+        tas_score = 88.0
+        grade = "Good"
+        passes = True
+        total_steps = 5
+        total_tokens = 500
+        metrics = {}
+        savings = {}
+        fixes = []
+        raw = {}
+
+    class BoundedClient:
+        def __init__(self, threshold: float, timeout: float):
+            seen["timeout"] = timeout
+
+        def analyse(self, trace):
+            return FakeReport()
+
+    BoundedClient.__module__ = "tracerazor._audit_client"
+    monkeypatch.setattr("assay_api.trace_audit._load_tracerazor_client", lambda: BoundedClient)
+    monkeypatch.setenv("ASSAY_TRACERAZOR_TIMEOUT_S", "7")
+
+    service = TraceAuditService(threshold=70)
+    candidate = CandidateConfig(name="Demo", adapter_type="mock")
+    steps = [{"id": index + 1, "type": "reasoning", "content": "x", "tokens": 1} for index in range(5)]
+
+    summary = service.analyse(candidate, trace_steps=steps, task_value_score=0.9)
+
+    assert summary.status == "ok"
+    assert seen["timeout"] == 7.0
+
+
+def test_ensure_tracerazor_bin_sets_env_from_local_build(monkeypatch, tmp_path) -> None:
+    release = tmp_path / "target" / "release"
+    release.mkdir(parents=True)
+    exe = release / "tracerazor.exe"
+    exe.write_bytes(b"stub")
+
+    monkeypatch.delenv("TRACERAZOR_BIN", raising=False)
+    monkeypatch.setattr(trace_audit, "LOCAL_TRACERAZOR", str(tmp_path))
+
+    _ensure_tracerazor_bin()
+
+    import os
+
+    assert os.environ.get("TRACERAZOR_BIN") == str(exe)
+    monkeypatch.delenv("TRACERAZOR_BIN", raising=False)
+
+
+def test_ensure_tracerazor_bin_respects_existing_env(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("TRACERAZOR_BIN", "preset")
+    monkeypatch.setattr(trace_audit, "LOCAL_TRACERAZOR", str(tmp_path))
+
+    _ensure_tracerazor_bin()
+
+    import os
+
+    assert os.environ.get("TRACERAZOR_BIN") == "preset"
+
+
+def test_ensure_tracerazor_bin_noop_without_local_build(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("TRACERAZOR_BIN", raising=False)
+    monkeypatch.setattr(trace_audit, "LOCAL_TRACERAZOR", str(tmp_path / "missing"))
+
+    _ensure_tracerazor_bin()
+
+    import os
+
+    assert os.environ.get("TRACERAZOR_BIN") is None
 
 
 def test_tracerazor_doctor_runs_synthetic_smoke(monkeypatch) -> None:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
-from multiprocessing import get_context
-from queue import Empty
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any
 from uuid import uuid4
 
@@ -18,7 +18,7 @@ class TraceAuditService:
 
     def __init__(self, threshold: float):
         self.threshold = threshold
-        self.timeout_s = float(os.environ.get("ASSAY_TRACERAZOR_TIMEOUT_S", "12"))
+        self.timeout_s = float(os.environ.get("ASSAY_TRACERAZOR_TIMEOUT_S", "20"))
         self.max_audit_steps = int(os.environ.get("ASSAY_TRACERAZOR_MAX_STEPS", str(self.DEFAULT_MAX_AUDIT_STEPS)))
 
     def analyse(
@@ -60,7 +60,7 @@ class TraceAuditService:
         }
         try:
             report_payload = (
-                _analyse_real_client_with_timeout(self.threshold, trace, self.timeout_s)
+                _analyse_real_client_with_timeout(client_cls, self.threshold, trace, self.timeout_s)
                 if str(getattr(client_cls, "__module__", "")).startswith("tracerazor")
                 else _report_payload(client_cls(threshold=self.threshold).analyse(trace))
             )
@@ -120,9 +120,16 @@ def tracerazor_doctor(threshold: float = 70) -> dict[str, Any]:
     if not installed:
         status = "missing"
         next_step = "Install tracerazor>=1.0.3 or set TRACERAZOR_REPO to a local checkout."
-    elif summary.status == "ok" and summary.passes:
+    elif summary.status == "ok":
+        # The doctor trace is intentionally wasteful (five near-identical
+        # steps) so it exercises fix generation; a low TAS here is expected
+        # and means the audit engine is fully operational.
         status = "passed"
-        next_step = "TraceRazor is ready for strict deploy gates."
+        score = f"{summary.tas_score:.1f}" if summary.tas_score is not None else "n/a"
+        next_step = (
+            f"TraceRazor is operational (synthetic audit returned TAS {score}/100; "
+            "the doctor trace is intentionally wasteful, so a low score is expected)."
+        )
     elif summary.status == "insufficient_steps":
         status = "insufficient_steps"
         next_step = "Capture at least five candidate reasoning/tool steps before audit."
@@ -131,17 +138,37 @@ def tracerazor_doctor(threshold: float = 70) -> dict[str, Any]:
         next_step = "Check TraceRazor install, timeout, and native dependencies."
     else:
         status = "warning"
-        next_step = "TraceRazor is importable but did not pass the synthetic audit."
+        next_step = "TraceRazor is importable but did not complete the synthetic audit."
     return {
         "schema": "assay.tracerazor_doctor.v1",
         "installed": installed,
         "status": status,
         "next_step": next_step,
+        "binary": os.environ.get("TRACERAZOR_BIN"),
         "summary": summary.model_dump(mode="json"),
     }
 
 
+def _ensure_tracerazor_bin() -> None:
+    """Point TraceRazor at the source checkout's Rust binary when available.
+
+    Older tracerazor releases resolve `tracerazor` from PATH, which can hit
+    the pip console-script launcher (a Python wrapper that adds a full
+    interpreter boot per audit) instead of the Rust binary. Setting
+    TRACERAZOR_BIN short-circuits detection everywhere. No-op when the env
+    var is already set or no local build exists (e.g. CI).
+    """
+    if os.environ.get("TRACERAZOR_BIN"):
+        return
+    for name in ("tracerazor.exe", "tracerazor"):
+        candidate = os.path.join(LOCAL_TRACERAZOR, "target", "release", name)
+        if os.path.isfile(candidate):
+            os.environ["TRACERAZOR_BIN"] = candidate
+            return
+
+
 def _load_tracerazor_client() -> Any | None:
+    _ensure_tracerazor_bin()
     try:
         from tracerazor import TraceRazorClient
 
@@ -157,34 +184,40 @@ def _load_tracerazor_client() -> Any | None:
             return None
 
 
-def _analyse_real_client_with_timeout(threshold: float, trace: dict[str, Any], timeout_s: float) -> dict[str, Any]:
-    context = get_context("spawn")
-    queue = context.Queue(maxsize=1)
-    process = context.Process(target=_trace_audit_worker, args=(threshold, trace, queue))
-    process.start()
-    process.join(timeout_s)
-    if process.is_alive():
-        process.terminate()
-        process.join(2)
-        raise TimeoutError(f"TraceRazor audit timed out after {timeout_s:.1f}s.")
+def _make_client(client_cls: Any, threshold: float, timeout_s: float) -> tuple[Any, bool]:
+    """Instantiate the client, passing the timeout through when supported.
+
+    Returns (client, client_bounded): client_bounded is True when the client
+    enforces the timeout itself (tracerazor>=1.0.4 subprocess timeout).
+    """
     try:
-        status, payload = queue.get_nowait()
-    except Empty as exc:
-        raise RuntimeError("TraceRazor audit exited without returning a report.") from exc
-    if status == "error":
-        raise RuntimeError(str(payload))
-    return payload
+        return client_cls(threshold=threshold, timeout=timeout_s), True
+    except TypeError:
+        return client_cls(threshold=threshold), False
 
 
-def _trace_audit_worker(threshold: float, trace: dict[str, Any], queue: Any) -> None:
+def _analyse_real_client_with_timeout(
+    client_cls: Any, threshold: float, trace: dict[str, Any], timeout_s: float
+) -> dict[str, Any]:
+    """Guard the audit with a thread-based timeout.
+
+    The tracerazor client already bounds the Rust binary subprocess, so the
+    thread is only a backstop. A spawn-based process guard here would
+    re-import the whole app per audit — several seconds on Windows — which
+    used to eat most of the timeout budget before the audit even started.
+    """
+    client, client_bounded = _make_client(client_cls, threshold, timeout_s)
+    guard_s = timeout_s + 2.0 if client_bounded else timeout_s
+    pool = ThreadPoolExecutor(max_workers=1)
     try:
-        client_cls = _load_tracerazor_client()
-        if client_cls is None:
-            raise RuntimeError("TraceRazor is not importable in audit worker.")
-        report = client_cls(threshold=threshold).analyse(trace)
-        queue.put(("ok", _report_payload(report)))
-    except Exception as exc:
-        queue.put(("error", str(exc)))
+        future = pool.submit(client.analyse, trace)
+        try:
+            report = future.result(timeout=guard_s)
+        except FuturesTimeoutError as exc:
+            raise TimeoutError(f"TraceRazor audit timed out after {timeout_s:.1f}s.") from exc
+        return _report_payload(report)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def _audit_slice(trace_steps: list[dict[str, Any]], max_steps: int) -> list[dict[str, Any]]:

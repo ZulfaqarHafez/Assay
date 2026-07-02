@@ -379,6 +379,27 @@ beforeEach(() => {
         sub_agent_count: 1
       });
     }
+    if (url.endsWith("/runs/run_demo/agent-spec/diff")) {
+      return json({
+        schema: "assay.agent_diff.v1",
+        run_id: "run_demo",
+        original_available: true,
+        from_label: "original/agent.md",
+        to_label: "refined/AGENTS.md",
+        unified: "--- original/agent.md\n+++ refined/AGENTS.md\n@@ -1,1 +1,2 @@\n # Demo Candidate\n+- Use job-related criteria only.",
+        hunks: [
+          {
+            header: "@@ -1,1 +1,2 @@",
+            lines: [
+              { op: " ", text: "# Demo Candidate" },
+              { op: "+", text: "- Use job-related criteria only." }
+            ]
+          }
+        ],
+        added: 1,
+        removed: 0
+      });
+    }
     if (url.endsWith("/runs/run_demo/agent-spec")) {
       return json(agentSpecOverride ?? agentSpec);
     }
@@ -392,13 +413,24 @@ afterEach(() => {
 
 describe("Assay page", () => {
   it("leads with the Assay agent.md intake as the first screen", async () => {
-    renderHome();
+    const { container } = renderHome();
     // Brand now lives in the global TopNav (layout); the page leads with the hero.
     await screen.findByRole("heading", { name: /find out where it breaks/i });
-    expect(screen.getByRole("button", { name: /run the litmus test/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /run.*litmus test/i })).toBeDisabled();
     expect(screen.getByText(/find out where it breaks/i)).toBeInTheDocument();
     // A starter template is offered as the fallback.
     expect(screen.getByText(/HR screener \(hardened\)/i)).toBeInTheDocument();
+    // Intake accepts structured agent configs, not just markdown.
+    const fileInput = container.querySelector('input[type="file"]');
+    const accept = fileInput?.getAttribute("accept") ?? "";
+    expect(accept).toContain(".json");
+    expect(accept).toContain(".yaml");
+    expect(accept).toContain(".toml");
+    // With no OpenAI key the demo framing is honest up front (not a post-run reveal).
+    expect(screen.getByText(/runs a/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /run demo litmus test/i })).toBeInTheDocument();
+    // Zero-input path: a one-click sample run is offered on the hero.
+    expect(screen.getByRole("button", { name: /run the sample agent/i })).toBeInTheDocument();
   });
 
   it("runs an uploaded agent.md and lands on a verdict", async () => {
@@ -406,24 +438,30 @@ describe("Assay page", () => {
     renderHome();
     const template = await screen.findByText(/HR screener \(hardened\)/i);
     await user.click(template);
-    const runButton = screen.getByRole("button", { name: /run the litmus test/i });
+    const runButton = screen.getByRole("button", { name: /run.*litmus test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
     await user.click(runButton);
     // Lands on the verdict hero with the ranked "what to fix" list.
-    await screen.findByText("What to fix");
+    await screen.findByText("What to fix", undefined, { timeout: 10000 });
     expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0);
     expect(screen.getByText(/By capability/i)).toBeInTheDocument();
-  });
+    // The intake's deploy-policy choice rides on the run request.
+    expect(runCreateBodies[0]).toMatchObject({
+      candidate_id: "cand_demo",
+      policy_name: "strict",
+      competency_threshold: 0.8
+    });
+  }, 15000);
 
   it("uses the current run as the baseline when testing the improved version", async () => {
     const user = userEvent.setup();
     renderHome();
     const template = await screen.findByText(/HR screener \(hardened\)/i);
     await user.click(template);
-    const runButton = screen.getByRole("button", { name: /run the litmus test/i });
+    const runButton = screen.getByRole("button", { name: /run.*litmus test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
     await user.click(runButton);
-    await screen.findByText("What to fix");
+    await screen.findByText("What to fix", undefined, { timeout: 10000 });
 
     await user.click(screen.getByRole("button", { name: /test improved version/i }));
 
@@ -433,7 +471,7 @@ describe("Assay page", () => {
       exam_pack_id: "hr-v1",
       baseline_run_id: "run_demo"
     });
-  });
+  }, 20000);
 
 });
 

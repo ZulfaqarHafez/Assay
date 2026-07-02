@@ -54,7 +54,12 @@ def _ok_audit(passes: bool = True, tas: float = 88.0, fixes=None) -> TraceAuditS
 
 def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
     run = RunRecord(id="run_ready", candidate_id="cand_x", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_x", name="Solid Agent", adapter_type="mock")
+    candidate = CandidateConfig(
+        id="cand_x",
+        name="Solid Agent",
+        adapter_type="mock",
+        system_prompt="# Solid Agent\n\nBe helpful and follow policy.",
+    )
     pack = get_exam_pack("hr-v1")
     scorecard = _scorecard(
         run.id,
@@ -70,6 +75,8 @@ def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
     assert spec.readiness == "ready"
     assert spec.strengths  # at least one verified competency
     assert spec.gaps == []
+    # The uploaded definition rides on the spec for before/after diffs.
+    assert spec.original_markdown == "# Solid Agent\n\nBe helpful and follow policy."
     assert "# Solid Agent - Operating Notes" in spec.agent_markdown
     assert "## Guardrails" in spec.agent_markdown
     assert "READY" in spec.agent_markdown
@@ -101,6 +108,39 @@ def test_failing_competency_recommends_specialist_subagent() -> None:
     assert any(agent.id == "heldout-verifier" for agent in recommended)
     assert any("Fairness" in line for line in spec.gaps)
     assert "Must-fix rules" in spec.agent_markdown
+
+
+def test_refined_markdown_is_not_hardcoded_to_hr() -> None:
+    """A non-HR agent must get a role + guardrails from its own identity and pack,
+    not the old hardcoded 'HR screening agent' persona."""
+    run = RunRecord(id="run_code", candidate_id="cand_code", exam_pack_id="coding-agent-v1")
+    candidate = CandidateConfig(
+        id="cand_code",
+        name="Repo Refactor Bot",
+        adapter_type="mock",
+        system_prompt="# Repo Refactor Bot\n\nRefactor code safely.",
+        metadata={"role": "Repo Refactor Bot", "title": "Repo Refactor Bot"},
+    )
+    pack = get_exam_pack("coding-agent-v1")
+    scorecard = _scorecard(
+        run.id,
+        held={"secret_handling": 0.5, "destructive_action_safety": 0.9},
+        transfer_gap={"secret_handling": 0.1, "destructive_action_safety": 0.0},
+        pass_at_k={"secret_handling": False, "destructive_action_safety": True},
+        certified=False,
+        audit=_ok_audit(),
+        failures=["secret_handling failed pass^3 on held-out variants"],
+    )
+
+    md = build_agent_spec(run, candidate, scorecard, pack, []).agent_markdown
+
+    # The role reflects the actual agent + pack, not HR screening.
+    assert "Repo Refactor Bot" in md
+    assert "HR screening agent" not in md
+    # Guardrails come from the coding pack's competencies, not candidate ranking.
+    assert "secret" in md.lower() or "destructive" in md.lower()
+    assert "protected attribute" not in md.lower()
+    assert "rank" not in md.lower() or "candidate" not in md.lower()
 
 
 def test_trace_audit_failure_recommends_trace_auditor() -> None:

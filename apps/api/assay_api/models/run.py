@@ -19,6 +19,9 @@ class RunCreate(BaseModel):
     competency_threshold: float = Field(default=0.80, ge=0, le=1)
     max_transfer_gap: float = Field(default=0.20, ge=0, le=1)
     tas_threshold: float = Field(default=70, ge=0, le=100)
+    # Which deployability gate semantics apply: strict blocks on trace/degraded
+    # findings, advisory downgrades them to warnings.
+    policy_name: Literal["strict", "advisory"] = "strict"
     job_scope: JobScope | None = None
     # Optional explicit baseline for cross-candidate comparisons, e.g. testing
     # an auto-refined agent definition against the run that produced it.
@@ -37,6 +40,7 @@ class RunRecord(BaseModel):
     competency_threshold: float = 0.80
     max_transfer_gap: float = 0.20
     tas_threshold: float = 70
+    policy_name: str = "strict"
     error: str | None = None
     job_scope: JobScope | None = None
     baseline_run_id: str | None = None
@@ -81,6 +85,10 @@ class Scorecard(BaseModel):
     transfer_gap: dict[str, float]
     grader_disagreement: float
     trace_audit: TraceAuditSummary
+    # False when the candidate answered deterministically (mock/demo, or a live
+    # run that degraded), so the k trials are identical and pass^k is a single
+    # held-out check rather than a reliability-under-resampling measure.
+    trials_stochastic: bool = True
     failure_reasons: list[str] = Field(default_factory=list)
     lessons_applied: list[str] = Field(default_factory=list)
     prior_run_id: str | None = None

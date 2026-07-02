@@ -20,7 +20,7 @@ harness to write.
 - **Held-out certification.** Verdicts are gated at `pass^k`: an agent has to
   hold the line across repeated held-out re-runs, so a single lucky pass never
   certifies it as ready to ship.
-- **A verdict you can act on.** You get a FAIL → RISKY → SHIP band, a per-capability
+- **A verdict you can act on.** You get a HOLD → RISKY → SHIP band, a per-capability
   score breakdown, and a severity-ranked "what to fix" list tied back to the
   failing trace.
 - **An audited paper trail.** Every run is persisted as an experiment with a
@@ -216,3 +216,9 @@ path, and Supabase boundary are in
 > **Note:** the package, API module, and many env vars still use the original
 > `assay` name internally; **Assay** is the product name. Renaming the code
 > namespace is intentionally deferred to avoid churn.
+
+## License
+
+Assay is released under the [MIT License](LICENSE). Contributions are welcome —
+see [CONTRIBUTING.md](CONTRIBUTING.md); security reports go through
+[SECURITY.md](SECURITY.md).

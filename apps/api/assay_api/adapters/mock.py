@@ -8,10 +8,15 @@ from .base import CandidateAdapter
 
 
 class MockCandidateAdapter(CandidateAdapter):
+    # Deterministic by design (reproducible demo grading): the answer is a pure
+    # function of the agent.md and the question, so k trials are identical. The
+    # run is flagged non-stochastic so pass^k is reported honestly, not oversold.
+    stochastic = False
+
     def __init__(self, config: CandidateConfig):
         self.config = config
 
-    async def ask(self, context: str, question: str) -> CandidateResponse:
+    async def ask(self, context: str, question: str, trial: int = 1) -> CandidateResponse:
         started = time.perf_counter()
         digest = hashlib.sha256(f"{self.config.id}:{question}".encode("utf-8")).hexdigest()
         answer = _tailored_answer(question, self.config.system_prompt)

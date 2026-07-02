@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from assay_api.deployability import DeployabilityPolicy, evaluate_scorecard
-from assay_api.models import Scorecard, TraceAuditSummary
+from assay_api.deployability import DeployabilityPolicy, evaluate_scorecard, policy_for_run
+from assay_api.models import RunRecord, Scorecard, TraceAuditSummary
 
 
 def _scorecard(**updates):
@@ -71,3 +71,45 @@ def test_advisory_policy_warns_on_trace_without_blocking() -> None:
     assert decision.deployable is True
     assert decision.verdict == "probation"
     assert decision.warnings
+
+
+def test_policy_for_run_overlays_run_thresholds_on_named_base() -> None:
+    run = RunRecord(
+        candidate_id="cand_unit",
+        k=2,
+        competency_threshold=0.7,
+        max_transfer_gap=0.3,
+        tas_threshold=60,
+        policy_name="advisory",
+    )
+
+    policy = policy_for_run(run)
+
+    assert policy.name == "advisory"
+    assert policy.require_trace is False
+    assert policy.allow_degraded is True
+    assert policy.k == 2
+    assert policy.competency_threshold == 0.7
+    assert policy.max_transfer_gap == 0.3
+    assert policy.tas_threshold == 60
+
+
+def test_policy_for_run_explicit_name_overrides_run_policy() -> None:
+    run = RunRecord(candidate_id="cand_unit", policy_name="advisory")
+
+    policy = policy_for_run(run, "strict")
+
+    assert policy.name == "strict"
+    assert policy.require_trace is True
+    # Run thresholds still overlay the named base.
+    assert policy.k == run.k
+    assert policy.competency_threshold == run.competency_threshold
+
+
+def test_policy_for_run_defaults_to_strict_for_legacy_runs() -> None:
+    run = RunRecord(candidate_id="cand_unit")
+
+    policy = policy_for_run(run)
+
+    assert policy.name == "strict"
+    assert policy.require_trace is True

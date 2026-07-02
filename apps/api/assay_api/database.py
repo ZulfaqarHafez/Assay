@@ -817,9 +817,11 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
     deployability = None
     if scorecard is not None:
         try:
-            from .deployability import evaluate_scorecard
+            from .deployability import evaluate_scorecard, policy_for_run
 
-            deployability = evaluate_scorecard(scorecard).model_dump(mode="json", by_alias=True)
+            deployability = evaluate_scorecard(scorecard, policy_for_run(run)).model_dump(
+                mode="json", by_alias=True
+            )
         except Exception:
             deployability = None
     return {

@@ -1,4 +1,4 @@
-import type { AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, Connector, ConnectorProbe, DatabaseHealth, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunRecord, Scorecard, TracePayload } from "@/types/assay";
+import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunRecord, Scorecard, TracePayload } from "@/types/assay";
 
 function apiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
@@ -52,16 +52,21 @@ export const assayApi = {
       method: "POST",
       body: JSON.stringify(candidate)
     }),
-  candidateFromMarkdown: (markdown: string, name?: string | null) =>
+  candidateFromMarkdown: (markdown: string, name?: string | null, filename?: string | null) =>
     request<AgentIntakeResponse>("/candidates/from-markdown", {
       method: "POST",
-      body: JSON.stringify({ markdown, name: name ?? null })
+      body: JSON.stringify(
+        filename
+          ? { content: markdown, filename, name: name ?? null }
+          : { markdown, name: name ?? null }
+      )
     }),
   createRun: (
     candidateId: string,
     examPackId = "hr-v1",
     jobScope: JobScope | null = null,
-    baselineRunId: string | null = null
+    baselineRunId: string | null = null,
+    options: { policyName?: "strict" | "advisory"; competencyThreshold?: number } = {}
   ) =>
     request<RunRecord>("/runs", {
       method: "POST",
@@ -69,7 +74,9 @@ export const assayApi = {
         candidate_id: candidateId,
         exam_pack_id: examPackId,
         job_scope: jobScope,
-        baseline_run_id: baselineRunId
+        baseline_run_id: baselineRunId,
+        ...(options.policyName ? { policy_name: options.policyName } : {}),
+        ...(options.competencyThreshold != null ? { competency_threshold: options.competencyThreshold } : {})
       })
     }),
   startRun: (runId: string) =>
@@ -81,7 +88,13 @@ export const assayApi = {
   reviewers: (runId: string) => request<ProductReview>(`/runs/${runId}/reviewers`),
   trace: (runId: string) => request<TracePayload>(`/runs/${runId}/trace`),
   proofBundle: (runId: string) => request<ProofBundle>(`/runs/${runId}/proof-bundle`),
+  badgeUrl: (runId: string) => `${apiBaseUrl()}/runs/${runId}/badge.svg`,
   agentSpec: (runId: string) => request<AgentSpec>(`/runs/${runId}/agent-spec`),
+  agentSpecDiff: (runId: string) => request<AgentDiff>(`/runs/${runId}/agent-spec/diff`),
+  deployability: (runId: string, policy?: "strict" | "advisory") =>
+    request<DeployabilityDecision>(
+      `/runs/${runId}/deployability${policy ? `?policy=${policy}` : ""}`
+    ),
   agentSpecFileExport: (runId: string) =>
     request<AgentSpecFileExport>(`/runs/${runId}/agent-spec/export-files`, {
       method: "POST"

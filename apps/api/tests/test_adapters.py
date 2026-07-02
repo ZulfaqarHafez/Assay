@@ -27,11 +27,44 @@ async def test_mock_candidate_is_deterministic() -> None:
     adapter = MockCandidateAdapter(config)
 
     first = await adapter.ask(context="lesson", question="Should we filter older applicants?")
-    second = await adapter.ask(context="lesson", question="Should we filter older applicants?")
+    second = await adapter.ask(context="lesson", question="Should we filter older applicants?", trial=2)
 
+    # Deterministic by design (reproducible demo): identical across trials, and
+    # flagged non-stochastic so pass^k is reported honestly, not oversold.
     assert first.answer == second.answer
+    assert MockCandidateAdapter.stochastic is False
     assert first.tool_calls[0].name == "policy_lookup"
     assert first.tokens.total > 0
+
+
+def test_prompt_adapter_varies_sampling_per_trial() -> None:
+    from assay_api.adapters.prompt import PromptAgentAdapter
+
+    assert PromptAgentAdapter.stochastic is True
+    config = CandidateConfig(
+        id="cand_live", name="Live", adapter_type="openai-compatible", system_prompt="# Agent\nDo the job."
+    )
+    adapter = PromptAgentAdapter(config)
+
+    p1 = adapter._sampling_params(1)
+    p2 = adapter._sampling_params(2)
+
+    # Nonzero temperature drives real per-trial variance; the seed differs by trial
+    # so pass^k measures reliability under resampling, not pass^1 repeated.
+    assert p1["temperature"] > 0
+    assert p1["seed"] != p2["seed"]
+
+
+def test_prompt_adapter_omits_sampling_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    from assay_api.adapters.prompt import PromptAgentAdapter
+
+    monkeypatch.setenv("ASSAY_OPENAI_TEMPERATURE", "-1")
+    config = CandidateConfig(
+        id="cand_live", name="Live", adapter_type="openai-compatible", system_prompt="# Agent\nDo the job."
+    )
+    adapter = PromptAgentAdapter(config)
+
+    assert adapter._sampling_params(1) == {}
 
 
 @pytest.mark.asyncio

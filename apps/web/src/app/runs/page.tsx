@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, AlertTriangle, Circle, Loader2, FlaskConical } from "lucide-react";
 import { useRuns, useCandidates } from "@/lib/queries";
 import { VialArt } from "@/components/ui/EmptyArt";
+import { VERDICT_LABEL } from "@/lib/verdict";
 import type { RunRecord } from "@/types/assay";
 
 /**
@@ -93,9 +94,9 @@ function RunRow({ run, agentName }: { run: RunRecord; agentName: string }) {
       </td>
       <td data-label="Verdict">
         {verdict === "ship" ? (
-          <span className="ws-verdict ship"><CheckCircle2 size={13} /> Ship</span>
+          <span className="ws-verdict ship"><CheckCircle2 size={13} /> {VERDICT_LABEL.ship}</span>
         ) : verdict === "hold" ? (
-          <span className="ws-verdict hold"><AlertTriangle size={13} /> Needs review</span>
+          <span className="ws-verdict hold"><AlertTriangle size={13} /> {VERDICT_LABEL.hold}</span>
         ) : (
           <span className="ws-verdict idle">—</span>
         )}

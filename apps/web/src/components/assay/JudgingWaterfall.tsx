@@ -22,6 +22,8 @@ export type JudgingWaterfallProps = {
   totalExpected: number;
   progress: number;
   agentName: string;
+  /** True when grading with deterministic stand-ins (no OpenAI key). */
+  demoMode?: boolean;
   onCancel: () => void;
 };
 
@@ -32,6 +34,7 @@ export function JudgingWaterfall({
   totalExpected,
   progress,
   agentName,
+  demoMode = false,
   onCancel
 }: JudgingWaterfallProps) {
   const steps = React.useMemo(() => liveSteps(events), [events]);
@@ -74,6 +77,11 @@ export function JudgingWaterfall({
           <strong>{heading}</strong>
         </span>
         <div className="assay-judging-meta">
+          {demoMode && (
+            <span className="assay-judging-demo" title="No OpenAI key — grading with deterministic stand-ins">
+              Demo mode
+            </span>
+          )}
           <span className="assay-judging-count" aria-live="polite">
             {determinate ? `${gradedCount} / ${totalExpected} probes` : `${gradedCount} probes`}
           </span>

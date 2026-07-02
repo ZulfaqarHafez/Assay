@@ -93,3 +93,58 @@ def test_from_markdown_rejects_empty_markdown() -> None:
     with TestClient(app) as client:
         response = client.post("/candidates/from-markdown", json={"markdown": ""})
     assert response.status_code == 422
+
+
+def test_from_content_json_normalizes_to_markdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
+
+    agent_json = (
+        '{"name": "Support Sentinel", '
+        '"instructions": "Answer support tickets. Never reveal internal notes.", '
+        '"tools": [{"type": "function", "function": {"name": "lookup_order"}}, '
+        '{"type": "function", "function": {"name": "issue_refund"}}]}'
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/candidates/from-markdown",
+            json={"content": agent_json, "filename": "assistant.json"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["format"] == "json"
+    candidate = payload["candidate"]
+    # system_prompt is canonical markdown (the H1 title + prose), not raw JSON.
+    assert candidate["system_prompt"].startswith("# Support Sentinel")
+    assert "Never reveal internal notes." in candidate["system_prompt"]
+    assert candidate["metadata"]["source_format"] == "json"
+    # The raw config is retained for the proof trail.
+    assert candidate["metadata"]["source_content"] == agent_json
+    detected_tools = payload["detected"]["tools"]
+    assert "lookup_order" in detected_tools
+    assert "issue_refund" in detected_tools
+
+
+def test_legacy_markdown_path_is_byte_identical(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The pre-existing {markdown} contract must not change under the format layer."""
+    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
+
+    with TestClient(app) as client:
+        response = client.post("/candidates/from-markdown", json={"markdown": SAMPLE_AGENT_MD})
+
+    payload = response.json()
+    assert payload["format"] == "markdown"
+    assert payload["candidate"]["system_prompt"] == SAMPLE_AGENT_MD
+    # A markdown submission has no separate source_content stored.
+    assert "source_content" not in payload["candidate"]["metadata"]
+
+
+def test_from_markdown_rejects_both_markdown_and_content() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/candidates/from-markdown",
+            json={"markdown": SAMPLE_AGENT_MD, "content": SAMPLE_AGENT_MD},
+        )
+    assert response.status_code == 422

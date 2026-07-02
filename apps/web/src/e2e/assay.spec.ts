@@ -10,7 +10,7 @@ test("intake screen renders the core controls", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Assay home/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /find out where it breaks/i })).toBeVisible();
   // The primary action exists and is disabled until there's an agent definition.
-  const run = page.locator(".assay-intake-actions").getByRole("button", { name: /run the litmus test/i });
+  const run = page.locator(".assay-intake-actions").getByRole("button", { name: /litmus test/i });
   await expect(run).toBeVisible();
   await expect(run).toBeDisabled();
   // The input and at least one starter template are present.
@@ -73,7 +73,7 @@ test("runs an agent.md through to a verdict", async ({ page }) => {
     { delay: 0 }
   );
 
-  const run = page.locator(".assay-intake-actions").getByRole("button", { name: /run the litmus test/i });
+  const run = page.locator(".assay-intake-actions").getByRole("button", { name: /litmus test/i });
   await expect(run).toBeEnabled({ timeout: 10_000 });
   await run.click();
 

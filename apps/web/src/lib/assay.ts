@@ -1,5 +1,6 @@
-import type { Scorecard, AgentSpec, RunEvent } from "@/types/assay";
+import type { Scorecard, AgentSpec, DeployabilityDecision, DeployabilityPolicy, RunEvent } from "@/types/assay";
 import { labelize, maxTransferGap } from "@/lib/derive";
+import { VERDICT_HEADLINE, bandFromDecision, type VerdictBand } from "@/lib/verdict";
 
 /**
  * Assay-flow derive helpers. Assay reframes the existing evaluation engine as a
@@ -50,24 +51,51 @@ function headlineScores(scorecard: Scorecard): Record<string, number> {
   return scorecard.competency_scores ?? {};
 }
 
-export function deriveVerdict(scorecard: Scorecard): VerdictSummary {
+export function deriveVerdict(
+  scorecard: Scorecard,
+  decision?: DeployabilityDecision | null
+): VerdictSummary {
   const scores = headlineScores(scorecard);
   const score = Math.round(meanOf(Object.values(scores)) * 100);
   const passValues = Object.values(scorecard.pass_at_k ?? {});
   const passedChecks = passValues.filter(Boolean).length;
   const totalChecks = passValues.length;
 
+  // Prefer the backend policy decision — it is the same gate the CLI and the
+  // proof bundle report, so the hero verdict never disagrees with them.
+  if (decision) {
+    const verdict = bandFromDecision(decision.verdict);
+    const headline =
+      decision.blocking_reasons[0] ?? decision.warnings[0] ?? decision.summary ?? biggestProblem(scorecard, verdict);
+    return { verdict, label: VERDICT_HEADLINE[verdict], score, headline, passedChecks, totalChecks };
+  }
+
   const tracePasses = scorecard.trace_audit?.passes ?? false;
-  let verdict: Verdict;
+  let verdict: VerdictBand;
   if (scorecard.certified && tracePasses) verdict = "ship";
   else if (scorecard.certified) verdict = "risky";
   else verdict = "hold";
 
-  const label = verdict === "ship" ? "Ready to ship" : verdict === "risky" ? "Ship with caution" : "Not ready yet";
-
   const headline = biggestProblem(scorecard, verdict);
 
-  return { verdict, label, score, headline, passedChecks, totalChecks };
+  return { verdict, label: VERDICT_HEADLINE[verdict], score, headline, passedChecks, totalChecks };
+}
+
+/** One human sentence stating the gate this run was judged against. */
+export function policyRuleSentence(policy: DeployabilityPolicy): string {
+  const parts = [
+    `${policy.name} policy`,
+    `k≥${policy.k}`,
+    `every competency ≥${Math.round(policy.competency_threshold * 100)}% held-out`,
+    `transfer gap ≤${policy.max_transfer_gap.toFixed(2)}`
+  ];
+  if (policy.require_trace) parts.push(`TraceRazor TAS ≥${Math.round(policy.tas_threshold)}`);
+  parts.push(
+    policy.critical_findings_allowed === 0
+      ? "no critical findings"
+      : `≤${policy.critical_findings_allowed} critical findings`
+  );
+  return parts.join(" · ");
 }
 
 function biggestProblem(scorecard: Scorecard, verdict: Verdict): string {
@@ -134,6 +162,16 @@ export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): 
       detail: "The trace audit flagged thin or under-justified reasoning steps. Have the agent show its work on tool use."
     });
   }
+
+  // Concrete TraceRazor fix patches: efficiency wins, never ship blockers.
+  (scorecard.trace_audit?.fixes ?? []).slice(0, 2).forEach((fix, index) => {
+    fixes.push({
+      id: `trace-fix-${index}`,
+      severity: "info",
+      title: `Trace efficiency: ${labelize(fix.fix_type)} on ${fix.target}`,
+      detail: `${fix.patch.slice(0, 140)}${fix.patch.length > 140 ? "…" : ""} · saves ~${fix.estimated_token_savings} tokens/run.`
+    });
+  });
 
   // Pull in any concrete gaps the coaching engine already named.
   agentSpec?.gaps?.forEach((gap, index) => {

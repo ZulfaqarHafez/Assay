@@ -118,6 +118,13 @@ class RunOrchestrator:
             scorecard.lessons_applied = applied_lesson_ids
             scorecard.prior_run_id = run.baseline_run_id or prior_run_id
             scorecard.qualification_status = qualification_status
+            # pass^k only measures reliability-under-resampling when the candidate
+            # can actually vary between trials. A deterministic adapter (or a run
+            # that degraded to demo answers) yields identical trials, so flag it
+            # honestly rather than dressing pass^1 up as pass^k.
+            scorecard.trials_stochastic = bool(getattr(adapter, "stochastic", False)) and not getattr(
+                adapter, "degraded", False
+            )
             if role_brief is not None:
                 scorecard.role_brief_summary = role_brief.role_summary or None
             # If the live key was rate-limited, the run answered deterministically;
@@ -166,7 +173,7 @@ class RunOrchestrator:
             {"competency": competency, "trial": trial, "variant": variant, "question": question},
         )
         try:
-            response = await adapter.ask(context=context, question=question)
+            response = await adapter.ask(context=context, question=question, trial=trial)
         except CandidateAdapterError:
             raise
 

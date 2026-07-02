@@ -11,7 +11,7 @@ import {
 import { useRunStream } from "@/lib/useRunStream";
 import { errorMessage, type LoadState } from "@/lib/derive";
 import TraceDrawer from "@/components/trace/TraceDrawer";
-import AgentIntake from "@/components/assay/AgentIntake";
+import AgentIntake, { type IntakePolicy } from "@/components/assay/AgentIntake";
 import Landing from "@/components/assay/Landing";
 import JudgingWaterfall from "@/components/assay/JudgingWaterfall";
 import VerdictPanel from "@/components/assay/VerdictPanel";
@@ -58,6 +58,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [intakeSubmitting, setIntakeSubmitting] = useState(false);
+  // The definition as submitted this session, so the verdict's diff has a true "before".
+  const [submittedMarkdown, setSubmittedMarkdown] = useState("");
+  const [runPolicy, setRunPolicy] = useState<IntakePolicy | null>(null);
 
   const runStream = useRunStream();
 
@@ -153,15 +156,17 @@ export default function Home() {
   // Assay primary flow: take an uploaded/authored agent.md, register it as the
   // candidate under test (live LLM when a key is set, deterministic demo when
   // not), then immediately run the adversarial exam and stream the judging.
-  async function runAgentMarkdown(markdown: string, roleScopeText?: string) {
+  async function runAgentMarkdown(markdown: string, roleScopeText?: string, policy?: IntakePolicy, filename?: string) {
     if (!markdown.trim()) return;
     setError(null);
     resetRunArtifacts();
     runStream.reset();
     setRun(null);
     setIntakeSubmitting(true);
+    setSubmittedMarkdown(markdown);
+    setRunPolicy(policy ?? null);
     try {
-      const intake = await assayApi.candidateFromMarkdown(markdown);
+      const intake = await assayApi.candidateFromMarkdown(markdown, null, filename ?? null);
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
@@ -182,7 +187,10 @@ export default function Home() {
             extraction: "none" as const
           }
         : null;
-      const createdRun = await assayApi.createRun(created.id, packId, jobScope);
+      const createdRun = await assayApi.createRun(created.id, packId, jobScope, null, {
+        policyName: policy?.name,
+        competencyThreshold: policy?.competencyThreshold
+      });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
@@ -213,7 +221,10 @@ export default function Home() {
     setRun(null);
     try {
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
-      const createdRun = await assayApi.createRun(candidateId, packId, null);
+      const createdRun = await assayApi.createRun(candidateId, packId, null, null, {
+        policyName: runPolicy?.name,
+        competencyThreshold: runPolicy?.competencyThreshold
+      });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
@@ -239,6 +250,7 @@ export default function Home() {
     runStream.reset();
     setRun(null);
     setIntakeSubmitting(true);
+    setSubmittedMarkdown(refined);
     try {
       const intake = await assayApi.candidateFromMarkdown(refined, `${candidate?.name ?? "Agent"} v2`);
       const created = intake.candidate;
@@ -246,7 +258,10 @@ export default function Home() {
       setSelectedCandidateId(created.id);
       void candidatesQuery.refetch();
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
-      const createdRun = await assayApi.createRun(created.id, packId, null, baselineRunId);
+      const createdRun = await assayApi.createRun(created.id, packId, null, baselineRunId, {
+        policyName: runPolicy?.name,
+        competencyThreshold: runPolicy?.competencyThreshold
+      });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
@@ -320,6 +335,7 @@ export default function Home() {
             totalExpected={runStream.totalExpected}
             progress={runStream.progress}
             agentName={candidate?.name ?? "your agent"}
+            demoMode={!health?.openai_configured}
             onCancel={cancelRun}
           />
         )}
@@ -328,6 +344,8 @@ export default function Home() {
             scorecard={scorecard}
             agentSpec={agentSpec}
             agentName={candidate?.name ?? scorecard.run_id}
+            deployability={proofBundle?.deployability ?? null}
+            originalMarkdown={submittedMarkdown || undefined}
             onViewTrace={openTraceDrawer}
             onTestAnother={testAnother}
             onRerun={rerunAgent}

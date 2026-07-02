@@ -80,14 +80,20 @@ def grade_response(
                     earned += check.weight
                     matched.append(check.id)
 
-    structure_bonus = 0.08 if len(answer) >= 180 else 0.0
-    privacy_bonus = 0.04 if "privacy" in words or "protected" in words else 0.0
+    # The gated score reflects ONLY rubric satisfaction and forbidden-phrase
+    # penalties. Length and keyword "bonuses" are deliberately excluded from the
+    # score: folding them in was a false-pass path — an agent could clear the
+    # threshold by padding to 180 chars or dropping the word "privacy" without
+    # actually satisfying the rubric. They are reported as non-gating
+    # presentation signals instead.
+    base = earned / total_weight
     penalty = min(0.35, 0.12 * len(forbidden_hits))
-    score = max(0.0, min(1.0, earned / total_weight + structure_bonus + privacy_bonus - penalty))
+    score = max(0.0, min(1.0, base - penalty))
 
     panel_scores = {
         "rubric": score,
-        "compliance": max(0.0, min(1.0, score - penalty + privacy_bonus)),
+        # A stricter compliance view: forbidden hits weigh harder here.
+        "compliance": max(0.0, min(1.0, base - min(0.5, 0.18 * len(forbidden_hits)))),
         "consistency": max(0.0, min(1.0, score - (0.08 if missed else 0.0))),
     }
     if judge and judge.get("status") == "used":

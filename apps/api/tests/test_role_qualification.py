@@ -138,17 +138,22 @@ def test_brief_errors_degrade_to_deterministic(monkeypatch) -> None:
     assert brief["competencies"]  # still seeded so the run can proceed
 
 
-def test_brief_absent_when_flag_off(monkeypatch) -> None:
+def test_deterministic_brief_present_when_flag_off(monkeypatch) -> None:
+    """With the tailored stage off (default), a grounded deterministic brief is
+    still recorded (P1-5) so /role-brief resolves instead of 404ing — but an
+    unknown run still 404s."""
     # Flag intentionally not set.
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
     monkeypatch.setattr(role_qualification, "resolve_openai_key", lambda: "")
 
     with TestClient(app) as client:
         run_id = _started_run(client)
-        missing = client.get(f"/runs/{run_id}/role-brief")
+        present = client.get(f"/runs/{run_id}/role-brief")
         absent_run = client.get("/runs/run_missing/role-brief")
 
-    assert missing.status_code == 404
+    assert present.status_code == 200
+    assert present.json()["status"] == "deterministic"
+    assert present.json()["role_summary"]
     assert absent_run.status_code == 404
 
 

@@ -105,6 +105,7 @@ export type RunRecord = {
   competency_threshold: number;
   max_transfer_gap: number;
   tas_threshold: number;
+  policy_name?: string;
   error?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -134,6 +135,21 @@ export type RunEvent = {
   tracerazor_step_id?: number | null;
 };
 
+export type TraceRazorFix = {
+  fix_type: string;
+  target: string;
+  patch: string;
+  estimated_token_savings: number;
+  risk?: "safe" | "needs_review" | "dangerous";
+};
+
+export type TraceRazorSavings = {
+  tokens_saved?: number;
+  reduction_pct?: number;
+  cost_saved_per_run_usd?: number;
+  monthly_savings_usd?: number;
+} & Record<string, unknown>;
+
 export type TraceAuditSummary = {
   status: "ok" | "insufficient_steps" | "unavailable" | "error";
   trace_id?: string | null;
@@ -143,8 +159,8 @@ export type TraceAuditSummary = {
   total_steps: number;
   total_tokens: number;
   metrics: Record<string, unknown>;
-  savings: Record<string, unknown>;
-  fixes: Array<Record<string, unknown>>;
+  savings: TraceRazorSavings;
+  fixes: TraceRazorFix[];
   raw: Record<string, unknown>;
   message?: string | null;
 };
@@ -165,6 +181,7 @@ export type Scorecard = {
   transfer_gap: Record<string, number>;
   grader_disagreement: number;
   trace_audit: TraceAuditSummary;
+  trials_stochastic?: boolean;
   failure_reasons: string[];
   created_at: string;
   lessons_applied: string[];
@@ -280,6 +297,7 @@ export type AgentSpec = {
   readiness: "ready" | "refine" | "needs_subagents";
   headline: string;
   agent_markdown: string;
+  original_markdown?: string | null;
   strengths: string[];
   gaps: string[];
   tracerazor_actions: string[];
@@ -292,6 +310,28 @@ export type AgentSpecFileExport = {
   directory: string;
   files: Record<string, string>;
   sub_agent_count: number;
+};
+
+export type AgentDiffLine = {
+  op: "+" | "-" | " ";
+  text: string;
+};
+
+export type AgentDiffHunk = {
+  header: string;
+  lines: AgentDiffLine[];
+};
+
+export type AgentDiff = {
+  schema: "assay.agent_diff.v1";
+  run_id: string;
+  original_available: boolean;
+  from_label: string;
+  to_label: string;
+  unified: string;
+  hunks: AgentDiffHunk[];
+  added: number;
+  removed: number;
 };
 
 export type SubAgentIdea = {

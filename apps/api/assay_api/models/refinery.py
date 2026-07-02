@@ -73,6 +73,9 @@ class AgentSpec(BaseModel):
     readiness: AgentReadiness
     headline: str
     agent_markdown: str
+    # The agent definition the candidate was registered with, so consumers can
+    # render a true before/after diff without a second candidate fetch.
+    original_markdown: str | None = None
     strengths: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
     tracerazor_actions: list[str] = Field(default_factory=list)

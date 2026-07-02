@@ -20,27 +20,47 @@ export type AgentTemplate = {
   markdown: string;
 };
 
+/** Deploy-gate choice made at intake; the run is judged against exactly this. */
+export type IntakePolicy = {
+  name: "strict" | "advisory";
+  competencyThreshold: number;
+};
+
 export type AgentIntakeProps = {
   examPackName: string;
   /** True when an LLM key is configured, so the upload runs for real. */
   liveMode: boolean;
   submitting: boolean;
   templates: AgentTemplate[];
-  onRun: (markdown: string, roleScopeText?: string) => void;
+  onRun: (markdown: string, roleScopeText?: string, policy?: IntakePolicy, filename?: string) => void;
 };
+
+const STRUCTURED_EXTENSIONS = /\.(json|ya?ml|toml)$/i;
 
 export function AgentIntake({ examPackName, liveMode, submitting, templates, onRun }: AgentIntakeProps) {
   const [markdown, setMarkdown] = React.useState("");
+  const [filename, setFilename] = React.useState<string | undefined>(undefined);
   const [roleScopeText, setRoleScopeText] = React.useState("");
+  const [policyName, setPolicyName] = React.useState<IntakePolicy["name"]>("strict");
+  const [thresholdPct, setThresholdPct] = React.useState(80);
   const [dragging, setDragging] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const facts = React.useMemo(() => detectAgentFacts(markdown), [markdown]);
+  // Structured configs (JSON/YAML/TOML) are normalized server-side; the local
+  // facts mirror only understands markdown, so skip it for those.
+  const isStructured = Boolean(filename && STRUCTURED_EXTENSIONS.test(filename)) || markdown.trimStart().startsWith("{");
+  const facts = React.useMemo(() => detectAgentFacts(isStructured ? "" : markdown), [markdown, isStructured]);
   const hasContent = markdown.trim().length > 0;
+  // The zero-input path: one click runs a real sample so a first-time visitor
+  // sees the full intake -> judging -> verdict flow without typing anything.
+  const sampleTemplate = templates[0] ?? null;
 
   const readFile = React.useCallback((file: File) => {
     const reader = new FileReader();
-    reader.onload = () => setMarkdown(String(reader.result ?? ""));
+    reader.onload = () => {
+      setMarkdown(String(reader.result ?? ""));
+      setFilename(file.name);
+    };
     reader.readAsText(file);
   }, []);
 
@@ -85,7 +105,10 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <textarea
           className="assay-textarea"
           value={markdown}
-          onChange={(event) => setMarkdown(event.target.value)}
+          onChange={(event) => {
+            setMarkdown(event.target.value);
+            setFilename(undefined);
+          }}
           placeholder={"# Support Triage Agent\n\nYou are a customer-support agent. Stay within policy, never reveal\ninternal notes, and escalate refunds over $100.\n\n## Tools\n- `lookup_order`\n- `issue_refund`\n- `escalate`"}
           spellCheck={false}
           aria-label="Agent definition markdown"
@@ -98,7 +121,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <input
           ref={fileInputRef}
           type="file"
-          accept=".md,.markdown,.txt,text/markdown,text/plain"
+          accept=".md,.markdown,.txt,.json,.yaml,.yml,.toml,text/markdown,text/plain,application/json,application/yaml,application/toml"
           hidden
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -113,7 +136,15 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         )}
       </div>
 
-      {hasContent && (
+      {hasContent && isStructured && (
+        <div className="assay-detected" aria-live="polite">
+          <span className="assay-detected-lead">Detected</span>
+          <span className="assay-chip">
+            <FileText size={13} /> {filename ?? "Structured config"} — normalized on the server
+          </span>
+        </div>
+      )}
+      {hasContent && !isStructured && (
         <div className="assay-detected" aria-live="polite">
           <span className="assay-detected-lead">Detected</span>
           <span className="assay-chip">
@@ -129,19 +160,40 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         </div>
       )}
 
+      {!liveMode && (
+        <p className="assay-demo-notice" role="note">
+          <Sparkles size={14} /> No OpenAI key detected — this runs a <strong>deterministic demo</strong>,
+          not your real agent. Add a key to grade the real thing.
+        </p>
+      )}
+
       <div className="assay-intake-actions">
         <button
           type="button"
           className="assay-run-button"
-          onClick={() => onRun(markdown, roleScopeText)}
+          onClick={() => onRun(markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 }, filename)}
           disabled={!hasContent || submitting}
         >
           <FlaskConical size={18} />
-          {submitting ? "Running the litmus test…" : `Run the litmus test`}
+          {submitting
+            ? liveMode ? "Running the litmus test…" : "Running the demo…"
+            : liveMode ? "Run the litmus test" : "Run demo litmus test"}
         </button>
+        {sampleTemplate && (
+          <button
+            type="button"
+            className="assay-ghost-button"
+            disabled={submitting}
+            onClick={() =>
+              onRun(sampleTemplate.markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 })
+            }
+          >
+            <Zap size={16} /> Run the sample agent
+          </button>
+        )}
         <button
           type="button"
-          className="assay-ghost-button"
+          className="assay-text-button"
           onClick={() =>
             document.querySelector('[aria-label="How it works"]')?.scrollIntoView({ behavior: "smooth", block: "start" })
           }
@@ -162,7 +214,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
       </div>
 
       <details className="assay-advanced">
-        <summary>Role scope</summary>
+        <summary>Role scope &amp; deploy policy</summary>
         <textarea
           className="assay-scope-textarea"
           value={roleScopeText}
@@ -171,6 +223,47 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           aria-label="Role scope"
           rows={3}
         />
+        <div className="assay-policy" aria-label="Deploy policy">
+          <div className="assay-policy-toggle" role="radiogroup" aria-label="Deployability policy">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={policyName === "strict"}
+              className={policyName === "strict" ? "active" : ""}
+              onClick={() => setPolicyName("strict")}
+            >
+              Strict
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={policyName === "advisory"}
+              className={policyName === "advisory" ? "active" : ""}
+              onClick={() => setPolicyName("advisory")}
+            >
+              Advisory
+            </button>
+          </div>
+          <small className="assay-policy-hint">
+            {policyName === "strict"
+              ? "Strict: trace-audit and degraded-mode findings block the verdict."
+              : "Advisory: trace-audit and degraded-mode findings warn instead of block."}
+          </small>
+          <label className="assay-policy-slider">
+            <span>
+              Pass bar <strong>{thresholdPct}%</strong> — every competency must score at least {thresholdPct}% on all held-out trials (not 100).
+            </span>
+            <input
+              type="range"
+              min={50}
+              max={95}
+              step={5}
+              value={thresholdPct}
+              onChange={(event) => setThresholdPct(Number(event.target.value))}
+              aria-label="Competency pass threshold percent"
+            />
+          </label>
+        </div>
       </details>
         </div>
         <aside className="assay-hero-aside">

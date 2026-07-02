@@ -4687,3 +4687,343 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
     max-height: 72vh;
   }
 }
+
+/* ==========================================================================
+   Deploy-policy controls, honest verdict chrome, real diff rendering, and
+   trace-efficiency fixes (frontend pass for policy/diff/trace surfaces).
+   ========================================================================== */
+
+/* Policy bar tick on the litmus meter — where the pass bar actually sits. */
+.assay-litmus-meter .threshold-tick {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-fg);
+  opacity: 0.55;
+  transform: translateX(-50%);
+}
+.assay-policy-rule {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--color-fg-muted);
+}
+
+/* Intake: strict/advisory toggle + pass-bar slider. */
+.assay-policy {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+.assay-policy-toggle {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  width: fit-content;
+}
+.assay-policy-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+.assay-policy-toggle button.active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+.assay-policy-hint {
+  font-size: 11.5px;
+  color: var(--color-fg-muted);
+}
+.assay-policy-slider {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  max-width: 520px;
+}
+.assay-policy-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+/* Real unified-diff rendering inside the improve panel. */
+.assay-improve-diff .assay-diff-hunk { color: var(--color-fg-muted); opacity: 0.8; }
+.assay-improve-diff .assay-diff-add { color: var(--color-pass); }
+.assay-improve-diff .assay-diff-del { color: var(--color-fail); }
+.assay-improve-diff .assay-diff-ctx { color: var(--color-fg-muted); }
+.assay-diff-add-count { color: var(--color-pass); font-style: normal; font-weight: 700; }
+.assay-diff-del-count { color: var(--color-fail); font-style: normal; font-weight: 700; }
+
+/* Validation state of the refined md (proven vs not yet re-tested). */
+.assay-improve-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.assay-improve-validation {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  text-decoration: none;
+}
+.assay-improve-validation.pass {
+  color: var(--color-pass);
+  background: var(--color-pass-bg);
+}
+.assay-improve-validation.warn {
+  color: var(--color-warn);
+  background: color-mix(in srgb, var(--color-warn) 12%, var(--color-panel));
+}
+
+/* Trace efficiency fixes (TraceRazor report.fixes). */
+.assay-improve-savings {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-fg-muted);
+}
+.assay-trace-fixes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.assay-trace-fixes li {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: 10px 12px;
+  display: grid;
+  gap: 5px;
+}
+.assay-trace-fix-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+.assay-trace-fix-head code {
+  font-size: 11.5px;
+  color: var(--color-fg-muted);
+}
+.assay-trace-fix-head small {
+  margin-left: auto;
+  color: var(--color-fg-muted);
+}
+.assay-trace-fix-patch {
+  color: var(--color-fg-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Run-detail: the gate rule, per-check chips, and trace-fix pointer. */
+.rd-meter-rule {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--color-fg-muted);
+}
+.rd-meter-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rd-check-chip {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
+  border: 1px solid var(--color-border);
+}
+.rd-check-chip.pass {
+  color: var(--color-pass);
+  background: var(--color-pass-bg);
+  border-color: color-mix(in srgb, var(--color-pass) 35%, var(--color-border));
+}
+.rd-check-chip.fail {
+  color: var(--color-fail);
+  background: var(--color-fail-bg);
+  border-color: color-mix(in srgb, var(--color-fail) 35%, var(--color-border));
+}
+.rd-meter-tracefixes {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+/* Refined-vs-baseline improvement banner on run detail. */
+.rd-improvement {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 13px;
+  background: var(--color-panel);
+}
+.rd-improvement.up {
+  border-color: color-mix(in srgb, var(--color-pass) 45%, var(--color-border));
+  background: var(--color-pass-bg);
+  color: var(--color-pass);
+}
+.rd-improvement.down {
+  border-color: color-mix(in srgb, var(--color-warn) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warn) 10%, var(--color-panel));
+  color: var(--color-warn);
+}
+.rd-improvement span { color: var(--color-fg); }
+.rd-improvement code { font-size: 12px; }
+.rd-improvement-link {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rd-improvement-link:hover { text-decoration: underline; }
+
+/* Preflight Council, made useful: flag count, expandable evidence, next steps. */
+.review-council-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.review-council-count { font-size: 12px; font-weight: 600; }
+.review-council-count.clear { color: var(--color-pass); }
+.review-council-count.flagged { color: var(--color-warn); }
+.review-council-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+.reviewer-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.reviewer-details > summary::-webkit-details-marker { display: none; }
+.reviewer-details > summary .reviewer-row { position: relative; padding-right: 18px; }
+.reviewer-details > summary .reviewer-row::after {
+  content: "\25B8";
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-fg-muted);
+  font-size: 11px;
+  transition: transform 160ms ease;
+}
+.reviewer-details[open] > summary .reviewer-row::after {
+  transform: translateY(-50%) rotate(90deg);
+}
+.reviewer-detail-body {
+  margin: 4px 0 10px 40px;
+  display: grid;
+  gap: 6px;
+}
+.reviewer-evidence {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+  display: grid;
+  gap: 3px;
+}
+.reviewer-next-step {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-warn);
+}
+.reviewer-next-step strong { font-weight: 700; }
+
+/* Honest demo mode + zero-input sample run (P1-3/P1-4). */
+.assay-demo-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 9px 13px;
+  font-size: 12.5px;
+  color: var(--color-fg);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-panel));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 26%, var(--color-border));
+  border-radius: var(--radius-md);
+}
+.assay-demo-notice strong { font-weight: 700; }
+.assay-judging-demo {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
+}
+
+/* Honesty note when pass^k trials are deterministic (P0-1). */
+.assay-trials-note {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-fg-muted);
+  background: var(--color-bg-subtle, rgba(0,0,0,0.03));
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* "How to improve" disclosure — coaching depth one click down (P1-7). */
+.assay-improve-more {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+}
+.assay-improve-more > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-fg);
+  user-select: none;
+}
+.assay-improve-more > summary::-webkit-details-marker { display: none; }
+.assay-improve-more > summary::after {
+  content: "\25B8";
+  margin-left: auto;
+  color: var(--color-fg-muted);
+  transition: transform 160ms ease;
+}
+.assay-improve-more[open] > summary::after { transform: rotate(90deg); }
+.assay-improve-more-body {
+  display: grid;
+  gap: 18px;
+  padding: 0 18px 18px;
+}
