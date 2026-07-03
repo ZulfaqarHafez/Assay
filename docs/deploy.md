@@ -61,14 +61,35 @@ repo root by default, which (a) can't import `assay_api` from `api/index.py` and
 python -m uvicorn assay_api.main:app --app-dir apps/api --host 0.0.0.0 --port $PORT
 ```
 
+**Container (recommended for Option B).** `apps/api/Dockerfile` builds a lean,
+non-root image that runs uvicorn on `$PORT`, with a `/health` container
+healthcheck and an optional TraceRazor install (degrades gracefully if no wheel
+exists for the platform):
+
+```bash
+docker build -t assay-api apps/api
+docker run -p 8000:8000 --env-file .env assay-api
+```
+
+`render.yaml` at the repo root is a one-click **Render Blueprint** for this image
+(New → Blueprint → point at the repo, then set the `sync:false` secrets in the
+dashboard). The same Dockerfile works on Railway, Fly.io, or any container host —
+they inject `$PORT`, which the image honors.
+
 Set these env vars on the API host (server-only), for either option:
 
 - `ASSAY_DB_BACKEND=supabase`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `ASSAY_ENV=production`
-- `ASSAY_API_KEYS=<comma-separated strong shared API keys>`
-- `ASSAY_REQUIRE_TENANT=1` for hosted multi-tenant mode; clients must send
-  `X-Assay-Tenant` on non-health routes
 - `ASSAY_CORS_ORIGINS=https://<your-web-host>` (comma-separated for multiple web origins)
+- `ASSAY_API_KEYS=<comma-separated strong shared API keys>` — **for programmatic /
+  CI clients only.** The browser web app cannot send a secret key
+  (`NEXT_PUBLIC_*` is public), so **do not set this on the API that serves the
+  web app** — a locked `ASSAY_CORS_ORIGINS` + rate limiting is the browser-facing
+  protection. Set keys on a *separate* API host that only the CLI / GitHub Action
+  calls, or leave unset for the web-facing host. The `/health` probe and the
+  `/runs/{id}/badge.svg` status badge are always public.
+- `ASSAY_REQUIRE_TENANT=1` for hosted multi-tenant mode; clients must send
+  `X-Assay-Tenant` on non-health routes (requires `ASSAY_API_KEYS`)
 - `ASSAY_RATE_LIMIT_ENABLED=1` (default) plus optional per-route limits such as `ASSAY_RATE_LIMIT_CREATE_RUN`
 - `ASSAY_REQUIRE_HARDENING=1` to fail startup instead of only warning when production hardening is incomplete
 - `OPENAI_API_KEY` (optional — enables the OpenAI research/extraction layer)

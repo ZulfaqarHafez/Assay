@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import { assayApi } from "@/lib/api";
 import {
   useCandidates,
@@ -17,7 +18,6 @@ import JudgingWaterfall from "@/components/assay/JudgingWaterfall";
 import VerdictPanel from "@/components/assay/VerdictPanel";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
-  AgentResearch,
   AgentSpec,
   CandidateConfig,
   ProofBundle,
@@ -44,6 +44,11 @@ export default function Home() {
     candidatesQuery.isLoading ||
     runsQuery.isLoading;
 
+  // The API is unreachable at boot when the core queries error out — surface
+  // that on the intake screen so the user isn't ambushed only after clicking Run.
+  const apiUnreachable =
+    healthQuery.isError && examPacksQuery.isError && candidatesQuery.isError;
+
   // Run-scoped state set imperatively once a run resolves.
   const [selectedExamPackId, setSelectedExamPackId] = useState("hr-v1");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
@@ -54,7 +59,6 @@ export default function Home() {
   const [trace, setTrace] = useState<TracePayload | null>(null);
   const [proofBundle, setProofBundle] = useState<ProofBundle | null>(null);
   const [agentSpec, setAgentSpec] = useState<AgentSpec | null>(null);
-  const [agentResearch, setAgentResearch] = useState<AgentResearch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [intakeSubmitting, setIntakeSubmitting] = useState(false);
@@ -133,7 +137,6 @@ export default function Home() {
     setTrace(null);
     setProofBundle(null);
     setAgentSpec(null);
-    setAgentResearch(null);
   }
 
   async function hydrateRunArtifacts(runId: string) {
@@ -309,6 +312,13 @@ export default function Home() {
   return (
     <main className="assay-shell">
       <div className="assay-stage">
+        {phase === "intake" && apiUnreachable && (
+          <div className="assay-api-down" role="alert">
+            <strong>Can&rsquo;t reach the Assay API.</strong> Start the backend
+            (<code>.\scripts\start-dev.ps1</code> or <code>npm run dev:api</code>), then reload —
+            uploads won&rsquo;t run until it&rsquo;s up.
+          </div>
+        )}
         {phase === "intake" && (
           <>
             <AgentIntake
@@ -327,7 +337,7 @@ export default function Home() {
             />
           </>
         )}
-        {phase === "running" && (
+        {phase === "running" && !runEnded && (
           <JudgingWaterfall
             status={runStream.status}
             events={runStream.events}
@@ -338,6 +348,25 @@ export default function Home() {
             demoMode={!health?.openai_configured}
             onCancel={cancelRun}
           />
+        )}
+        {phase === "running" && runEnded && (
+          <div className="assay-failcard" role="alert">
+            <div className="assay-failcard-head">
+              <AlertTriangle size={18} />
+              {runStream.status === "canceled" ? "Run canceled" : "The run hit an error"}
+            </div>
+            {error && <p className="assay-failcard-msg">{error}</p>}
+            <div className="assay-failcard-actions">
+              {selectedCandidateId && runStream.status !== "canceled" && (
+                <button type="button" className="assay-run-button slim" onClick={rerunAgent}>
+                  <RotateCcw size={16} /> Try again
+                </button>
+              )}
+              <button type="button" className="assay-ghost-button" onClick={testAnother}>
+                Back to start
+              </button>
+            </div>
+          </div>
         )}
         {phase === "verdict" && scorecard && (
           <VerdictPanel
@@ -352,15 +381,8 @@ export default function Home() {
             onTestImproved={testImproved}
           />
         )}
-        {error && phase !== "verdict" && (
+        {error && phase === "intake" && (
           <p className="assay-error" role="alert">{error}</p>
-        )}
-        {runEnded && (
-          <div className="assay-retry">
-            <button type="button" className="assay-ghost-button" onClick={testAnother}>
-              Back to start
-            </button>
-          </div>
         )}
       </div>
 
@@ -370,7 +392,7 @@ export default function Home() {
         scorecard={scorecard}
         proofBundle={proofBundle}
         agentSpec={agentSpec}
-        agentResearch={agentResearch}
+        agentResearch={null}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
       />

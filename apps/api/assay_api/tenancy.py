@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import Header, HTTPException, Request, status
 
-from .security import EXEMPT_PATHS, configured_api_keys
+from .security import configured_api_keys, is_public_path
 
 TENANT_HEADER = "X-Assay-Tenant"
 DEFAULT_TENANT_ENV = "ASSAY_DEFAULT_TENANT"
@@ -69,7 +69,7 @@ async def require_tenant(
     non-health routes; API-key auth is still handled by ``require_api_key``.
     """
 
-    if request.url.path in EXEMPT_PATHS:
+    if is_public_path(request.url.path):
         yield
         return
 

@@ -129,7 +129,7 @@ runs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: assay-assay
+        name: assay-proof
         path: |
           ${{ inputs.json-out }}
           ${{ inputs.proof-out }}
@@ -146,13 +146,13 @@ runs:
           const path = "${{ inputs.summary-out }}";
           if (!fs.existsSync(path)) return;
           const body = [
-            "<!-- assay-assay-comment -->",
+            "<!-- assay-comment -->",
             fs.readFileSync(path, "utf8")
           ].join("\n");
           const { owner, repo } = context.repo;
           const issue_number = context.payload.pull_request.number;
           const comments = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 });
-          const existing = comments.data.find((comment) => comment.body && comment.body.includes("<!-- assay-assay-comment -->"));
+          const existing = comments.data.find((comment) => comment.body && comment.body.includes("<!-- assay-comment -->"));
           if (existing) {
             await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
           } else {

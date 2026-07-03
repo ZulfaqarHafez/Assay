@@ -9,7 +9,6 @@
 
 export { queryKeys, type HealthPayload, type QueryOpts, type MutationOpts } from "./keys";
 export { useHealth, useDatabaseHealth } from "./health";
-export { useConnectors, useConnectorProbes } from "./connectors";
 export { useExamPacks, useImportExamPackFile } from "./suites";
 export { useCandidates, useCandidateProgress, useCandidateLessons, useCreateCandidate } from "./agents";
 export {
@@ -21,6 +20,7 @@ export {
   useProofBundle,
   useAgentSpec,
   useAgentSpecDiff,
+  useAgentResearch,
   useDeployability,
   useReviewers,
   useRunComparison,

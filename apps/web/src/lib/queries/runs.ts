@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assayApi } from "@/lib/api";
 import type {
   AgentDiff,
+  AgentResearch,
   AgentSpec,
   DeployabilityDecision,
   DiagnosticLesson,
@@ -177,6 +178,16 @@ export function useCreateRun(options?: MutationOpts<RunRecord, CreateRunVars>) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       options?.onSettled?.(...args);
     }
+  });
+}
+
+export function useAgentResearch(
+  options?: MutationOpts<AgentResearch, { runId: string; mode: "fast" | "deep" }>
+) {
+  return useMutation({
+    mutationFn: ({ runId, mode }: { runId: string; mode: "fast" | "deep" }) =>
+      assayApi.agentResearch(runId, mode),
+    ...options
   });
 }
 

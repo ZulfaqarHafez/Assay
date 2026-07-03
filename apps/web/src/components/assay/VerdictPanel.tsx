@@ -57,6 +57,10 @@ export function VerdictPanel({
   const categories = React.useMemo(() => deriveCategoryScores(scorecard), [scorecard]);
   const Icon = VERDICT_ICON[verdict.verdict];
   const canTestImproved = Boolean(agentSpec?.agent_markdown?.trim());
+  // One primary CTA driven by verdict state: ship → workspace; fail/risky →
+  // fix-and-retry when a refined md exists, else rerun.
+  const primaryAction: "workspace" | "improve" | "rerun" =
+    verdict.verdict === "ship" ? "workspace" : canTestImproved ? "improve" : "rerun";
 
   return (
     <section className="assay-verdict" aria-label="Verdict">
@@ -122,15 +126,28 @@ export function VerdictPanel({
       </div>
 
       <div className="assay-verdict-actions">
-        <button type="button" className="assay-run-button slim" onClick={onRerun}>
+        {/* Exactly one visually-primary CTA, chosen by verdict: SHIP → open the
+            workspace; otherwise fix-and-retry (or rerun when no refined md yet). */}
+        <button
+          type="button"
+          className={primaryAction === "rerun" ? "assay-run-button" : "assay-ghost-button"}
+          onClick={onRerun}
+        >
           <RotateCcw size={16} /> Rerun same agent
         </button>
         {canTestImproved && (
-          <button type="button" className="assay-run-button slim ghost-accent" onClick={onTestImproved}>
+          <button
+            type="button"
+            className={primaryAction === "improve" ? "assay-run-button ghost-accent" : "assay-ghost-button"}
+            onClick={onTestImproved}
+          >
             <Sparkles size={16} /> Test improved version
           </button>
         )}
-        <Link href={`/runs/${scorecard.run_id}`} className="assay-ghost-button">
+        <Link
+          href={`/runs/${scorecard.run_id}`}
+          className={primaryAction === "workspace" ? "assay-run-button" : "assay-ghost-button"}
+        >
           <LayoutDashboard size={16} /> Open in workspace
         </Link>
         <button type="button" className="assay-ghost-button" onClick={onViewTrace}>

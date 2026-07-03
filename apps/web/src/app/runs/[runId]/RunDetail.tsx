@@ -58,9 +58,11 @@ export default function RunDetail({ runId }: { runId: string }) {
   const [badgeCopied, setBadgeCopied] = React.useState(false);
 
   // Drawer open/closed driven by the URL so the view is deep-linkable.
+  // Only the trace inspector exists; the old spec/research values opened the
+  // same view with mismatched intent, so the enum is narrowed to what renders.
   const [drawer, setDrawer] = useQueryState(
     "drawer",
-    parseAsStringEnum(["trace", "spec", "research"]).withOptions({ history: "push" })
+    parseAsStringEnum(["trace"]).withOptions({ history: "push" })
   );
   const drawerOpen = drawer !== null;
 
@@ -173,9 +175,22 @@ export default function RunDetail({ runId }: { runId: string }) {
           <DeployabilityMeter decision={deployability} scorecard={scorecard} />
           <InterviewTimeline events={events} scorecard={scorecard} decision={deployability} />
         </div>
+      ) : isLoading ? (
+        <div className="rd-cockpit">
+          <div className="ws-skeleton-card" />
+          <div className="ws-skeleton-card" />
+        </div>
       ) : null}
 
-      {reviewers ? <ReviewCouncil review={reviewers} decision={deployability} /> : null}
+      {proofBundleQuery.isLoading && !proofBundle && (
+        <p className="rd-bundle-hint" role="status">Assembling proof bundle…</p>
+      )}
+
+      {reviewers ? (
+        <ReviewCouncil review={reviewers} decision={deployability} />
+      ) : reviewersQuery.isLoading ? (
+        <div className="ws-skeleton-card" />
+      ) : null}
 
       {agentSpec ? (
         <ImprovePanel

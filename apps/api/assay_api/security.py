@@ -12,6 +12,17 @@ API_KEYS_ENV = "ASSAY_API_KEYS"
 EXEMPT_PATHS = {"/health", "/health/database"}
 
 
+def is_public_path(path: str) -> bool:
+    """True for endpoints that must work without an API key.
+
+    Health probes for load balancers, plus the run status badge — a shareable
+    proof artifact embedded as an ``<img>`` in a README/PR, which cannot send an
+    auth header. The badge only exposes a run's ship/risky/hold verdict, which is
+    the whole point of a public trust signal.
+    """
+    return path in EXEMPT_PATHS or path.endswith("/badge.svg")
+
+
 def configured_api_keys() -> set[str]:
     """Return the set of accepted API keys parsed from ``ASSAY_API_KEYS``.
 
@@ -44,7 +55,7 @@ async def require_api_key(
     accepted = configured_api_keys()
     if not accepted:
         return
-    if request.url.path in EXEMPT_PATHS:
+    if is_public_path(request.url.path):
         return
     if x_api_key is None or not _key_matches(x_api_key, accepted):
         raise HTTPException(
