@@ -7,12 +7,18 @@ from .deployability import evaluate_scorecard, policy_for_run
 from .models import ProductReview, ProductReviewer, RunRecord, Scorecard
 
 
-def product_review_for_run(run_id: str, db_health: dict[str, Any] | None = None) -> ProductReview | None:
+def product_review_for_run(
+    run_id: str,
+    db_health: dict[str, Any] | None = None,
+    *,
+    load_events: bool = True,
+) -> ProductReview | None:
     run = get_run(run_id)
     if run is None:
         return None
     scorecard = get_scorecard(run_id)
-    events = list_events(run_id)
+    events = list_events(run_id) if load_events else None
+    event_count = len(events) if events is not None else None
     if db_health is None:
         try:
             db = database_health()
@@ -26,9 +32,9 @@ def product_review_for_run(run_id: str, db_health: dict[str, Any] | None = None)
         reviewers=[
             _role_analyst(scorecard),
             _security_interviewer(scorecard),
-            _tool_auditor(scorecard, len(events)),
+            _tool_auditor(scorecard, event_count),
             _trace_auditor(scorecard, db),
-            _release_manager(run, scorecard, len(events)),
+            _release_manager(run, scorecard, event_count),
         ],
     )
 
@@ -109,7 +115,7 @@ def _security_interviewer(scorecard: Scorecard | None) -> ProductReviewer:
     )
 
 
-def _tool_auditor(scorecard: Scorecard | None, event_count: int) -> ProductReviewer:
+def _tool_auditor(scorecard: Scorecard | None, event_count: int | None) -> ProductReviewer:
     if scorecard is None:
         return ProductReviewer(
             key="tool_auditor",
@@ -143,7 +149,11 @@ def _tool_auditor(scorecard: Scorecard | None, event_count: int) -> ProductRevie
         status="pass",
         label="clean",
         summary="Tool discipline did not introduce a blocking finding.",
-        evidence=[f"{event_count} ordered run events are available for audit."],
+        evidence=[
+            f"{event_count} ordered run events are available for audit."
+            if event_count is not None
+            else "Ordered run events are available in the full proof export."
+        ],
         sprite="candidate-approved",
     )
 
@@ -205,7 +215,7 @@ def _trace_auditor(scorecard: Scorecard | None, db: dict[str, Any]) -> ProductRe
     )
 
 
-def _release_manager(run: RunRecord, scorecard: Scorecard | None, event_count: int) -> ProductReviewer:
+def _release_manager(run: RunRecord, scorecard: Scorecard | None, event_count: int | None) -> ProductReviewer:
     if scorecard is None:
         return ProductReviewer(
             key="release_manager",
@@ -227,7 +237,9 @@ def _release_manager(run: RunRecord, scorecard: Scorecard | None, event_count: i
             summary=decision.summary,
             evidence=[
                 f"{len(decision.passed_checks)} policy checks passed.",
-                f"{event_count} proof events persisted.",
+                f"{event_count} proof events persisted."
+                if event_count is not None
+                else "Proof events are available in the full export.",
             ],
             next_step="Export the proof bundle and attach it to the release record." if decision.verdict == "ship" else "Review advisory findings before production.",
             sprite="candidate-approved",

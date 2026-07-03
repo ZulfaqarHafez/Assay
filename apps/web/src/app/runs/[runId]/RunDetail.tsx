@@ -58,7 +58,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   const proofBundleQuery = useProofBundle(runId);
   const proofBundle = proofBundleQuery.data ?? null;
   const traceFromBundle = React.useMemo<TracePayload | null>(() => {
-    if (!proofBundle) return null;
+    if (!proofBundle || proofBundle.events.length === 0) return null;
     return {
       run_id: runId,
       events: proofBundle.events,

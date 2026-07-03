@@ -78,7 +78,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert bundle["summary"]["deployability_label"] in {"Ship", "Probation", "Do not ship"}
     assert detail["schema"] == "assay.proof_bundle.v1"
     assert detail["detail_profile"] == "fast"
-    assert detail["summary"]["event_count"] == len(events)
+    assert detail["events"] == []
+    assert detail["summary"]["event_count"] == 0
     assert detail["product_review"]["schema"] == "assay.product_review.v1"
     assert detail["agent_spec"]["schema"] == "assay.agent_spec.v1"
     assert detail["candidate_progress"]["schema"] == "assay.candidate_progress.v1"

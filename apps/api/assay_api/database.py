@@ -794,6 +794,7 @@ def trace_payload(run_id: str) -> dict[str, Any]:
 def proof_bundle(
     run_id: str,
     *,
+    include_events: bool = True,
     product_review_db_health: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     run = get_run(run_id)
@@ -801,11 +802,15 @@ def proof_bundle(
         return None
     candidate = get_candidate(run.candidate_id)
     scorecard = get_scorecard(run_id)
-    events = [event.model_dump(mode="json") for event in list_events(run_id)]
+    events = [event.model_dump(mode="json") for event in list_events(run_id)] if include_events else []
     try:
         from .product_review import product_review_for_run
 
-        product_review = product_review_for_run(run_id, db_health=product_review_db_health)
+        product_review = product_review_for_run(
+            run_id,
+            db_health=product_review_db_health,
+            load_events=include_events,
+        )
     except Exception:
         product_review = None
     # What the judge was qualified with (Phase 1-2): the persisted role brief and,

@@ -349,6 +349,7 @@ def run_detail(run_id: str) -> dict:
         backend = "unknown"
     bundle = proof_bundle(
         run_id,
+        include_events=False,
         product_review_db_health={
             "ok": True,
             "backend": backend,
