@@ -34,6 +34,15 @@ function Add-VercelTokenArg {
   return $Args
 }
 
+function Get-NpxCommand {
+  $cmd = Get-Command npx.cmd -ErrorAction SilentlyContinue
+  if ($cmd) {
+    return $cmd.Source
+  }
+
+  return (Get-Command npx -ErrorAction Stop).Source
+}
+
 function Copy-StageItem {
   param(
     [Parameter(Mandatory = $true)]
@@ -313,7 +322,8 @@ function Get-ExistingDeploymentForCommit {
   $previousErrorActionPreference = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
   try {
-    $raw = (& npx @args 2>$null) -join "`n"
+    $npx = Get-NpxCommand
+    $raw = (& $npx @args 2>$null) -join "`n"
     $exitCode = $LASTEXITCODE
   } finally {
     $ErrorActionPreference = $previousErrorActionPreference
@@ -398,7 +408,8 @@ function Use-ExistingDeployment {
     Write-Host "Promoting existing deployment to production aliases."
     $args = @("vercel", "promote", $url, "--cwd", $projectPath, "--yes")
     $args = Add-VercelTokenArg -Args $args
-    & npx @args
+    $npx = Get-NpxCommand
+    & $npx @args
     if ($LASTEXITCODE -ne 0) {
       throw "Vercel promote failed for $Name with exit code $LASTEXITCODE"
     }
@@ -443,7 +454,8 @@ function Invoke-VercelDeploy {
 
   Push-Location $StagePath
   try {
-    & npx @args
+    $npx = Get-NpxCommand
+    & $npx @args
     if ($LASTEXITCODE -ne 0) {
       throw "Vercel deploy failed for $Name with exit code $LASTEXITCODE"
     }
