@@ -125,12 +125,11 @@ The local fallback returns `backend: sqlite`. A configured Supabase server shoul
 
 - Project ref: `yeuvdqhwqjninzifqdgz`
 - API URL: `https://yeuvdqhwqjninzifqdgz.supabase.co`
-- Remote migrations applied:
-  - `assay_core`
-  - `assay_service_role_policies`
-  - `assay_diagnostic_library`
-  - `assay_tenant_scope`
-- Security advisors: clean after adding service-role-only policies.
-- Performance advisors: only `unused_index` for `assay_events_run_sequence_idx` on the empty schema, expected until real event queries run.
+- Remote migration history currently applied:
+  - `20260627033410_interviu_core`
+  - `20260627033526_interviu_service_role_policies`
+- Pending local migrations add the diagnostic library, tenant scope, and the `interviu_*` to `assay_*` table rename.
+- Security advisors were previously clean after adding service-role-only policies; rerun advisors after applying the pending migrations.
+- Performance advisors previously only reported `unused_index` on the empty schema, expected until real event queries run.
 
 The service role key is intentionally not stored in this repo.

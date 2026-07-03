@@ -206,7 +206,7 @@ trend, diagnostics, reviewers, and the trace drawer.
 
 ## Supabase Backend
 
-The migration lives at `supabase/migrations/20260627031004_interviu_core.sql`.
+The core migration lives at `supabase/migrations/20260627033410_interviu_core.sql`.
 
 Set these server-only env vars to use Supabase:
 
