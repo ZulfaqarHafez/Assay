@@ -30,7 +30,7 @@ import {
 } from "@/lib/queries";
 import { assayApi } from "@/lib/api";
 import { policyRuleSentence } from "@/lib/assay";
-import { VERDICT_LABEL, decisionLabel } from "@/lib/verdict";
+import { VERDICT_LABEL, bandFromDecision, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import TraceDrawer from "@/components/trace/TraceDrawer";
 import CompetencyRadar from "@/components/scorecard/CompetencyRadar";
@@ -90,11 +90,12 @@ export default function RunDetail({ runId }: { runId: string }) {
   const passTotal = passEntries.length;
   const certified = scorecard?.certified ?? false;
   const deployable = deployability?.deployable ?? certified;
-  const verdictLabel = deployability
-    ? decisionLabel(deployability.verdict)
+  const verdictBand = deployability
+    ? bandFromDecision(deployability.verdict)
     : certified
-      ? VERDICT_LABEL.ship
-      : VERDICT_LABEL.hold;
+      ? "ship"
+      : "hold";
+  const verdictLabel = deployability ? decisionLabel(deployability.verdict) : VERDICT_LABEL[verdictBand];
 
   return (
     <main className="rd-shell">
@@ -155,8 +156,8 @@ export default function RunDetail({ runId }: { runId: string }) {
 
       {scorecard ? (
         <div className={`rd-verdict ${deployable ? "ship" : "hold"}`}>
-          <span className="rd-verdict-badge">
-            {deployable ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+          <span className={`stamp rd-verdict-stamp ${verdictBand}`}>
+            {deployable ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
             {verdictLabel}
           </span>
           <span className="rd-verdict-score">
