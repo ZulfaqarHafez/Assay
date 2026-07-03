@@ -55,6 +55,7 @@ export function VerdictPanel({
   const verdict = React.useMemo(() => deriveVerdict(scorecard, deployability), [scorecard, deployability]);
   const fixes = React.useMemo(() => deriveFixes(scorecard, agentSpec), [scorecard, agentSpec]);
   const categories = React.useMemo(() => deriveCategoryScores(scorecard), [scorecard]);
+  const [improveOpen, setImproveOpen] = React.useState(false);
   const Icon = VERDICT_ICON[verdict.verdict];
   const canTestImproved = Boolean(agentSpec?.agent_markdown?.trim());
   // One primary CTA driven by verdict state: ship → workspace; fail/risky →
@@ -200,25 +201,30 @@ export function VerdictPanel({
 
       {/* The coaching depth lives one disclosure down so the 5-second path is
           verdict → score → biggest problem → top fixes, not a wall of panels. */}
-      <details className="assay-improve-more">
+      <details
+        className="assay-improve-more"
+        onToggle={(event) => setImproveOpen(event.currentTarget.open)}
+      >
         <summary>
           <span className="section-no">03</span>
           <Sparkles size={15} /> How to improve — refined agent.md, coaching, and run comparison
         </summary>
-        <div className="assay-improve-more-body">
-          {scorecard.prior_run_id && (
-            <RunComparison runId={scorecard.run_id} className="assay-verdict-comparison" />
-          )}
-          <RoleBriefCard runId={scorecard.run_id} />
-          <ImprovePanel
-            agentSpec={agentSpec}
-            agentName={agentName}
-            runId={scorecard.run_id}
-            originalMarkdown={originalMarkdown}
-            traceAudit={scorecard.trace_audit}
-            validation={agentSpec?.agent_markdown?.trim() ? { state: "pending" } : null}
-          />
-        </div>
+        {improveOpen ? (
+          <div className="assay-improve-more-body">
+            {scorecard.prior_run_id && (
+              <RunComparison runId={scorecard.run_id} className="assay-verdict-comparison" />
+            )}
+            <RoleBriefCard runId={scorecard.run_id} />
+            <ImprovePanel
+              agentSpec={agentSpec}
+              agentName={agentName}
+              runId={scorecard.run_id}
+              originalMarkdown={originalMarkdown}
+              traceAudit={scorecard.trace_audit}
+              validation={agentSpec?.agent_markdown?.trim() ? { state: "pending" } : null}
+            />
+          </div>
+        ) : null}
       </details>
 
       <button type="button" className="assay-evidence-link" onClick={onViewTrace}>

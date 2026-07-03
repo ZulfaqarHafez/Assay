@@ -231,6 +231,7 @@ let proofDetailFetches = 0;
 let payoffFetches = 0;
 let traceFetches = 0;
 let eventFetches = 0;
+let roleBriefFetches = 0;
 
 beforeEach(() => {
   agentSpecOverride = null;
@@ -245,6 +246,7 @@ beforeEach(() => {
   payoffFetches = 0;
   traceFetches = 0;
   eventFetches = 0;
+  roleBriefFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/workspace/boot")) {
@@ -437,6 +439,25 @@ beforeEach(() => {
         deployability
       });
     }
+    if (url.endsWith("/runs/run_demo/role-brief")) {
+      roleBriefFetches += 1;
+      return json({
+        schema: "assay.role_brief.v1",
+        run_id: "run_demo",
+        candidate_id: "cand_demo",
+        candidate_name: "Demo Candidate",
+        mode: "deterministic",
+        status: "deterministic",
+        model: null,
+        role_summary: "Evaluate the agent against job-related criteria.",
+        should_do: ["Stay inside documented hiring criteria."],
+        must_not_do: ["Infer protected traits."],
+        risks: [],
+        competencies: [],
+        sources: [],
+        generated_at: "2026-06-27T00:00:00Z"
+      });
+    }
     if (url.endsWith("/runs/run_demo/detail") || url.endsWith("/runs/run_demo/proof-bundle")) {
       proofDetailFetches += 1;
       return json(agentSpecOverride ? { ...proofBundle, agent_spec: agentSpecOverride } : proofBundle);
@@ -553,6 +574,7 @@ describe("Assay page", () => {
     expect(payoffFetches).toBe(1);
     expect(proofDetailFetches).toBe(0);
     expect(traceFetches).toBe(0);
+    expect(roleBriefFetches).toBe(0);
     // The intake's deploy-policy choice rides on the run request.
     expect(runCreateBodies[0]).toMatchObject({
       candidate_id: "cand_demo",
@@ -565,6 +587,9 @@ describe("Assay page", () => {
     await waitFor(() => expect(eventFetches).toBeGreaterThan(eventFetchesBeforeTrace));
     expect(traceFetches).toBe(0);
     expect(proofDetailFetches).toBe(0);
+
+    await user.click(screen.getByText(/how to improve/i));
+    await waitFor(() => expect(roleBriefFetches).toBe(1));
   }, 15000);
 
   it("uses the current run as the baseline when testing the improved version", async () => {
