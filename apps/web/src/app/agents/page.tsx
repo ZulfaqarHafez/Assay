@@ -1,18 +1,16 @@
-"use client";
-
-import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, FlaskConical } from "lucide-react";
-import { useAgentSummaries } from "@/lib/queries";
 import { AgentArt } from "@/components/ui/EmptyArt";
+import { getAgentSummaries } from "@/lib/serverApi";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Agents - the candidate definitions under test, deduplicated and rolled up by
  * the API so first paint is one slim read instead of candidate + run fanout.
  */
-export default function AgentsPage() {
-  const agentsQuery = useAgentSummaries();
-  const rows = React.useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
+export default async function AgentsPage() {
+  const { rows, error } = await loadAgents();
 
   return (
     <main className="ws-page">
@@ -24,11 +22,11 @@ export default function AgentsPage() {
         <span className="ws-count">{rows.length} agent{rows.length === 1 ? "" : "s"}</span>
       </header>
 
-      {agentsQuery.isLoading ? (
-        <div className="ws-table-wrap" aria-hidden="true">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div className="ws-skeleton-row" key={i} />
-          ))}
+      {error ? (
+        <div className="ws-empty-rich" role="alert">
+          <AgentArt size={104} className="ws-empty-art" />
+          <h2>Agents unavailable</h2>
+          <p>{error}</p>
         </div>
       ) : rows.length === 0 ? (
         <div className="ws-empty-rich">
@@ -84,4 +82,12 @@ export default function AgentsPage() {
       )}
     </main>
   );
+}
+
+async function loadAgents() {
+  try {
+    return { rows: await getAgentSummaries(), error: null };
+  } catch (exc) {
+    return { rows: [], error: exc instanceof Error ? exc.message : "Could not load agents." };
+  }
 }

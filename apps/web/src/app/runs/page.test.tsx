@@ -1,12 +1,10 @@
-import React from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ExperimentsPage from "./page";
 
-const queryMocks = vi.hoisted(() => ({
-  useRunSummaries: vi.fn(() => ({
-    isLoading: false,
-    data: [
+const serverMocks = vi.hoisted(() => ({
+  getRunSummaries: vi.fn(() =>
+    Promise.resolve([
       {
         id: "run_support",
         candidate_id: "cand_support",
@@ -18,19 +16,19 @@ const queryMocks = vi.hoisted(() => ({
         pass_count: 5,
         total_count: 5
       }
-    ]
-  }))
+    ])
+  )
 }));
 
-vi.mock("@/lib/queries", () => ({
-  useRunSummaries: queryMocks.useRunSummaries
+vi.mock("@/lib/serverApi", () => ({
+  getRunSummaries: serverMocks.getRunSummaries
 }));
 
 describe("ExperimentsPage", () => {
-  it("renders API-provided run rows without a candidate summary fanout", () => {
-    render(<ExperimentsPage />);
+  it("renders API-provided run rows without a candidate summary fanout", async () => {
+    render(await ExperimentsPage());
 
-    expect(queryMocks.useRunSummaries).toHaveBeenCalledTimes(1);
+    expect(serverMocks.getRunSummaries).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("heading", { name: "Experiments" })).toBeInTheDocument();
     expect(screen.getByText("Support Triage Agent")).toBeInTheDocument();
     expect(screen.getByText("support-triage-v1")).toBeInTheDocument();

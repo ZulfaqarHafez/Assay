@@ -1,20 +1,18 @@
-"use client";
-
-import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, Circle, Loader2, FlaskConical } from "lucide-react";
-import { useRunSummaries } from "@/lib/queries";
 import { GaugeArt } from "@/components/ui/EmptyArt";
+import { getRunSummaries } from "@/lib/serverApi";
 import { VERDICT_LABEL } from "@/lib/verdict";
 import type { RunSummary } from "@/types/assay";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Experiments - the run history of the workspace. The API returns display-ready
  * run rows, so first paint is one slim read rather than run + candidate fanout.
  */
-export default function ExperimentsPage() {
-  const runsQuery = useRunSummaries();
-  const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
+export default async function ExperimentsPage() {
+  const { runs, error } = await loadRuns();
 
   return (
     <main className="ws-page">
@@ -26,11 +24,11 @@ export default function ExperimentsPage() {
         <span className="ws-count">{runs.length} run{runs.length === 1 ? "" : "s"}</span>
       </header>
 
-      {runsQuery.isLoading ? (
-        <div className="ws-table-wrap" aria-hidden="true">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div className="ws-skeleton-row" key={i} />
-          ))}
+      {error ? (
+        <div className="ws-empty-rich" role="alert">
+          <GaugeArt size={104} className="ws-empty-art" />
+          <h2>Experiments unavailable</h2>
+          <p>{error}</p>
         </div>
       ) : runs.length === 0 ? (
         <div className="ws-empty-rich">
@@ -63,6 +61,14 @@ export default function ExperimentsPage() {
       )}
     </main>
   );
+}
+
+async function loadRuns(): Promise<{ runs: RunSummary[]; error: string | null }> {
+  try {
+    return { runs: await getRunSummaries(), error: null };
+  } catch (exc) {
+    return { runs: [], error: exc instanceof Error ? exc.message : "Could not load experiments." };
+  }
 }
 
 function RunRow({ run }: { run: RunSummary }) {

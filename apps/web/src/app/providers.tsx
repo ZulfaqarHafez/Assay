@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Tooltip } from "@radix-ui/react-tooltip";
-import { TooltipProvider } from "@radix-ui/react-tooltip";
-import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 /** Build a QueryClient with sensible app-wide defaults. */
 function makeQueryClient() {
@@ -39,17 +36,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NuqsAdapter>
-        <TooltipProvider delayDuration={200} skipDelayDuration={300}>
-          {children}
-        </TooltipProvider>
-      </NuqsAdapter>
+      {children}
     </QueryClientProvider>
   );
 }
-
-// Re-export the Radix Tooltip root so downstream agents can compose tooltips
-// without importing Radix directly.
-export { Tooltip };
 
 export default Providers;

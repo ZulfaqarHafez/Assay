@@ -3,15 +3,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { AnnouncerProvider } from "@/components/announcer";
 import Home from "./page";
 
 /**
- * The refactored page composes TanStack Query hooks (and components that depend
- * on nuqs / the announcer), so tests render it inside the same provider stack
- * the real app uses. Retries are disabled so error-state queries (the learning
- * surfaces hit endpoints this fixture does not mock) settle immediately.
+ * The page composes TanStack Query hooks and the announcer context, so tests
+ * render it inside the same hot-path provider stack the real app uses. Retries
+ * are disabled so error-state queries settle immediately.
  */
 function renderHome() {
   const queryClient = new QueryClient({
@@ -19,11 +17,9 @@ function renderHome() {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <NuqsTestingAdapter>
-        <AnnouncerProvider>
-          <Home />
-        </AnnouncerProvider>
-      </NuqsTestingAdapter>
+      <AnnouncerProvider>
+        <Home />
+      </AnnouncerProvider>
     </QueryClientProvider>
   );
 }

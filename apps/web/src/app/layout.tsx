@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Toaster } from "@/components/Toaster";
 import { AnnouncerProvider } from "@/components/announcer";
 import { TopNav } from "@/components/workspace/TopNav";
 
@@ -65,7 +64,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <AnnouncerProvider>
             <TopNav />
             {children}
-            <Toaster />
           </AnnouncerProvider>
         </Providers>
       </body>

@@ -1,17 +1,16 @@
 import { Suspense } from "react";
-import RunDetail from "./RunDetail";
+import RunDetailRoute from "./RunDetailRoute";
 
 /**
- * Deep-linkable run detail route: `/runs/{runId}`. The drawer + drawer-tab
- * selection live in the URL (`?drawer=trace|spec|research`) via nuqs so a run
- * view is shareable. nuqs reads `useSearchParams` under the hood, which Next
- * requires to be wrapped in <Suspense> on statically-rendered routes.
+ * Deep-linkable run detail route: `/runs/{runId}`. The trace drawer state lives
+ * in the URL (`?drawer=trace`) via a route-local nuqs adapter, so the global
+ * app shell stays lighter while this view remains shareable.
  */
 export default async function RunPage({ params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
   return (
     <Suspense fallback={<RunDetailFallback />}>
-      <RunDetail runId={runId} />
+      <RunDetailRoute runId={runId} />
     </Suspense>
   );
 }
