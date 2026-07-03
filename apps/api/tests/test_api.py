@@ -237,9 +237,13 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
 
     assert run_summary["id"] == run["id"]
     assert run_summary["candidate_id"] == candidate["id"]
+    assert run_summary["candidate_name"] == "Verbose Agent"
+    assert run_summary["candidate_adapter_type"] == "mock"
     assert run_summary["certified"] in {True, False}
     assert run_summary["pass_count"] >= 0
     assert "job_scope" not in run_summary
+    assert "system_prompt" not in run_summary
+    assert "metadata" not in run_summary
     assert "tailored_exam_pack" not in run_summary
     assert run_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert "origin" in run_summary_response.headers["vary"].lower()

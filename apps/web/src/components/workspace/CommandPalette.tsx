@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   FlaskConical, Layers, Bot, Beaker, Clock, MoonStar, CheckCircle2, AlertTriangle, CornerDownLeft
 } from "lucide-react";
-import { useRunSummaries, useExamPackSummaries, useCandidateSummaries } from "@/lib/queries";
+import { useRunSummaries, useExamPackSummaries } from "@/lib/queries";
 
 type Item = {
   id: string;
@@ -17,9 +17,9 @@ type Item = {
 };
 
 /**
- * Keyboard-first command palette (⌘K / Ctrl-K). Jumps to any route, recent run,
- * suite, or agent, plus quick actions. Mounted once under the providers so its
- * data hooks share the workspace query cache.
+ * Keyboard-first command palette (Cmd-K / Ctrl-K). Jumps to any route, recent
+ * run, suite, or agent, plus quick actions. Mounted once under the providers so
+ * its data hooks share the workspace query cache.
  */
 export function CommandPalette() {
   const router = useRouter();
@@ -31,16 +31,8 @@ export function CommandPalette() {
 
   const runsQuery = useRunSummaries({ enabled: open });
   const packsQuery = useExamPackSummaries({ enabled: open });
-  const candidatesQuery = useCandidateSummaries({ enabled: open });
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
   const packs = React.useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
-  const candidates = React.useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
-
-  const nameById = React.useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const c of candidates) m[c.id] = c.name;
-    return m;
-  }, [candidates]);
 
   const go = React.useCallback(
     (href: string) => {
@@ -60,7 +52,7 @@ export function CommandPalette() {
     setOpen(false);
   }, []);
 
-  // The full candidate item set, grouped. Filtered below by query.
+  // The full command item set, grouped. Filtered below by query.
   const items = React.useMemo<Item[]>(() => {
     const nav: Item[] = [
       { id: "nav-test", label: "Test an agent", sublabel: "Run a new litmus test", group: "Go to", icon: <FlaskConical size={15} />, run: () => go("/") },
@@ -75,8 +67,8 @@ export function CommandPalette() {
       const scored = r.status === "completed" && typeof r.certified === "boolean";
       return {
         id: `run-${r.id}`,
-        label: nameById[r.candidate_id] ?? r.candidate_id,
-        sublabel: `${r.id} · ${r.exam_pack_id}`,
+        label: r.candidate_name ?? r.candidate_id,
+        sublabel: `${r.id} - ${r.exam_pack_id}`,
         group: "Recent runs",
         icon: scored ? (r.certified ? <CheckCircle2 size={15} color="var(--color-pass)" /> : <AlertTriangle size={15} color="var(--color-warn)" />) : <Clock size={15} />,
         run: () => go(`/runs/${r.id}`)
@@ -85,13 +77,13 @@ export function CommandPalette() {
     const suiteItems: Item[] = packs.map((p) => ({
       id: `suite-${p.id}`,
       label: p.name,
-      sublabel: `${p.id} · ${p.item_count} probes`,
+      sublabel: `${p.id} - ${p.item_count} probes`,
       group: "Suites",
       icon: <Layers size={15} />,
       run: () => go("/suites")
     }));
     return [...nav, ...actions, ...runItems, ...suiteItems];
-  }, [runs, packs, nameById, go, toggleTheme]);
+  }, [runs, packs, go, toggleTheme]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -172,7 +164,7 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             className="cmdk-input"
-            placeholder="Jump to a run, suite, agent, or action…"
+            placeholder="Jump to a run, suite, agent, or action..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
@@ -182,7 +174,7 @@ export function CommandPalette() {
         </div>
         <div className="cmdk-list" ref={listRef}>
           {filtered.length === 0 ? (
-            <div className="cmdk-empty">No matches for “{query}”.</div>
+            <div className="cmdk-empty">No matches for &quot;{query}&quot;.</div>
           ) : (
             groups.map((g) => (
               <div className="cmdk-group" key={g.group}>

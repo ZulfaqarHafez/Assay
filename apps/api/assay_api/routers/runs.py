@@ -19,6 +19,7 @@ from ..database import (
     get_run,
     get_scorecard,
     get_scorecards,
+    list_candidate_summaries,
     list_events,
     list_run_summaries,
     list_runs,
@@ -63,7 +64,7 @@ def runs() -> list[dict]:
 @router.get("/runs/summary")
 def run_summaries() -> JSONResponse:
     return JSONResponse(
-        content=list_run_summaries(),
+        content=_run_summary_rows(list_run_summaries(), list_candidate_summaries()),
         headers=public_read_json_headers(),
     )
 
@@ -402,6 +403,21 @@ def _prettify_card_finding(reason: str) -> str:
     import re
 
     return re.sub(r"\b[a-z]+(?:_[a-z]+)+\b", lambda m: m.group(0).replace("_", " ").title(), reason or "")
+
+
+def _run_summary_rows(runs: list[dict], candidates: list[dict]) -> list[dict[str, object]]:
+    candidate_by_id = {str(candidate["id"]): candidate for candidate in candidates if candidate.get("id")}
+    rows: list[dict[str, object]] = []
+    for run in runs:
+        row: dict[str, object] = dict(run)
+        candidate_id = str(row.get("candidate_id") or "")
+        candidate = candidate_by_id.get(candidate_id)
+        row["candidate_name"] = str(candidate.get("name") or candidate_id) if candidate else candidate_id
+        row["candidate_adapter_type"] = (
+            str(candidate.get("adapter_type") or "unknown") if candidate else "unknown"
+        )
+        rows.append(row)
+    return rows
 
 
 @router.get("/runs/{run_id}/trace")

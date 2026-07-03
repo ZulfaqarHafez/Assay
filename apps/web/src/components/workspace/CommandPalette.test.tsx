@@ -7,8 +7,7 @@ import { CommandPalette } from "./CommandPalette";
 const pushMock = vi.hoisted(() => vi.fn());
 const queryMocks = vi.hoisted(() => ({
   useRunSummaries: vi.fn(() => ({ data: [] })),
-  useExamPackSummaries: vi.fn(() => ({ data: [] })),
-  useCandidateSummaries: vi.fn(() => ({ data: [] }))
+  useExamPackSummaries: vi.fn(() => ({ data: [] }))
 }));
 
 vi.mock("next/navigation", () => ({
@@ -17,8 +16,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/queries", () => ({
   useRunSummaries: queryMocks.useRunSummaries,
-  useExamPackSummaries: queryMocks.useExamPackSummaries,
-  useCandidateSummaries: queryMocks.useCandidateSummaries
+  useExamPackSummaries: queryMocks.useExamPackSummaries
 }));
 
 function renderWithClient(ui: React.ReactElement) {
@@ -33,7 +31,6 @@ describe("CommandPalette", () => {
     pushMock.mockReset();
     queryMocks.useRunSummaries.mockClear();
     queryMocks.useExamPackSummaries.mockClear();
-    queryMocks.useCandidateSummaries.mockClear();
   });
 
   it("opens with Ctrl-K, filters commands, and navigates on Enter", async () => {
@@ -53,13 +50,32 @@ describe("CommandPalette", () => {
 
     expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: false });
     expect(queryMocks.useExamPackSummaries).toHaveBeenLastCalledWith({ enabled: false });
-    expect(queryMocks.useCandidateSummaries).toHaveBeenLastCalledWith({ enabled: false });
 
     fireEvent(window, new Event("assay:open-cmdk"));
 
     await waitFor(() => expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: true }));
     expect(queryMocks.useExamPackSummaries).toHaveBeenLastCalledWith({ enabled: true });
-    expect(queryMocks.useCandidateSummaries).toHaveBeenLastCalledWith({ enabled: true });
+  });
+
+  it("uses run summary candidate names without a candidate fanout query", async () => {
+    queryMocks.useRunSummaries.mockReturnValue({
+      data: [
+        {
+          id: "run_support",
+          candidate_id: "cand_support",
+          candidate_name: "Support Triage Agent",
+          exam_pack_id: "support-triage-v1",
+          status: "completed",
+          certified: true
+        }
+      ]
+    });
+
+    renderWithClient(<CommandPalette />);
+    fireEvent(window, new Event("assay:open-cmdk"));
+
+    expect(await screen.findByText("Support Triage Agent")).toBeInTheDocument();
+    expect(screen.getByText("run_support - support-triage-v1")).toBeInTheDocument();
   });
 
   it("shows an empty state for unmatched filters", async () => {

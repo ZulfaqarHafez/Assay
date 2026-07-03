@@ -3,26 +3,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, Circle, Loader2, FlaskConical } from "lucide-react";
-import { useRunSummaries, useCandidateSummaries } from "@/lib/queries";
+import { useRunSummaries } from "@/lib/queries";
 import { GaugeArt } from "@/components/ui/EmptyArt";
 import { VERDICT_LABEL } from "@/lib/verdict";
 import type { RunSummary } from "@/types/assay";
 
 /**
- * Experiments — the run history of the workspace. Every run an agent has been
- * put through, scored and certified, newest first. Uses slim summary reads for
- * the table so detail-only proof payloads stay off the hot path.
+ * Experiments - the run history of the workspace. The API returns display-ready
+ * run rows, so first paint is one slim read rather than run + candidate fanout.
  */
 export default function ExperimentsPage() {
   const runsQuery = useRunSummaries();
-  const candidatesQuery = useCandidateSummaries();
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
-  const candidates = React.useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
-  const nameById = React.useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const c of candidates) m[c.id] = c.name;
-    return m;
-  }, [candidates]);
 
   return (
     <main className="ws-page">
@@ -44,7 +36,7 @@ export default function ExperimentsPage() {
         <div className="ws-empty-rich">
           <GaugeArt size={104} className="ws-empty-art" />
           <h2>No experiments yet</h2>
-          <p>Run an agent through an adversarial suite and every scored, certified run will land here — ready to compare and inspect.</p>
+          <p>Run an agent through an adversarial suite and every scored, certified run will land here - ready to compare and inspect.</p>
           <Link href="/" className="ws-empty-cta"><FlaskConical size={15} /> Run your first test</Link>
         </div>
       ) : (
@@ -63,7 +55,7 @@ export default function ExperimentsPage() {
             </thead>
             <tbody>
               {runs.map((run) => (
-                <RunRow key={run.id} run={run} agentName={nameById[run.candidate_id] ?? run.candidate_id} />
+                <RunRow key={run.id} run={run} />
               ))}
             </tbody>
           </table>
@@ -73,12 +65,13 @@ export default function ExperimentsPage() {
   );
 }
 
-function RunRow({ run, agentName }: { run: RunSummary; agentName: string }) {
+function RunRow({ run }: { run: RunSummary }) {
   // Scorecard summary is attached to GET /runs/summary (no per-row fetch).
   const scored = run.status === "completed" && typeof run.certified === "boolean";
   const verdict = scored ? (run.certified ? "ship" : "hold") : null;
   const passCount = run.pass_count ?? 0;
   const total = run.total_count ?? 0;
+  const agentName = run.candidate_name ?? run.candidate_id;
 
   return (
     <tr>
@@ -99,13 +92,13 @@ function RunRow({ run, agentName }: { run: RunSummary; agentName: string }) {
         ) : verdict === "hold" ? (
           <span className="ws-verdict hold"><AlertTriangle size={13} /> {VERDICT_LABEL.hold}</span>
         ) : (
-          <span className="ws-verdict idle">—</span>
+          <span className="ws-verdict idle">-</span>
         )}
       </td>
-      <td className="num" data-label="Score">{scored ? `${passCount}/${total}` : "—"}</td>
-      <td className="num" data-label="k">{run.k}×</td>
+      <td className="num" data-label="Score">{scored ? `${passCount}/${total}` : "-"}</td>
+      <td className="num" data-label="k">{run.k}x</td>
       <td data-label="Status"><RunStatus status={run.status} /></td>
-      <td className="num ws-row-action"><Link prefetch={false} href={`/runs/${run.id}`} className="ws-row-link">Open →</Link></td>
+      <td className="num ws-row-action"><Link prefetch={false} href={`/runs/${run.id}`} className="ws-row-link">Open -&gt;</Link></td>
     </tr>
   );
 }

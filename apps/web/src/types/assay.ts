@@ -163,7 +163,10 @@ export type RunSummary = Pick<RunRecord,
   | "degraded"
   | "qualification_status"
   | "role_brief_summary"
->;
+> & {
+  candidate_name?: string | null;
+  candidate_adapter_type?: CandidateConfig["adapter_type"] | "unknown";
+};
 
 export type RunEvent = {
   span_id: string;
