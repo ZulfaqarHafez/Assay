@@ -194,11 +194,15 @@ const proofBundle = {
 let agentSpecOverride: typeof agentSpec | null = null;
 let runCreateBodies: Array<Record<string, unknown>> = [];
 let runListFetches = 0;
+let candidateListFetches = 0;
+let candidateSummaryFetches = 0;
 
 beforeEach(() => {
   agentSpecOverride = null;
   runCreateBodies = [];
   runListFetches = 0;
+  candidateListFetches = 0;
+  candidateSummaryFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith("/health")) {
@@ -327,7 +331,16 @@ beforeEach(() => {
       const body = JSON.parse(String(init.body ?? "{}"));
       return json({ ...httpCandidate, ...body, id: httpCandidate.id });
     }
+    if (url.endsWith("/candidates/summary")) {
+      candidateSummaryFetches += 1;
+      return json([{
+        id: candidate.id,
+        name: candidate.name,
+        adapter_type: candidate.adapter_type
+      }]);
+    }
     if (url.endsWith("/candidates")) {
+      candidateListFetches += 1;
       return json([candidate]);
     }
     if (url.endsWith("/runs") && init?.method !== "POST") {
@@ -436,6 +449,10 @@ describe("Assay page", () => {
     expect(screen.getByRole("button", { name: /run the sample agent/i })).toBeInTheDocument();
     // The intake path should not fetch historical runs until a workspace route needs them.
     expect(runListFetches).toBe(0);
+    // The first screen only needs candidate labels, so it must stay on the slim
+    // cached summary endpoint instead of pulling full prompts and adapter config.
+    expect(candidateSummaryFetches).toBeGreaterThan(0);
+    expect(candidateListFetches).toBe(0);
   });
 
   it("runs an uploaded agent.md and lands on a verdict", async () => {

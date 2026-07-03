@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { assayApi } from "@/lib/api";
 import {
-  useCandidates,
+  useCandidateSummaries,
   useExamPacks,
   useHealth,
   queryKeys
@@ -18,7 +18,7 @@ import Landing from "@/components/assay/Landing";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
   AgentSpec,
-  CandidateConfig,
+  CandidateSummary,
   ProofBundle,
   RunEvent,
   RunRecord,
@@ -54,26 +54,29 @@ export default function Home() {
   // Boot data via TanStack Query (cache, retry, dedupe handled by the client).
   const healthQuery = useHealth();
   const examPacksQuery = useExamPacks();
-  const candidatesQuery = useCandidates();
+  const candidateSummariesQuery = useCandidateSummaries();
 
   const health = healthQuery.data ?? null;
   const examPacks = useMemo(() => examPacksQuery.data ?? [], [examPacksQuery.data]);
-  const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
+  const candidates = useMemo(
+    () => candidateSummariesQuery.data ?? [],
+    [candidateSummariesQuery.data]
+  );
 
   const bootLoading =
     healthQuery.isLoading ||
     examPacksQuery.isLoading ||
-    candidatesQuery.isLoading;
+    candidateSummariesQuery.isLoading;
 
   // The API is unreachable at boot when the core queries error out — surface
   // that on the intake screen so the user isn't ambushed only after clicking Run.
   const apiUnreachable =
-    healthQuery.isError && examPacksQuery.isError && candidatesQuery.isError;
+    healthQuery.isError && examPacksQuery.isError && candidateSummariesQuery.isError;
 
   // Run-scoped state set imperatively once a run resolves.
   const [selectedExamPackId, setSelectedExamPackId] = useState("hr-v1");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
-  const [extraCandidates, setExtraCandidates] = useState<CandidateConfig[]>([]);
+  const [extraCandidates, setExtraCandidates] = useState<CandidateSummary[]>([]);
   const [run, setRun] = useState<RunRecord | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
@@ -92,7 +95,7 @@ export default function Home() {
   // Merge server candidates with any registered locally this session.
   const allCandidates = useMemo(() => {
     const seen = new Set<string>();
-    const merged: CandidateConfig[] = [];
+    const merged: CandidateSummary[] = [];
     for (const item of [...extraCandidates, ...candidates]) {
       if (seen.has(item.id)) continue;
       seen.add(item.id);
@@ -195,7 +198,7 @@ export default function Home() {
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
-      void candidatesQuery.refetch();
+      void candidateSummariesQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const jobScope = roleScopeText?.trim()
@@ -284,7 +287,7 @@ export default function Home() {
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
-      void candidatesQuery.refetch();
+      void candidateSummariesQuery.refetch();
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const createdRun = await assayApi.createRun(created.id, packId, null, baselineRunId, {
