@@ -18,7 +18,7 @@ export type UseAgentRunOptions = {
 
 export function useAgentRun(options: UseAgentRunOptions = {}) {
   const runStream = useRunStream();
-  const packsRef = React.useRef<Awaited<ReturnType<typeof assayApi.examPacks>> | null>(null);
+  const packsRef = React.useRef<Awaited<ReturnType<typeof assayApi.examPackSummaries>> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [starting, setStarting] = React.useState(false);
 
@@ -38,14 +38,14 @@ export function useAgentRun(options: UseAgentRunOptions = {}) {
     }
   }, [runStream.status, runStream.scorecard]);
 
-  // itemCount only drives the progress bar. Load pack metadata after a rerun is
-  // requested, keeping ordinary page boot free of the /exam-packs request.
+  // itemCount only drives the progress bar. Load slim pack metadata after a
+  // rerun is requested, keeping ordinary page boot free of heavier pack reads.
   const itemCountFor = React.useCallback(async (examPackId: string) => {
     try {
       if (!packsRef.current) {
-        packsRef.current = await assayApi.examPacks();
+        packsRef.current = await assayApi.examPackSummaries();
       }
-      return packsRef.current.find((item) => item.id === examPackId)?.items.length;
+      return packsRef.current.find((item) => item.id === examPackId)?.item_count;
     } catch {
       return undefined;
     }
