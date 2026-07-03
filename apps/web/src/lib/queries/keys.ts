@@ -14,6 +14,7 @@ export type HealthPayload = {
  * connectors).
  */
 export const queryKeys = {
+  workspaceBoot: () => ["workspace", "boot"] as const,
   health: () => ["health"] as const,
   databaseHealth: () => ["health", "database"] as const,
   examPacks: () => ["exam-packs"] as const,

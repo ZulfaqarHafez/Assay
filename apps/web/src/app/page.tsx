@@ -6,9 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { assayApi } from "@/lib/api";
 import {
-  useCandidateSummaries,
-  useExamPacks,
-  useHealth,
+  useWorkspaceBoot,
   queryKeys
 } from "@/lib/queries";
 import { useRunStream } from "@/lib/useRunStream";
@@ -51,27 +49,21 @@ const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
 
 export default function Home() {
   const queryClient = useQueryClient();
-  // Boot data via TanStack Query (cache, retry, dedupe handled by the client).
-  const healthQuery = useHealth();
-  const examPacksQuery = useExamPacks();
-  const candidateSummariesQuery = useCandidateSummaries();
+  // One boot snapshot keeps first paint to a single cached API read.
+  const bootQuery = useWorkspaceBoot();
 
-  const health = healthQuery.data ?? null;
-  const examPacks = useMemo(() => examPacksQuery.data ?? [], [examPacksQuery.data]);
+  const health = bootQuery.data?.health ?? null;
+  const examPacks = useMemo(() => bootQuery.data?.exam_packs ?? [], [bootQuery.data]);
   const candidates = useMemo(
-    () => candidateSummariesQuery.data ?? [],
-    [candidateSummariesQuery.data]
+    () => bootQuery.data?.candidate_summaries ?? [],
+    [bootQuery.data]
   );
 
-  const bootLoading =
-    healthQuery.isLoading ||
-    examPacksQuery.isLoading ||
-    candidateSummariesQuery.isLoading;
+  const bootLoading = bootQuery.isLoading;
 
   // The API is unreachable at boot when the core queries error out — surface
   // that on the intake screen so the user isn't ambushed only after clicking Run.
-  const apiUnreachable =
-    healthQuery.isError && examPacksQuery.isError && candidateSummariesQuery.isError;
+  const apiUnreachable = bootQuery.isError;
 
   // Run-scoped state set imperatively once a run resolves.
   const [selectedExamPackId, setSelectedExamPackId] = useState("hr-v1");
@@ -198,7 +190,7 @@ export default function Home() {
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
-      void candidateSummariesQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const jobScope = roleScopeText?.trim()
@@ -221,6 +213,7 @@ export default function Home() {
         competencyThreshold: policy?.competencyThreshold
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
@@ -256,6 +249,7 @@ export default function Home() {
         competencyThreshold: runPolicy?.competencyThreshold
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
@@ -287,7 +281,7 @@ export default function Home() {
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
-      void candidateSummariesQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const createdRun = await assayApi.createRun(created.id, packId, null, baselineRunId, {
@@ -295,6 +289,7 @@ export default function Home() {
         competencyThreshold: runPolicy?.competencyThreshold
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });

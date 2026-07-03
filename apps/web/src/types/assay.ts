@@ -22,6 +22,13 @@ export type Health = {
   openai_configured?: boolean;
 };
 
+export type WorkspaceBoot = {
+  schema: "assay.workspace_boot.v1";
+  health: Health;
+  exam_packs: ExamPack[];
+  candidate_summaries: CandidateSummary[];
+};
+
 export type AgentIntakeDetected = {
   role: string;
   title: string;

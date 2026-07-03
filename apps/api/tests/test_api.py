@@ -203,6 +203,35 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert "origin" in exam_packs_response.headers["vary"].lower()
 
 
+def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
+    monkeypatch.setattr("assay_api.routers.health.resolve_openai_key", lambda: "test-key")
+
+    with TestClient(app) as client:
+        candidate = client.post(
+            "/candidates",
+            json={
+                "name": "Boot Agent",
+                "adapter_type": "mock",
+                "system_prompt": "# Boot Agent\n\n" + ("instructions " * 200),
+                "metadata": {"source": "test", "notes": "large metadata should stay off boot"},
+            },
+        ).json()
+        response = client.get("/workspace/boot")
+        payload = response.json()
+
+    assert payload["schema"] == "assay.workspace_boot.v1"
+    assert payload["health"]["ok"] is True
+    assert payload["health"]["openai_configured"] is True
+    assert payload["exam_packs"]
+    assert payload["candidate_summaries"][0]["id"] == candidate["id"]
+    assert payload["candidate_summaries"][0]["name"] == "Boot Agent"
+    assert "system_prompt" not in payload["candidate_summaries"][0]
+    assert "metadata" not in payload["candidate_summaries"][0]
+    assert "candidates" not in payload
+    assert response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert "origin" in response.headers["vary"].lower()
+
+
 def test_supabase_startup_skips_eager_db_probe(monkeypatch) -> None:
     """Production Supabase cold starts should not probe or seed the DB eagerly."""
     from assay_api import main

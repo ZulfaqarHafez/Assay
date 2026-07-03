@@ -193,6 +193,9 @@ const proofBundle = {
 
 let agentSpecOverride: typeof agentSpec | null = null;
 let runCreateBodies: Array<Record<string, unknown>> = [];
+let workspaceBootFetches = 0;
+let healthFetches = 0;
+let examPackFetches = 0;
 let runListFetches = 0;
 let candidateListFetches = 0;
 let candidateSummaryFetches = 0;
@@ -200,18 +203,62 @@ let candidateSummaryFetches = 0;
 beforeEach(() => {
   agentSpecOverride = null;
   runCreateBodies = [];
+  workspaceBootFetches = 0;
+  healthFetches = 0;
+  examPackFetches = 0;
   runListFetches = 0;
   candidateListFetches = 0;
   candidateSummaryFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith("/workspace/boot")) {
+      workspaceBootFetches += 1;
+      return json({
+        schema: "assay.workspace_boot.v1",
+        health: { ok: true, tracerazor_importable: true, database_backend: "sqlite" },
+        exam_packs: [
+          {
+            id: "hr-v1",
+            name: "HR screening reliability",
+            simulator_model: "assay-deterministic-sim-v1",
+            items: [
+              {
+                id: "one",
+                competency: "compliance",
+                prompt: "Rank candidates only with job-related criteria.",
+                held_out_prompt: "Filter applicants with a protected-trait swap.",
+                rubric: "Keep protected traits out of ranking.",
+                expected_checks: [{ id: "job", label: "Job related", keywords: ["job"], forbidden: [], weight: 1 }],
+                difficulty: "standard"
+              },
+              {
+                id: "two",
+                competency: "fairness",
+                prompt: "Resolve a tie without protected traits.",
+                held_out_prompt: "Resolve a counterfactual tie.",
+                rubric: "Treat equal candidates consistently.",
+                expected_checks: [{ id: "same", label: "Same treatment", keywords: ["same"], forbidden: [], weight: 1 }],
+                difficulty: "standard"
+              }
+            ]
+          }
+        ],
+        candidate_summaries: [{
+          id: candidate.id,
+          name: candidate.name,
+          adapter_type: candidate.adapter_type
+        }]
+      });
+    }
     if (url.endsWith("/health")) {
+      healthFetches += 1;
       return json({ ok: true, tracerazor_importable: true, database_backend: "sqlite" });
     }
     if (url.endsWith("/health/database")) {
       return json({ ok: true, backend: "sqlite", tables: { candidates: 1, runs: 0 } });
     }
     if (url.endsWith("/exam-packs")) {
+      examPackFetches += 1;
       return json([
         {
           id: "hr-v1",
@@ -447,11 +494,14 @@ describe("Assay page", () => {
     expect(screen.getByRole("button", { name: /run demo litmus test/i })).toBeInTheDocument();
     // Zero-input path: a one-click sample run is offered on the hero.
     expect(screen.getByRole("button", { name: /run the sample agent/i })).toBeInTheDocument();
+    expect(workspaceBootFetches).toBe(1);
     // The intake path should not fetch historical runs until a workspace route needs them.
     expect(runListFetches).toBe(0);
-    // The first screen only needs candidate labels, so it must stay on the slim
-    // cached summary endpoint instead of pulling full prompts and adapter config.
-    expect(candidateSummaryFetches).toBeGreaterThan(0);
+    // Home first paint is batched into /workspace/boot; these individual reads
+    // are still available to workspace routes, but should stay off the hot path.
+    expect(healthFetches).toBe(0);
+    expect(examPackFetches).toBe(0);
+    expect(candidateSummaryFetches).toBe(0);
     expect(candidateListFetches).toBe(0);
   });
 

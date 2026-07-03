@@ -1,4 +1,4 @@
-import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunRecord, RunSummary, RunSurfaces, RunVerdict, Scorecard, TracePayload } from "@/types/assay";
+import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunRecord, RunSummary, RunSurfaces, RunVerdict, Scorecard, TracePayload, WorkspaceBoot } from "@/types/assay";
 
 function apiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
@@ -36,6 +36,7 @@ function requestHeaders(init?: RequestInit): Headers {
 }
 
 export const assayApi = {
+  workspaceBoot: () => request<WorkspaceBoot>("/workspace/boot"),
   health: () => request<Health>("/health"),
   databaseHealth: () => request<DatabaseHealth>("/health/database"),
   examPacks: () => request<ExamPack[]>("/exam-packs"),

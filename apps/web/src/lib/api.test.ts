@@ -38,6 +38,16 @@ describe("assayApi request headers", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("https://api.assay.test/candidates/summary");
   });
 
+  it("uses the workspace boot endpoint for home first paint", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
+    const fetchMock = vi.fn(async () => json({ schema: "assay.workspace_boot.v1" }));
+    global.fetch = fetchMock;
+
+    await assayApi.workspaceBoot();
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/workspace/boot");
+  });
+
   it("reads a single run without assembling a proof bundle", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
     const fetchMock = vi.fn(async () => json({ id: "run_1" }));

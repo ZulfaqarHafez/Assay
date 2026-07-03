@@ -56,16 +56,20 @@ def test_shared_metadata_cache_disables_when_key_configured(monkeypatch: pytest.
         candidates = client.get("/candidates/summary", headers=headers)
         runs = client.get("/runs/summary", headers=headers)
         packs = client.get("/exam-packs", headers=headers)
+        boot = client.get("/workspace/boot", headers=headers)
 
     assert candidates.status_code == 200
     assert runs.status_code == 200
     assert packs.status_code == 200
+    assert boot.status_code == 200
     assert candidates.headers["cache-control"] == "no-store"
     assert runs.headers["cache-control"] == "no-store"
     assert packs.headers["cache-control"] == "no-store"
+    assert boot.headers["cache-control"] == "no-store"
     assert "origin" in candidates.headers["vary"].lower()
     assert "origin" in runs.headers["vary"].lower()
     assert "origin" in packs.headers["vary"].lower()
+    assert "origin" in boot.headers["vary"].lower()
 
 
 def test_tenant_header_required_in_hosted_tenant_mode(monkeypatch: pytest.MonkeyPatch) -> None:

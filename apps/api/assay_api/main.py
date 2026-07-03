@@ -15,7 +15,7 @@ from .logging_config import (
 )
 from .models import CandidateConfig
 from .rate_limit import RATE_LIMIT_ENABLED_ENV, limiter, rate_limiting_enabled
-from .routers import candidates, connectors, health, role, runs, suites
+from .routers import candidates, connectors, health, role, runs, suites, workspace
 from .security import API_KEYS_ENV, configured_api_keys, require_api_key
 from .tenancy import REQUIRE_TENANT_ENV, require_tenant, tenant_required
 
@@ -72,6 +72,7 @@ app.add_middleware(
 
 # Mount one router per product surface. Route handlers live in ``routers/``.
 app.include_router(health.router)
+app.include_router(workspace.router)
 app.include_router(suites.router)
 app.include_router(candidates.router)
 app.include_router(runs.router)
