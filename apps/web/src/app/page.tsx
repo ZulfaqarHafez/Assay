@@ -18,7 +18,6 @@ import type {
   AgentSpec,
   CandidateSummary,
   DeployabilityDecision,
-  ProofBundle,
   RunEvent,
   RunRecord,
   Scorecard,
@@ -89,7 +88,6 @@ export default function Home() {
   const [events, setEvents] = useState<RunEvent[]>([]);
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [trace, setTrace] = useState<TracePayload | null>(null);
-  const [proofBundle, setProofBundle] = useState<ProofBundle | null>(null);
   const [agentSpec, setAgentSpec] = useState<AgentSpec | null>(null);
   const [deployability, setDeployability] = useState<DeployabilityDecision | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +166,6 @@ export default function Home() {
     setEvents([]);
     setScorecard(null);
     setTrace(null);
-    setProofBundle(null);
     setAgentSpec(null);
     setDeployability(null);
   }
@@ -178,7 +175,6 @@ export default function Home() {
       const payoff = await assayApi.runPayoff(runId);
       setEvents([]);
       setTrace(null);
-      setProofBundle(null);
       setAgentSpec(payoff.agent_spec ?? null);
       setDeployability(payoff.deployability ?? null);
       markRunListsStale(queryClient);
@@ -316,19 +312,12 @@ export default function Home() {
       return;
     }
     const hasCurrentTrace = trace?.run_id === runId;
-    const hasCurrentBundle = proofBundle?.run.id === runId;
-    if (!hasCurrentTrace || !hasCurrentBundle) {
+    if (!hasCurrentTrace) {
       setError(null);
       try {
-        const [tracePayload, bundlePayload] = await Promise.all([
-          assayApi.trace(runId),
-          assayApi.proofBundle(runId)
-        ]);
-        setEvents(tracePayload.events);
-        setTrace(tracePayload);
-        setProofBundle(bundlePayload);
-        setAgentSpec(bundlePayload.agent_spec ?? null);
-        setDeployability(bundlePayload.deployability ?? null);
+        const traceEvents = await assayApi.events(runId);
+        setEvents(traceEvents);
+        setTrace({ run_id: runId, events: traceEvents, scorecard });
       } catch (exc) {
         setError(errorMessage(exc));
       }
@@ -426,7 +415,7 @@ export default function Home() {
           events={events}
           trace={trace}
           scorecard={scorecard}
-          proofBundle={proofBundle}
+          proofBundle={null}
           agentSpec={agentSpec}
           agentResearch={null}
           open={drawerOpen}

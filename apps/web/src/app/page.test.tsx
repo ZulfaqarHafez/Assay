@@ -230,6 +230,7 @@ let candidateSummaryFetches = 0;
 let proofDetailFetches = 0;
 let payoffFetches = 0;
 let traceFetches = 0;
+let eventFetches = 0;
 
 beforeEach(() => {
   agentSpecOverride = null;
@@ -243,6 +244,7 @@ beforeEach(() => {
   proofDetailFetches = 0;
   payoffFetches = 0;
   traceFetches = 0;
+  eventFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/workspace/boot")) {
@@ -419,6 +421,7 @@ beforeEach(() => {
       return json(scorecard);
     }
     if (url.endsWith("/runs/run_demo/events")) {
+      eventFetches += 1;
       return json(events);
     }
     if (url.endsWith("/runs/run_demo/trace")) {
@@ -557,9 +560,11 @@ describe("Assay page", () => {
       competency_threshold: 0.8
     });
 
+    const eventFetchesBeforeTrace = eventFetches;
     await user.click(screen.getByRole("button", { name: /open full trace/i }));
-    await waitFor(() => expect(traceFetches).toBe(1));
-    await waitFor(() => expect(proofDetailFetches).toBe(1));
+    await waitFor(() => expect(eventFetches).toBeGreaterThan(eventFetchesBeforeTrace));
+    expect(traceFetches).toBe(0);
+    expect(proofDetailFetches).toBe(0);
   }, 15000);
 
   it("uses the current run as the baseline when testing the improved version", async () => {
