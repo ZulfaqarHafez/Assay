@@ -3,11 +3,13 @@
 import * as React from "react";
 
 /**
- * The Assay mark — a tapered spiral that winds inward and settles on a single
- * plum specimen at its eye: many trials drawn in to one reading. Generated as a
- * rounded tile (bone or ink) by scripts/build-logo.mjs and rendered as an <img>
- * so the real brand asset is used verbatim rather than re-drawn. The tile is
- * self-contained, so it reads on both the warm light and dark surfaces.
+ * The Assay mark — the "Specimen A": a bespoke high-contrast serif A (hairline
+ * left stroke, weighted right, fine bracketed serifs, sharp apex) with the
+ * specimen worn beside it as a discreet maker's mark — a jewel sample and a
+ * smaller gold reading. Generated as a rounded tile (ivory or navy) by
+ * scripts/build-logo.mjs and rendered as an <img> so the real brand asset is
+ * used verbatim rather than re-drawn. The tile is self-contained, so it reads
+ * on both the warm light and dark surfaces.
  */
 
 export type BrandMarkProps = {
