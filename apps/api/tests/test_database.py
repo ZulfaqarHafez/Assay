@@ -195,6 +195,37 @@ def test_sqlite_lessons_round_trip() -> None:
     assert len(list_lessons_for_candidate("cand_1", active_only=False)) == 1
 
 
+def test_sqlite_list_events_filters_after_sequence_in_store() -> None:
+    from assay_api.database import init_db, list_events, save_event
+    from assay_api.models import RunEvent
+
+    init_db()
+    for sequence in (1, 2, 3):
+        save_event(
+            RunEvent(
+                span_id=f"span_{sequence}",
+                run_id="run_delta",
+                sequence=sequence,
+                actor="candidate",
+                event_type="candidate_answered",
+                payload={"sequence": sequence},
+            )
+        )
+    save_event(
+        RunEvent(
+            span_id="span_other",
+            run_id="run_other",
+            sequence=4,
+            actor="candidate",
+            event_type="candidate_answered",
+        )
+    )
+
+    assert [event.sequence for event in list_events("run_delta")] == [1, 2, 3]
+    assert [event.sequence for event in list_events("run_delta", after=1)] == [2, 3]
+    assert list_events("run_delta", after=3) == []
+
+
 def test_sqlite_quarantines_legacy_private_http_candidate() -> None:
     from assay_api.database import init_db, list_candidates
 
@@ -282,3 +313,61 @@ def test_supabase_store_persists_lessons(monkeypatch: pytest.MonkeyPatch) -> Non
 
     # The filtered list path executes its query chain without error.
     assert store_instance.list_lessons_for_candidate("cand_x", "hr-v1", ["compliance"]) == []
+
+
+def test_supabase_list_events_pushes_after_filter_to_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, tuple]] = []
+    event_payload = {
+        "span_id": "span_2",
+        "run_id": "run_delta",
+        "sequence": 2,
+        "actor": "candidate",
+        "event_type": "candidate_answered",
+        "payload": {},
+        "started_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    class FakeQuery:
+        def __init__(self, table: str):
+            self.table = table
+
+        def select(self, *args, **_kwargs):
+            calls.append(("select", (self.table, *args)))
+            return self
+
+        def eq(self, *args):
+            calls.append(("eq", args))
+            return self
+
+        def gt(self, *args):
+            calls.append(("gt", args))
+            return self
+
+        def order(self, *args, **kwargs):
+            calls.append(("order", (*args, kwargs)))
+            return self
+
+        def execute(self):
+            return type("Response", (), {"data": [{"payload": event_payload}], "count": 1})()
+
+    class FakeClient:
+        def table(self, table: str):
+            calls.append(("table", (table,)))
+            return FakeQuery(table)
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "supabase",
+        type("FakeSupabase", (), {"create_client": lambda url, key: FakeClient()}),
+    )
+    store_instance = SupabaseStore("https://project.supabase.co", "server-key")
+    store_instance._schema_checked = True
+    store_instance._available_tables = set(store_instance.tables)
+    store_instance._tenant_tables = set(store_instance.tables)
+
+    events = store_instance.list_events("run_delta", after=1)
+
+    assert [event.sequence for event in events] == [2]
+    assert ("gt", ("sequence", 1)) in calls
+    assert ("eq", ("run_id", "run_delta")) in calls
+    assert ("order", ("sequence", {})) in calls

@@ -110,7 +110,7 @@ class DataStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list_events(self, run_id: str) -> list[RunEvent]:
+    def list_events(self, run_id: str, after: int | None = None) -> list[RunEvent]:
         raise NotImplementedError
 
     @abstractmethod
@@ -360,11 +360,16 @@ class SQLiteStore(DataStore):
             )
         return event
 
-    def list_events(self, run_id: str) -> list[RunEvent]:
+    def list_events(self, run_id: str, after: int | None = None) -> list[RunEvent]:
+        clauses = ["run_id = ?", "tenant_id = ?"]
+        params: list[Any] = [run_id, current_tenant_id()]
+        if after is not None:
+            clauses.append("sequence > ?")
+            params.append(after)
         with self.connect() as conn:
             rows = conn.execute(
-                "SELECT payload FROM events WHERE run_id = ? AND tenant_id = ? ORDER BY sequence ASC",
-                (run_id, current_tenant_id()),
+                f"SELECT payload FROM events WHERE {' AND '.join(clauses)} ORDER BY sequence ASC",
+                tuple(params),
             ).fetchall()
         return [RunEvent.model_validate_json(row["payload"]) for row in rows]
 
@@ -624,9 +629,11 @@ class SupabaseStore(DataStore):
         )
         return event
 
-    def list_events(self, run_id: str) -> list[RunEvent]:
+    def list_events(self, run_id: str, after: int | None = None) -> list[RunEvent]:
         self._ensure_schema()
         query = self.client.table(self.tables["events"]).select("payload").eq("run_id", run_id)
+        if after is not None:
+            query = query.gt("sequence", after)
         response = self._with_tenant_filter("events", query).order("sequence").execute()
         return [RunEvent.model_validate(row["payload"]) for row in response.data or []]
 
@@ -856,8 +863,8 @@ def save_event(event: RunEvent) -> RunEvent:
     return store().save_event(event)
 
 
-def list_events(run_id: str) -> list[RunEvent]:
-    return store().list_events(run_id)
+def list_events(run_id: str, after: int | None = None) -> list[RunEvent]:
+    return store().list_events(run_id, after=after)
 
 
 def save_scorecard(scorecard: Scorecard) -> Scorecard:
