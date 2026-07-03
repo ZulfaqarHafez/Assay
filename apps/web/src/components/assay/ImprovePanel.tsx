@@ -48,7 +48,11 @@ export function ImprovePanel({
   validation = null
 }: ImprovePanelProps) {
   const [copied, setCopied] = React.useState(false);
-  const diffQuery = useAgentSpecDiff(runId, { retry: false });
+  const [exactDiffRequested, setExactDiffRequested] = React.useState(false);
+  const diffQuery = useAgentSpecDiff(runId, {
+    retry: false,
+    enabled: Boolean(runId && exactDiffRequested)
+  });
 
   if (!agentSpec) return null;
 
@@ -69,6 +73,13 @@ export function ImprovePanel({
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
       /* clipboard blocked — Download remains available */
+    }
+  }
+
+  function requestExactDiff() {
+    setExactDiffRequested(true);
+    if (exactDiffRequested) {
+      void diffQuery.refetch();
     }
   }
 
@@ -171,6 +182,18 @@ export function ImprovePanel({
               <span>{fallbackPreview.length} changed lines previewed</span>
             )}
           </div>
+          {runId && !serverDiff ? (
+            <div className="assay-improve-refined-actions">
+              <button
+                type="button"
+                className="assay-ghost-button slim"
+                disabled={diffQuery.isFetching}
+                onClick={requestExactDiff}
+              >
+                <Activity size={14} /> {diffQuery.isFetching ? "Loading diff" : diffQuery.isError ? "Retry diff" : "Exact diff"}
+              </button>
+            </div>
+          ) : null}
           {serverDiff && !serverDiff.original_available && (
             <p className="assay-muted">
               No original agent.md is on file for this candidate — showing the full refined document as additions.
