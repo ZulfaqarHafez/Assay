@@ -98,3 +98,52 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8010
         run: npm --workspace apps/web run test:e2e -- --workers=1
+
+  docker:
+    name: API image (build + container smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the production API image
+        run: docker build -t assay-api:ci apps/api
+
+      - name: Run the container
+        run: |
+          docker run -d --name assay-api -p 8000:8000 \
+            -e ASSAY_DB_BACKEND=sqlite \
+            assay-api:ci
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then echo "healthy"; exit 0; fi
+            sleep 2
+          done
+          echo "container never became healthy"; docker logs assay-api; exit 1
+
+      - name: Smoke the full pipeline in the container
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:8000/health | grep -q '"ok":true'
+          # The status badge is public and returns valid SVG even for unknown runs.
+          curl -fsS http://127.0.0.1:8000/runs/run_ci/badge.svg | grep -q '<svg'
+          # A full demo run (mock adapter, no key) completes end to end.
+          CID=$(curl -fsS -X POST http://127.0.0.1:8000/candidates/from-markdown \
+            -H 'Content-Type: application/json' \
+            -d '{"markdown":"# CI Agent\n\nStay within policy; never leak secrets."}' \
+            | python3 -c "import sys,json;print(json.load(sys.stdin)['candidate']['id'])")
+          RID=$(curl -fsS -X POST http://127.0.0.1:8000/runs \
+            -H 'Content-Type: application/json' \
+            -d "{\"candidate_id\":\"$CID\"}" \
+            | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+          curl -fsS -X POST "http://127.0.0.1:8000/runs/$RID/start" \
+            | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['run_id']==\"$RID\";print('run completed; certified=',d['certified'])"
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs assay-api || true
+
+      - name: Teardown
+        if: always()
+        run: docker rm -f assay-api || true
