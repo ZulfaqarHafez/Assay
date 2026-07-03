@@ -47,14 +47,21 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         db_health = client.get("/health/database").json()
         candidate_id = candidates[0]["id"]
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        pending_verdict_response = client.get(f"/runs/{run['id']}/verdict")
         scorecard = client.post(f"/runs/{run['id']}/start").json()
         reviewers = client.get(f"/runs/{run['id']}/reviewers").json()
         events = client.get(f"/runs/{run['id']}/events").json()
         public_scorecard = client.get(f"/runs/{run['id']}/scorecard").json()
-        verdict = client.get(f"/runs/{run['id']}/verdict").json()
+        verdict_response = client.get(f"/runs/{run['id']}/verdict")
+        verdict = verdict_response.json()
         trace = client.get(f"/runs/{run['id']}/trace").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
         detail = client.get(f"/runs/{run['id']}/detail").json()
+        monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
+        protected_verdict_response = client.get(
+            f"/runs/{run['id']}/verdict",
+            headers={"X-API-Key": "secret-key-1"},
+        )
 
     assert scorecard["run_id"] == run["id"]
     assert db_health["backend"] == "sqlite"
@@ -64,6 +71,9 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert scorecard["trace_audit"]["tas_score"] == 88
     assert events
     assert public_scorecard["trace_audit"]["raw"] == {}
+    assert pending_verdict_response.headers["cache-control"] == "no-store"
+    assert verdict_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert protected_verdict_response.headers["cache-control"] == "no-store"
     assert verdict["schema"] == "assay.run_verdict.v1"
     assert verdict["run"]["id"] == run["id"]
     assert verdict["candidate"]["id"] == candidate_id

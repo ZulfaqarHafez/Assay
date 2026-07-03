@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from ..agent_diff import diff_payload
 from ..badge import agent_hash, badge_svg
@@ -32,6 +32,8 @@ from ..product_review import product_review_for_run
 from ..progress import candidate_progress, lesson_library, run_comparison
 from ..rate_limit import rate_limit
 from ..role_intelligence import analyze_job_scope, role_analysis_for_run
+from ..security import configured_api_keys
+from ..tenancy import tenant_required
 
 router = APIRouter()
 
@@ -174,8 +176,14 @@ def run_scorecard(run_id: str) -> dict:
     return _scorecard_payload(scorecard, include_trace_raw=False)
 
 
+def _run_verdict_cache_control(run: RunRecord) -> str:
+    if run.status == "completed" and not configured_api_keys() and not tenant_required():
+        return "public, max-age=30, stale-while-revalidate=300"
+    return "no-store"
+
+
 @router.get("/runs/{run_id}/verdict")
-def run_verdict(run_id: str) -> dict:
+def run_verdict(run_id: str) -> JSONResponse:
     """Slim first-paint payload for the run detail page.
 
     Bundles the records needed to render the verdict strip and action controls
@@ -192,7 +200,7 @@ def run_verdict(run_id: str) -> dict:
             mode="json",
             by_alias=True,
         )
-    return {
+    payload = {
         "schema": "assay.run_verdict.v1",
         "run": run.model_dump(mode="json"),
         "candidate": (
@@ -208,6 +216,10 @@ def run_verdict(run_id: str) -> dict:
         "scorecard": _scorecard_payload(scorecard, include_trace_raw=False) if scorecard else None,
         "deployability": deployability,
     }
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": _run_verdict_cache_control(run)},
+    )
 
 
 @router.get("/runs/{run_id}/reviewers")
