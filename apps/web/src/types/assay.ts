@@ -218,6 +218,14 @@ export type TraceAuditSummary = {
   message?: string | null;
 };
 
+export type PrivilegeDelta = {
+  declared: string[];
+  used: string[];
+  removable: string[];
+  dangerous_removable: string[];
+  note: string;
+};
+
 export type Scorecard = {
   tenant_id?: string;
   run_id: string;
@@ -243,6 +251,7 @@ export type Scorecard = {
   degraded_reason?: string | null;
   qualification_status?: "tailored" | "deterministic" | "partial";
   role_brief_summary?: string | null;
+  privilege_delta?: PrivilegeDelta | null;
   semantic_judge_used?: boolean;
   semantic_judge_summary?: Record<string, unknown>;
 };

@@ -6,6 +6,7 @@ import { CheckCircle2, AlertTriangle, XCircle, ArrowRight, RotateCcw, PanelRight
 import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, type FixSeverity } from "@/lib/assay";
 import RoleBriefCard from "@/components/assay/RoleBriefCard";
 import ImprovePanel from "@/components/assay/ImprovePanel";
+import PrivilegeDeltaPanel from "@/components/assay/PrivilegeDeltaPanel";
 import RunComparison from "@/components/scorecard/RunComparison";
 import { VERDICT_LABEL, VERDICT_SCALE } from "@/lib/verdict";
 import type { Scorecard, AgentSpec, DeployabilityDecision } from "@/types/assay";
@@ -176,6 +177,8 @@ export function VerdictPanel({
           ))}
         </ol>
       </div>
+
+      <PrivilegeDeltaPanel delta={scorecard.privilege_delta} />
 
       <div className="assay-categories">
         <h3 className="assay-section-label"><span className="section-no">02</span>By capability</h3>

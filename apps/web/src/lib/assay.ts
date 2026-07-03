@@ -140,6 +140,17 @@ function biggestProblem(scorecard: Scorecard, verdict: Verdict): string {
   return verdict === "ship" ? "Passed every check on held-out variants." : "The agent did not clear the internal gate.";
 }
 
+/**
+ * Parse a `CRITICAL guardrail_breach: <category> (<variant>) - tripwire <id>: <call>` reason
+ * into a clean title and the offending tool call. Returns null for other reasons.
+ */
+function parseGuardrailBreach(reason: string): { title: string; call: string } | null {
+  if (!reason.startsWith("CRITICAL guardrail_breach")) return null;
+  const category = reason.match(/guardrail_breach:\s*([a-z_]+)/i)?.[1] ?? "guardrail";
+  const call = reason.match(/tripwire\s+[a-z0-9_.-]+:\s*(.+?)\.?$/i)?.[1] ?? "a forbidden tool";
+  return { title: `Guardrail breach: ${labelize(category)}`, call: `\`${call.trim()}\`` };
+}
+
 /** Ranked, finite "what to fix" list: hard failures first, then trace + transfer + gaps. */
 export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): FixItem[] {
   const fixes: RankedFixItem[] = [];
@@ -147,11 +158,14 @@ export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): 
   let order = 0;
 
   scorecard.failure_reasons?.forEach((reason, index) => {
+    const breach = parseGuardrailBreach(reason);
     fixes.push({
       id: `fail-${index}`,
       severity: "critical",
-      title: reason,
-      detail: "Failed the internal gate. Tighten the agent.md guardrail covering this case, then re-run.",
+      title: breach ? breach.title : reason,
+      detail: breach
+        ? `The agent actually called ${breach.call}. Add an explicit refusal for this case to your agent.md, then re-run.`
+        : "Failed the internal gate. Tighten the agent.md guardrail covering this case, then re-run.",
       priority: index,
       order: order++
     });

@@ -4,10 +4,12 @@ from assay_api.agent_refinery import agent_spec_payload, build_agent_spec
 from assay_api.exam_packs import get_exam_pack
 from assay_api.models import (
     CandidateConfig,
+    PrivilegeDelta,
     RunEvent,
     RunRecord,
     Scorecard,
     TraceAuditSummary,
+    ToolSpec,
 )
 
 
@@ -218,6 +220,41 @@ def test_certified_run_with_trace_fixes_keeps_subagents_optional() -> None:
     assert all(agent.priority == "optional" for agent in spec.sub_agents)
     assert spec.metrics["recommended_subagents"] == 0
     assert "recommended helper" not in spec.headline
+
+
+def test_agent_markdown_surfaces_least_privilege_delta() -> None:
+    run = RunRecord(id="run_privilege", candidate_id="cand_privilege", exam_pack_id="hr-injection-v1")
+    candidate = CandidateConfig(
+        id="cand_privilege",
+        name="Ops Agent",
+        adapter_type="mock",
+        tools=[
+            ToolSpec(name="read_file"),
+            ToolSpec(name="delete_repo", dangerous=True),
+        ],
+    )
+    pack = get_exam_pack("hr-injection-v1")
+    scorecard = _scorecard(
+        run.id,
+        held={"privilege_hygiene": 0.95},
+        transfer_gap={"privilege_hygiene": 0.0},
+        pass_at_k={"privilege_hygiene": True},
+        certified=True,
+        audit=_ok_audit(),
+    )
+    scorecard.privilege_delta = PrivilegeDelta(
+        declared=["delete_repo", "read_file"],
+        used=["read_file"],
+        removable=["delete_repo"],
+        dangerous_removable=["delete_repo"],
+        note="1 of 2 declared tools were never used in the exam.",
+    )
+
+    md = build_agent_spec(run, candidate, scorecard, pack, []).agent_markdown
+
+    assert "Least privilege (remove unused grants)" in md
+    assert "`delete_repo`" in md
+    assert "dangerous" in md
 
 
 def test_subagent_cap_reserves_cross_cutting_auditors() -> None:
