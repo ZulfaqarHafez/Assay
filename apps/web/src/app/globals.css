@@ -34,8 +34,10 @@
   --surface: #fbf4e6;
   --review-bg: #fbf0dd;
   --pass-bg: #e8f3ec;
-  --shadow: 0 18px 55px rgba(28, 33, 46, 0.09);
-  --shadow-soft: 0 8px 24px rgba(28, 33, 46, 0.06);
+  /* Lab Instrument: shadows are tight and rare; hairlines do the separation.
+     (Was a 55px halo — the "floating dashboard card" look.) */
+  --shadow: 0 2px 10px rgba(28, 33, 46, 0.08), 0 1px 2px rgba(28, 33, 46, 0.06);
+  --shadow-soft: 0 1px 4px rgba(28, 33, 46, 0.06);
 
   /* Semantic tokens (alias the raw palette; light theme) */
   --color-bg: var(--paper);
@@ -59,9 +61,11 @@
   --color-overlay: rgba(28, 33, 46, 0.42);
   --shadow-card: var(--shadow);
   --shadow-card-soft: var(--shadow-soft);
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* Lab Instrument: tight radii — instruments are precise, dashboards are round.
+     (docs/design/direction.md) */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
   --radius-pill: 999px;
 
   /* Chromatography spectrum — the brand signature. Warm saffron through to a
@@ -77,6 +81,7 @@
   /* Type families (set by next/font on <html>). */
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
   --font-display: "Space Grotesk", "Sora", var(--font-sans);
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 /* Dark palette. Activated by .dark or [data-theme="dark"] on any ancestor. */
@@ -99,8 +104,8 @@
   --surface: #1b1a24;
   --review-bg: #302008;
   --pass-bg: #132d21;
-  --shadow: 0 18px 55px rgba(0, 0, 0, 0.5);
-  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.3);
 
   --color-bg: var(--paper);
   --color-surface: var(--surface);
@@ -2367,13 +2372,18 @@ pre {
   gap: 10px;
 }
 
+/* Section headers read like a lab report's numbered sections: mono, tracked,
+   quiet, sitting on a hairline. */
 .assay-section-label {
-  font-size: 12px;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   color: var(--color-fg-muted);
-  margin: 0 0 10px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 /* Secondary "Test improved version" — accent-tinted variant of the run button. */
@@ -2803,12 +2813,13 @@ pre {
 }
 
 /* Gradient score number ties the headline figure to the motif. */
+/* The score is the 2-second glance — solid ink, instrument numerals. (The old
+   gradient-clipped fill faded the right digits to near-transparent: P3-1.) */
 .assay-verdict-score strong.litmus-num {
-  background: var(--litmus);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  color: var(--color-fg);
 }
 
 /* Running flask container holds the brand tile directly. */
@@ -5105,3 +5116,160 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
 /* Inline deploy-gate value in the intake disclosure summary (P2-3). */
 .assay-advanced > summary strong { color: var(--color-fg); font-weight: 700; }
 .assay-advanced-hint { color: var(--color-fg-muted); font-weight: 400; }
+
+/* ==========================================================================
+   LAB INSTRUMENT craft layer (docs/design/direction.md).
+   The details that separate a shipped instrument from a generated dashboard:
+   mono data, micro-labels, hairlines, the verdict stamp, instrument meters,
+   and a breath of paper grain.
+   ========================================================================== */
+
+/* Micro-label: the tiny uppercase mono label above any datum (RUN ID · TAS · PASS^K). */
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+/* Data: any measured value. Always tabular so columns of numbers align. */
+.data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Section number chip used inside .assay-section-label: `01 - VERDICT`. */
+.section-no {
+  color: var(--color-accent);
+  margin-right: 10px;
+}
+
+/* The verdict stamp - like a rubber stamp on a lab report. The single loudest
+   element on the page; everything else stays quiet so this can speak. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  padding: 7px 16px 7px 18px; /* extra left pad balances the tracking */
+  border: 2px solid currentColor;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 25%, transparent);
+}
+.stamp.ship { color: var(--color-pass); background: color-mix(in srgb, var(--color-pass) 7%, transparent); }
+.stamp.risky { color: var(--color-warn); background: color-mix(in srgb, var(--color-warn) 7%, transparent); }
+.stamp.hold { color: var(--color-fail); background: color-mix(in srgb, var(--color-fail) 7%, transparent); }
+
+/* Hairline utilities - prefer rules to boxes. */
+.hairline-top { border-top: 1px solid var(--color-border); }
+.hairline-bottom { border-bottom: 1px solid var(--color-border); }
+
+/* Instrument meter: a thin track with tick marks, not a glowing pill. */
+.assay-litmus-meter {
+  height: 6px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0 calc(10% - 1px),
+      color-mix(in srgb, var(--color-fg) 22%, transparent) calc(10% - 1px) 10%),
+    color-mix(in srgb, var(--color-fg) 7%, transparent);
+  box-shadow: none;
+}
+.assay-litmus-meter .knob {
+  width: 3px;
+  height: 16px;
+  border-radius: 1.5px;
+  border: 0;
+  background: var(--color-fg);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-bg) 80%, transparent);
+}
+.assay-litmus-meter .threshold-tick {
+  background: var(--color-accent);
+  opacity: 0.9;
+  width: 2px;
+}
+.assay-verdict-meter .scale {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+/* The verdict hero flattens from a glowing card to a stamped report header. */
+.assay-verdict-hero {
+  box-shadow: none;
+}
+.assay-verdict-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.assay-verdict-score span,
+.assay-verdict-score small {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Run-detail metric grid reads as an instrument readout. */
+.rd-meter-grid span small {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+.rd-meter-grid span strong {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.rd-verdict-score strong,
+.rd-verdict-meta,
+.rd-check-chip {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.rd-check-chip { font-size: 10.5px; letter-spacing: 0.04em; }
+
+/* Category scores: mono values, hairline bars. */
+.assay-category-score {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Detected-facts chips on intake: specimen readouts. */
+.assay-chip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+}
+
+/* Paper grain - a breath of texture so the light background reads as paper,
+   not a hex value. Light theme only; dark stays clean. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.11 0 0 0 0 0.13 0 0 0 0 0.18 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.dark body::after { display: none; }
+
+/* The stamp inside the verdict hero: slightly rotated, like it was pressed on. */
+.assay-verdict-stamp {
+  display: flex; /* block-level: its own line under the mono eyebrow */
+  width: fit-content;
+  margin: 6px 0 10px;
+  transform: rotate(-1.6deg);
+}
