@@ -108,7 +108,8 @@ function New-WebStage {
     "package.json",
     "postcss.config.mjs",
     "tailwind.config.ts",
-    "tsconfig.json"
+    "tsconfig.json",
+    "vercel.json"
   ) | ForEach-Object {
     Copy-StageItem "apps/web/$_"
   }
