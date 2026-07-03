@@ -154,6 +154,10 @@ class DataStore(ABC):
     def get_lesson(self, lesson_id: str) -> DiagnosticLesson | None:
         raise NotImplementedError
 
+    @abstractmethod
+    def get_lessons(self, lesson_ids: list[str]) -> dict[str, DiagnosticLesson]:
+        raise NotImplementedError
+
 
 class SQLiteStore(DataStore):
     name = "sqlite"
@@ -502,6 +506,18 @@ class SQLiteStore(DataStore):
             ).fetchone()
         return DiagnosticLesson.model_validate_json(row["payload"]) if row else None
 
+    def get_lessons(self, lesson_ids: list[str]) -> dict[str, DiagnosticLesson]:
+        if not lesson_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in lesson_ids)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"SELECT payload FROM lessons WHERE tenant_id = ? AND id IN ({placeholders})",
+                (current_tenant_id(), *lesson_ids),
+            ).fetchall()
+        lessons = [DiagnosticLesson.model_validate_json(row["payload"]) for row in rows]
+        return {lesson.id: lesson for lesson in lessons}
+
 
 class SupabaseStore(DataStore):
     name = "supabase"
@@ -790,6 +806,15 @@ class SupabaseStore(DataStore):
         row = self._single("lessons", "id", lesson_id)
         return DiagnosticLesson.model_validate(row["payload"]) if row else None
 
+    def get_lessons(self, lesson_ids: list[str]) -> dict[str, DiagnosticLesson]:
+        self._ensure_schema()
+        if not lesson_ids or not self._table_available("lessons"):
+            return {}
+        query = self.client.table(self.tables["lessons"]).select("payload").in_("id", lesson_ids)
+        response = self._with_tenant_filter("lessons", query).execute()
+        lessons = [DiagnosticLesson.model_validate(row["payload"]) for row in response.data or []]
+        return {lesson.id: lesson for lesson in lessons}
+
     def _upsert(self, logical_table: str, row: dict[str, Any], on_conflict: str) -> None:
         if not self._table_available(logical_table):
             return
@@ -991,6 +1016,10 @@ def list_lessons_for_candidate(
 
 def get_lesson(lesson_id: str) -> DiagnosticLesson | None:
     return store().get_lesson(lesson_id)
+
+
+def get_lessons(lesson_ids: list[str]) -> dict[str, DiagnosticLesson]:
+    return store().get_lessons(lesson_ids)
 
 
 def trace_payload(run_id: str) -> dict[str, Any]:

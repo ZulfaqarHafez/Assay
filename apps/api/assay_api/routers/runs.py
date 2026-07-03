@@ -15,7 +15,7 @@ from ..database import (
     database_backend_name,
     database_health,
     get_candidate,
-    get_lesson,
+    get_lessons,
     get_run,
     get_scorecard,
     get_scorecards,
@@ -463,7 +463,8 @@ def run_lessons_applied(run_id: str) -> list[dict]:
     scorecard = get_scorecard(run_id)
     if scorecard is None:
         return []
-    resolved = [get_lesson(lesson_id) for lesson_id in scorecard.lessons_applied]
+    lessons_by_id = get_lessons(scorecard.lessons_applied)
+    resolved = [lessons_by_id.get(lesson_id) for lesson_id in scorecard.lessons_applied]
     return [lesson.model_dump(mode="json") for lesson in resolved if lesson is not None]
 
 

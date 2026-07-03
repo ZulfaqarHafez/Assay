@@ -112,6 +112,9 @@ def test_progress_tracks_competency_trend(monkeypatch: pytest.MonkeyPatch) -> No
 
         from assay_api import progress as progress_module
 
+        original_get_lessons = progress_module.get_lessons
+        lesson_batch_calls: list[list[str]] = []
+
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(
                 progress_module,
@@ -120,12 +123,20 @@ def test_progress_tracks_competency_trend(monkeypatch: pytest.MonkeyPatch) -> No
                     AssertionError(f"candidate_progress should batch scorecard reads; got {run_id}")
                 ),
             )
+
+            def _tracked_get_lessons(lesson_ids: list[str]):
+                lesson_batch_calls.append(list(lesson_ids))
+                return original_get_lessons(lesson_ids)
+
+            patch.setattr(progress_module, "get_lessons", _tracked_get_lessons)
             progress = client.get(f"/candidates/{candidate_id}/progress").json()
         comparison = client.get(f"/runs/{run_b}/comparison?baseline={run_a}").json()
         lessons = client.get(f"/candidates/{candidate_id}/lessons").json()
 
     assert progress["schema"] == "assay.candidate_progress.v1"
     assert progress["run_count"] == 2
+    assert len(lesson_batch_calls) == 1
+    assert lesson_batch_calls[0], "candidate_progress should batch applied lesson ids"
     assert progress["competencies"], "progress should report per-competency trends"
     a_competency = progress["competencies"][0]
     assert len(a_competency["points"]) >= 2

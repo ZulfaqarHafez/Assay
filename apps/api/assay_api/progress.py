@@ -13,10 +13,10 @@ from typing import Literal
 
 from .database import (
     get_candidate,
-    get_lesson,
     get_run,
     get_scorecard,
     get_scorecards,
+    get_lessons,
     list_lessons_for_candidate,
     list_runs_for_candidate,
 )
@@ -38,11 +38,14 @@ def _labelize(value: str) -> str:
     return value.replace("_", " ").title()
 
 
-def _competency_lesson_counts(scorecard: Scorecard) -> dict[str, int]:
+def _competency_lesson_counts(
+    scorecard: Scorecard,
+    lessons_by_id: dict[str, DiagnosticLesson],
+) -> dict[str, int]:
     """Resolve a scorecard's applied lesson ids to per-competency counts."""
     counts: dict[str, int] = defaultdict(int)
     for lesson_id in scorecard.lessons_applied:
-        lesson = get_lesson(lesson_id)
+        lesson = lessons_by_id.get(lesson_id)
         if lesson is not None:
             counts[lesson.competency] += 1
     return counts
@@ -67,6 +70,10 @@ def candidate_progress(candidate_id: str) -> CandidateProgress | None:
 
     runs = [run for run in list_runs_for_candidate(candidate_id) if run.status == "completed"]
     scorecards = get_scorecards([run.id for run in runs])
+    applied_lesson_ids = sorted(
+        {lesson_id for scorecard in scorecards.values() for lesson_id in scorecard.lessons_applied}
+    )
+    lessons_by_id = get_lessons(applied_lesson_ids)
     points_by_comp: dict[str, list[CompetencyTrendPoint]] = defaultdict(list)
     certified_count = 0
     for run in runs:
@@ -75,7 +82,7 @@ def candidate_progress(candidate_id: str) -> CandidateProgress | None:
             continue
         if scorecard.certified:
             certified_count += 1
-        lesson_counts = _competency_lesson_counts(scorecard)
+        lesson_counts = _competency_lesson_counts(scorecard, lessons_by_id)
         for competency, score in scorecard.held_out_scores.items():
             points_by_comp[competency].append(
                 CompetencyTrendPoint(
