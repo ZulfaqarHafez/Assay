@@ -55,6 +55,7 @@ export const assayApi = {
   candidateSummaries: () => request<CandidateSummary[]>("/candidates/summary"),
   runs: () => request<RunRecord[]>("/runs"),
   runSummaries: () => request<RunSummary[]>("/runs/summary"),
+  run: (runId: string) => request<RunRecord>(`/runs/${runId}`),
   createCandidate: (candidate: Partial<CandidateConfig>) =>
     request<CandidateConfig>("/candidates", {
       method: "POST",

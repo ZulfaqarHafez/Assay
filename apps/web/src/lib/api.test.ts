@@ -38,6 +38,16 @@ describe("assayApi request headers", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("https://api.assay.test/candidates/summary");
   });
 
+  it("reads a single run without assembling a proof bundle", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
+    const fetchMock = vi.fn(async () => json({ id: "run_1" }));
+    global.fetch = fetchMock;
+
+    await assayApi.run("run_1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1");
+  });
+
   it("adds JSON content type for mutation bodies", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
     const fetchMock = vi.fn(async () => json({ id: "run_1" }));

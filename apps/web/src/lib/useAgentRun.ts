@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { assayApi } from "@/lib/api";
-import { useExamPacks } from "@/lib/queries";
 import { useRunStream } from "@/lib/useRunStream";
 import { errorMessage } from "@/lib/derive";
 
@@ -19,9 +18,7 @@ export type UseAgentRunOptions = {
 
 export function useAgentRun(options: UseAgentRunOptions = {}) {
   const runStream = useRunStream();
-  const examPacksQuery = useExamPacks();
-  const packsData = examPacksQuery.data;
-  const packs = React.useMemo(() => packsData ?? [], [packsData]);
+  const packsRef = React.useRef<Awaited<ReturnType<typeof assayApi.examPacks>> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [starting, setStarting] = React.useState(false);
 
@@ -41,11 +38,18 @@ export function useAgentRun(options: UseAgentRunOptions = {}) {
     }
   }, [runStream.status, runStream.scorecard]);
 
-  // itemCount only drives the progress bar; runStream tolerates undefined.
-  const itemCountFor = React.useCallback(
-    (examPackId: string) => packs.find((item) => item.id === examPackId)?.items.length,
-    [packs]
-  );
+  // itemCount only drives the progress bar. Load pack metadata after a rerun is
+  // requested, keeping ordinary page boot free of the /exam-packs request.
+  const itemCountFor = React.useCallback(async (examPackId: string) => {
+    try {
+      if (!packsRef.current) {
+        packsRef.current = await assayApi.examPacks();
+      }
+      return packsRef.current.find((item) => item.id === examPackId)?.items.length;
+    } catch {
+      return undefined;
+    }
+  }, []);
 
   /** Re-test an already-registered candidate (the learning loop applies). */
   const rerun = React.useCallback(
@@ -56,7 +60,8 @@ export function useAgentRun(options: UseAgentRunOptions = {}) {
       firedFor.current = null;
       try {
         const createdRun = await assayApi.createRun(candidateId, examPackId, null);
-        runStream.start(createdRun.id, { k: createdRun.k, itemCount: itemCountFor(createdRun.exam_pack_id) });
+        const itemCount = await itemCountFor(createdRun.exam_pack_id);
+        runStream.start(createdRun.id, { k: createdRun.k, itemCount });
         return createdRun.id;
       } catch (exc) {
         setError(errorMessage(exc));
@@ -80,7 +85,8 @@ export function useAgentRun(options: UseAgentRunOptions = {}) {
       try {
         const intake = await assayApi.candidateFromMarkdown(refined, name);
         const createdRun = await assayApi.createRun(intake.candidate.id, examPackId, null, baselineRunId ?? null);
-        runStream.start(createdRun.id, { k: createdRun.k, itemCount: itemCountFor(createdRun.exam_pack_id) });
+        const itemCount = await itemCountFor(createdRun.exam_pack_id);
+        runStream.start(createdRun.id, { k: createdRun.k, itemCount });
         return { runId: createdRun.id, candidateId: intake.candidate.id };
       } catch (exc) {
         setError(errorMessage(exc));

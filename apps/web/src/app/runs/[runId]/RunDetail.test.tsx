@@ -191,9 +191,14 @@ describe("RunDetail query fanout", () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
       paths.push(url.pathname);
-      if (url.pathname === "/runs/run_demo/detail") return json(proofBundle);
+      if (url.pathname === "/runs/run_demo") return json(runRecord);
+      if (url.pathname === "/candidates/summary") return json([candidate]);
       if (url.pathname === "/runs/run_demo/scorecard") return json(scorecard);
       if (url.pathname === "/runs/run_demo/deployability") return json(deployability);
+      if (url.pathname === "/runs/run_demo/agent-spec") return json(agentSpec);
+      if (url.pathname === "/runs/run_demo/reviewers") return json(proofBundle.product_review);
+      if (url.pathname === "/candidates/cand_demo/progress") return json(proofBundle.candidate_progress);
+      if (url.pathname === "/candidates/cand_demo/lessons") return json([]);
       if (url.pathname === "/runs/run_demo/agent-spec/diff") {
         return json({
           schema: "assay.agent_diff.v1",
@@ -221,18 +226,23 @@ describe("RunDetail query fanout", () => {
     renderRunDetail();
 
     await screen.findByText("Demo Candidate");
-    await waitFor(() => expect(paths).toContain("/runs/run_demo/detail"));
+    await waitFor(() => expect(paths).toContain("/runs/run_demo"));
 
     expect(paths).toContain("/runs/run_demo/scorecard");
     expect(paths).toContain("/runs/run_demo/deployability");
+    expect(paths).toContain("/candidates/summary");
+    expect(paths).not.toContain("/runs/run_demo/detail");
     expect(paths).not.toContain("/runs/run_demo/proof-bundle");
     expect(paths).not.toContain("/runs/run_demo/agent-spec/diff");
     expect(paths).not.toContain("/runs/run_demo/trace");
-    expect(paths).not.toContain("/runs/run_demo/reviewers");
     expect(paths).not.toContain("/runs/run_demo/comparison");
-    expect(paths).not.toContain("/candidates/cand_demo/progress");
-    expect(paths).not.toContain("/candidates/cand_demo/lessons");
-    expect(paths).not.toContain("/runs");
+    expect(paths).not.toContain("/exam-packs");
+
+    await screen.findByRole("button", { name: /exact diff/i }, { timeout: 3000 });
+    expect(paths).toContain("/runs/run_demo/agent-spec");
+    expect(paths).toContain("/runs/run_demo/reviewers");
+    expect(paths).not.toContain("/runs/run_demo/detail");
+    expect(paths).not.toContain("/runs/run_demo/proof-bundle");
 
     await user.click(screen.getByRole("button", { name: /exact diff/i }));
     await waitFor(() => expect(paths).toContain("/runs/run_demo/agent-spec/diff"));

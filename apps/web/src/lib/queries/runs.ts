@@ -41,7 +41,7 @@ export function useRunSummaries(options?: QueryOpts<RunSummary[]>) {
 export function useRun(runId: string | null | undefined, options?: QueryOpts<RunRecord>) {
   return useQuery({
     queryKey: queryKeys.run(runId ?? ""),
-    queryFn: () => assayApi.proofBundle(runId as string).then((bundle) => bundle.run),
+    queryFn: () => assayApi.run(runId as string),
     enabled: Boolean(runId),
     ...options
   });

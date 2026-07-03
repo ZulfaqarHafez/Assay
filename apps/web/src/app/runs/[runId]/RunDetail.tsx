@@ -21,8 +21,12 @@ import {
   Rocket
 } from "lucide-react";
 import {
+  useAgentSpec,
+  useCandidateProgress,
+  useCandidateSummaries,
   useDeployability,
-  useProofBundle,
+  useReviewers,
+  useRun,
   useRunComparison,
   useScorecard,
   useTrace
@@ -40,7 +44,7 @@ import DiagnosticLibrary from "@/components/library/DiagnosticLibrary";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import ReviewCouncil from "@/components/assay/ReviewCouncil";
-import type { DeployabilityDecision, RunComparison as RunComparisonData, RunEvent, Scorecard, TracePayload } from "@/types/assay";
+import type { DeployabilityDecision, RunComparison as RunComparisonData, RunEvent, Scorecard } from "@/types/assay";
 
 /**
  * Shareable run-detail view. Reuses the same composition pieces as the console
@@ -57,60 +61,70 @@ export default function RunDetail({ runId }: { runId: string }) {
   );
   const drawerOpen = drawer !== null;
 
-  const proofBundleQuery = useProofBundle(runId);
-  const proofBundle = proofBundleQuery.data ?? null;
-  const traceFromBundle = React.useMemo<TracePayload | null>(() => {
-    if (!proofBundle || proofBundle.events.length === 0) return null;
-    return {
-      run_id: runId,
-      events: proofBundle.events,
-      scorecard: proofBundle.scorecard
-    };
-  }, [proofBundle, runId]);
+  const [richSurfacesReady, setRichSurfacesReady] = React.useState(false);
+  React.useEffect(() => {
+    setRichSurfacesReady(false);
+    const handle = window.setTimeout(() => setRichSurfacesReady(true), 1500);
+    return () => window.clearTimeout(handle);
+  }, [runId]);
+
+  const runQuery = useRun(runId);
+  const runRecord = runQuery.data ?? null;
+  const candidateId = runRecord?.candidate_id ?? null;
+  const candidatesQuery = useCandidateSummaries({ staleTime: 60_000 });
+  const candidateSummary = candidatesQuery.data?.find((candidate) => candidate.id === candidateId) ?? null;
   const traceQuery = useTrace(runId, {
-    enabled: drawerOpen && !traceFromBundle
+    enabled: drawerOpen
   });
   const scorecardQuery = useScorecard(runId);
-  // Fast, policy-honest decision (no proof-bundle wait); bundle is fallback.
+  // Fast, policy-honest decision (no proof-bundle wait); scorecard is fallback.
   const deployabilityQuery = useDeployability(runId, { retry: false });
+  const agentSpecQuery = useAgentSpec(runId, {
+    enabled: richSurfacesReady,
+    retry: false
+  });
+  const reviewersQuery = useReviewers(runId, {
+    enabled: richSurfacesReady,
+    retry: false
+  });
+  const progressQuery = useCandidateProgress(candidateId);
   const [badgeCopied, setBadgeCopied] = React.useState(false);
   const [cardBusy, setCardBusy] = React.useState(false);
   const [exportingProof, setExportingProof] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
 
-  const trace = traceQuery.data ?? traceFromBundle;
-  const scorecard = scorecardQuery.data ?? proofBundle?.scorecard ?? null;
-  const deployability = deployabilityQuery.data ?? proofBundle?.deployability ?? null;
-  const reviewers = proofBundle?.product_review ?? null;
-  const events = trace?.events ?? proofBundle?.events ?? [];
-  const agentSpec = proofBundle?.agent_spec ?? null;
-  const candidateId = proofBundle?.candidate?.id ?? proofBundle?.run?.candidate_id ?? null;
-  const candidateName = proofBundle?.candidate?.name ?? "Candidate";
+  const trace = traceQuery.data ?? null;
+  const scorecard = scorecardQuery.data ?? null;
+  const deployability = deployabilityQuery.data ?? null;
+  const reviewers = reviewersQuery.data ?? null;
+  const events = trace?.events ?? [];
+  const agentSpec = agentSpecQuery.data ?? null;
+  const candidateName = candidateSummary?.name ?? agentSpec?.candidate_name ?? "Candidate";
   // Rerun against the originally-requested pack (a tailored run repoints exam_pack_id at a gen-* id).
-  const rerunPackId = proofBundle?.run?.source_pack_id ?? proofBundle?.run?.exam_pack_id ?? "hr-v1";
+  const rerunPackId = runRecord?.source_pack_id ?? runRecord?.exam_pack_id ?? agentSpec?.exam_pack_id ?? "hr-v1";
   // This run tested a refined agent when it carries a baseline; conversely a
   // later run pointing back here means this run's refinery output was validated.
-  const baselineRunId = proofBundle?.run?.baseline_run_id ?? null;
+  const baselineRunId = runRecord?.baseline_run_id ?? null;
   const validationRun =
-    proofBundle?.candidate_progress?.runs.find((item) => item.baseline_run_id === runId) ?? null;
+    progressQuery.data?.runs.find((item) => item.baseline_run_id === runId) ?? null;
   const comparisonFallback = React.useMemo<RunComparisonData | undefined>(() => {
     if (!scorecard || scorecard.prior_run_id) return undefined;
     return {
       schema: "assay.run_comparison.v1",
       run_id: runId,
       baseline_run_id: null,
-      candidate_id: proofBundle?.run?.candidate_id ?? candidateId ?? "",
+      candidate_id: runRecord?.candidate_id ?? candidateId ?? "",
       competencies: [],
       improved: 0,
       regressed: 0,
       unchanged: 0,
       certified_changed: false
     };
-  }, [candidateId, proofBundle?.run?.candidate_id, runId, scorecard]);
+  }, [candidateId, runRecord?.candidate_id, runId, scorecard]);
 
-  // Gate the analytics on the fast scorecard, not the ~8s proof-bundle assembly.
+  // Gate the analytics on the fast scorecard, not the slower proof surfaces.
   const isLoading = scorecardQuery.isLoading && !scorecard;
-  const loadError = scorecardQuery.error ?? proofBundleQuery.error;
+  const loadError = scorecardQuery.error ?? runQuery.error;
   const passEntries = scorecard ? Object.values(scorecard.pass_at_k ?? {}) : [];
   const passCount = passEntries.filter(Boolean).length;
   const passTotal = passEntries.length;
@@ -169,7 +183,7 @@ export default function RunDetail({ runId }: { runId: string }) {
           <button
             type="button"
             className="command-button"
-            disabled={exportingProof || !proofBundle}
+            disabled={exportingProof}
             onClick={() => void exportProofBundle()}
           >
             <Save size={16} /> {exportingProof ? "Exporting" : "Export proof"}
@@ -240,17 +254,13 @@ export default function RunDetail({ runId }: { runId: string }) {
         </div>
       ) : null}
 
-      {proofBundleQuery.isLoading && !proofBundle && (
-        <p className="rd-bundle-hint" role="status">Assembling proof bundle…</p>
-      )}
-
       {exportError ? (
         <p className="rd-error" role="alert">Could not export proof: {exportError}</p>
       ) : null}
 
       {reviewers ? (
         <ReviewCouncil review={reviewers} decision={deployability} />
-      ) : proofBundleQuery.isLoading ? (
+      ) : richSurfacesReady && reviewersQuery.isLoading ? (
         <div className="ws-skeleton-card" />
       ) : null}
 
@@ -259,7 +269,6 @@ export default function RunDetail({ runId }: { runId: string }) {
           agentSpec={agentSpec}
           agentName={candidateName}
           runId={runId}
-          originalMarkdown={proofBundle?.candidate?.system_prompt || undefined}
           traceAudit={scorecard?.trace_audit ?? null}
           validation={
             validationRun
@@ -290,11 +299,10 @@ export default function RunDetail({ runId }: { runId: string }) {
           />
           <ProgressTrend
             candidateId={candidateId}
-            progress={proofBundle?.candidate_progress ?? undefined}
+            progress={progressQuery.data ?? undefined}
           />
           <DiagnosticLibrary
             candidateId={candidateId}
-            lessons={proofBundle?.diagnostic_library}
           />
         </div>
       )}
@@ -303,7 +311,7 @@ export default function RunDetail({ runId }: { runId: string }) {
         events={events}
         trace={trace}
         scorecard={scorecard}
-        proofBundle={proofBundle}
+        proofBundle={null}
         agentSpec={agentSpec}
         agentResearch={null}
         open={drawerOpen}
