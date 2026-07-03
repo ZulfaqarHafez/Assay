@@ -13,6 +13,10 @@
     "dev:api": "python -m uvicorn assay_api.main:app --reload --app-dir apps/api --host 127.0.0.1 --port 8000",
     "dev:candidate": "powershell -ExecutionPolicy Bypass -File scripts/start-http-candidate.ps1",
     "dev:web": "npm --workspace apps/web run dev",
+    "deploy:api": "powershell -ExecutionPolicy Bypass -File scripts/deploy-vercel.ps1 -Target api -Prod",
+    "deploy:web": "powershell -ExecutionPolicy Bypass -File scripts/deploy-vercel.ps1 -Target web -Prod",
+    "deploy:dry:api": "powershell -ExecutionPolicy Bypass -File scripts/deploy-vercel.ps1 -Target api -Prod -DryRun",
+    "deploy:dry:web": "powershell -ExecutionPolicy Bypass -File scripts/deploy-vercel.ps1 -Target web -Prod -DryRun",
     "test": "python -m pytest apps/api/tests && npm --workspace apps/web run test -- --run",
     "build": "npm --workspace apps/web run build"
   },
