@@ -78,6 +78,12 @@ class DataStore(ABC):
     def list_candidates(self) -> list[CandidateConfig]:
         raise NotImplementedError
 
+    def list_candidate_summaries(self) -> list[dict[str, Any]]:
+        return [
+            _candidate_summary_from_payload(candidate.model_dump(mode="json"))
+            for candidate in self.list_candidates()
+        ]
+
     @abstractmethod
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
         raise NotImplementedError
@@ -89,6 +95,11 @@ class DataStore(ABC):
     @abstractmethod
     def list_runs(self) -> list[RunRecord]:
         raise NotImplementedError
+
+    def list_run_summaries(self) -> list[dict[str, Any]]:
+        run_records = self.list_runs()
+        scorecards = self.get_scorecards([run.id for run in run_records if run.status == "completed"])
+        return [_run_summary_from_model(run, scorecards.get(run.id)) for run in run_records]
 
     @abstractmethod
     def get_run(self, run_id: str) -> RunRecord | None:
@@ -260,6 +271,14 @@ class SQLiteStore(DataStore):
             ).fetchall()
         return [_load_candidate(row["payload"]) for row in rows]
 
+    def list_candidate_summaries(self) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT id, payload, created_at FROM candidates WHERE tenant_id = ? ORDER BY created_at DESC",
+                (current_tenant_id(),),
+            ).fetchall()
+        return [_candidate_summary_from_row(row) for row in rows]
+
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
         with self.connect() as conn:
             row = conn.execute(
@@ -298,6 +317,28 @@ class SQLiteStore(DataStore):
                 (current_tenant_id(),),
             ).fetchall()
         return [RunRecord.model_validate_json(row["payload"]) for row in rows]
+
+    def list_run_summaries(self) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            run_rows = conn.execute(
+                """
+                SELECT id, candidate_id, exam_pack_id, status, payload, created_at, updated_at
+                FROM runs
+                WHERE tenant_id = ?
+                ORDER BY created_at DESC
+                """,
+                (current_tenant_id(),),
+            ).fetchall()
+            completed_ids = [row["id"] for row in run_rows if row["status"] == "completed"]
+            scorecard_rows: dict[str, dict[str, Any]] = {}
+            if completed_ids:
+                placeholders = ", ".join("?" for _ in completed_ids)
+                rows = conn.execute(
+                    f"SELECT run_id, payload FROM scorecards WHERE tenant_id = ? AND run_id IN ({placeholders})",
+                    (current_tenant_id(), *completed_ids),
+                ).fetchall()
+                scorecard_rows = {row["run_id"]: _payload_dict(row["payload"]) for row in rows}
+        return [_run_summary_from_row(row, scorecard_rows.get(row["id"])) for row in run_rows]
 
     def get_run(self, run_id: str) -> RunRecord | None:
         with self.connect() as conn:
@@ -497,6 +538,11 @@ class SupabaseStore(DataStore):
         rows = self._select("candidates", order="created_at", desc=True)
         return [_load_candidate(row["payload"]) for row in rows]
 
+    def list_candidate_summaries(self) -> list[dict[str, Any]]:
+        self._ensure_schema()
+        rows = self._select("candidates", columns="id, payload, created_at", order="created_at", desc=True)
+        return [_candidate_summary_from_row(row) for row in rows]
+
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
         self._ensure_schema()
         row = self._single("candidates", "id", candidate_id)
@@ -529,6 +575,29 @@ class SupabaseStore(DataStore):
         self._ensure_schema()
         rows = self._select("runs", order="created_at", desc=True)
         return [RunRecord.model_validate(row["payload"]) for row in rows]
+
+    def list_run_summaries(self) -> list[dict[str, Any]]:
+        self._ensure_schema()
+        run_rows = self._select(
+            "runs",
+            columns="id, candidate_id, exam_pack_id, status, created_at, updated_at, payload",
+            order="created_at",
+            desc=True,
+        )
+        completed_ids = [
+            str(_row_get(row, "id"))
+            for row in run_rows
+            if (_row_get(row, "status") or _payload_dict(_row_get(row, "payload")).get("status")) == "completed"
+        ]
+        scorecards: dict[str, dict[str, Any]] = {}
+        if completed_ids and "scorecards" in self._available_tables:
+            query = self.client.table(self.tables["scorecards"]).select("run_id, payload").in_("run_id", completed_ids)
+            response = self._with_tenant_filter("scorecards", query).execute()
+            scorecards = {
+                str(_row_get(row, "run_id")): _payload_dict(_row_get(row, "payload"))
+                for row in response.data or []
+            }
+        return [_run_summary_from_row(row, scorecards.get(str(_row_get(row, "id")))) for row in run_rows]
 
     def get_run(self, run_id: str) -> RunRecord | None:
         self._ensure_schema()
@@ -658,10 +727,16 @@ class SupabaseStore(DataStore):
             return
         self.client.table(self.tables[logical_table]).upsert(row, on_conflict=on_conflict).execute()
 
-    def _select(self, logical_table: str, order: str, desc: bool = False) -> list[dict[str, Any]]:
+    def _select(
+        self,
+        logical_table: str,
+        order: str,
+        desc: bool = False,
+        columns: str = "payload",
+    ) -> list[dict[str, Any]]:
         if logical_table not in self._available_tables:
             return []
-        query = self.client.table(self.tables[logical_table]).select("payload")
+        query = self.client.table(self.tables[logical_table]).select(columns)
         response = self._with_tenant_filter(logical_table, query).order(order, desc=desc).execute()
         return response.data or []
 
@@ -753,6 +828,10 @@ def list_candidates() -> list[CandidateConfig]:
     return store().list_candidates()
 
 
+def list_candidate_summaries() -> list[dict[str, Any]]:
+    return store().list_candidate_summaries()
+
+
 def get_candidate(candidate_id: str) -> CandidateConfig | None:
     return store().get_candidate(candidate_id)
 
@@ -763,6 +842,10 @@ def save_run(run: RunRecord) -> RunRecord:
 
 def list_runs() -> list[RunRecord]:
     return store().list_runs()
+
+
+def list_run_summaries() -> list[dict[str, Any]]:
+    return store().list_run_summaries()
 
 
 def get_run(run_id: str) -> RunRecord | None:
@@ -928,6 +1011,75 @@ def store() -> DataStore:
 
 def reset_store_cache() -> None:
     store.cache_clear()
+
+
+def _row_get(row: Any, key: str, default: Any = None) -> Any:
+    if isinstance(row, dict):
+        return row.get(key, default)
+    try:
+        return row[key]
+    except Exception:
+        return default
+
+
+def _payload_dict(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, dict):
+        return dict(payload)
+    if isinstance(payload, str) and payload:
+        try:
+            loaded = json.loads(payload)
+            return loaded if isinstance(loaded, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _candidate_summary_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": payload.get("id"),
+        "name": payload.get("name") or "Agent",
+        "adapter_type": payload.get("adapter_type") or "mock",
+        "created_at": payload.get("created_at"),
+    }
+
+
+def _candidate_summary_from_row(row: Any) -> dict[str, Any]:
+    payload = _payload_dict(_row_get(row, "payload"))
+    summary = _candidate_summary_from_payload(payload)
+    summary["id"] = _row_get(row, "id") or summary["id"]
+    summary["created_at"] = _row_get(row, "created_at") or summary["created_at"]
+    return summary
+
+
+def _run_summary_from_model(run: RunRecord, scorecard: Scorecard | None = None) -> dict[str, Any]:
+    return _run_summary_from_row(run.model_dump(mode="json"), scorecard.model_dump(mode="json") if scorecard else None)
+
+
+def _run_summary_from_row(row: Any, scorecard_payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload = _payload_dict(_row_get(row, "payload"))
+    if not payload and isinstance(row, dict):
+        payload = row
+    status = _row_get(row, "status") or payload.get("status")
+    item = {
+        "id": _row_get(row, "id") or payload.get("id"),
+        "candidate_id": _row_get(row, "candidate_id") or payload.get("candidate_id"),
+        "exam_pack_id": _row_get(row, "exam_pack_id") or payload.get("exam_pack_id"),
+        "source_pack_id": payload.get("source_pack_id"),
+        "status": status,
+        "k": payload.get("k", 3),
+        "created_at": _row_get(row, "created_at") or payload.get("created_at"),
+        "updated_at": _row_get(row, "updated_at") or payload.get("updated_at"),
+        "baseline_run_id": payload.get("baseline_run_id"),
+    }
+    if status == "completed" and scorecard_payload:
+        passes = scorecard_payload.get("pass_at_k") or {}
+        item["certified"] = scorecard_payload.get("certified")
+        item["pass_count"] = sum(1 for value in passes.values() if value)
+        item["total_count"] = len(passes)
+        item["degraded"] = scorecard_payload.get("degraded", False)
+        item["qualification_status"] = scorecard_payload.get("qualification_status")
+        item["role_brief_summary"] = scorecard_payload.get("role_brief_summary")
+    return item
 
 
 def _dump_model(model: Any) -> str:

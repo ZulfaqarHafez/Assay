@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ..agent_formats import normalize_agent_definition
 from ..agent_intake import detect_agent_facts
 from ..agent_research import resolve_openai_key
-from ..database import get_candidate, list_candidates, save_candidate
+from ..database import get_candidate, list_candidate_summaries, list_candidates, save_candidate
 from ..models import CandidateConfig
 from ..progress import candidate_progress, lesson_library
 from ..tool_parser import parse_tools
@@ -55,15 +55,7 @@ def candidates() -> list[dict]:
 
 @router.get("/candidates/summary")
 def candidate_summaries() -> list[dict]:
-    return [
-        {
-            "id": candidate.id,
-            "name": candidate.name,
-            "adapter_type": candidate.adapter_type,
-            "created_at": candidate.created_at.isoformat(),
-        }
-        for candidate in list_candidates()
-    ]
+    return list_candidate_summaries()
 
 
 @router.post("/candidates")

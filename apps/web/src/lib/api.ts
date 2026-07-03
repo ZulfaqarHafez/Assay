@@ -100,6 +100,7 @@ export const assayApi = {
       profile === "full" ? `/runs/${runId}/proof-bundle` : `/runs/${runId}/detail`
     ),
   badgeUrl: (runId: string) => `${apiBaseUrl()}/runs/${runId}/badge.svg`,
+  cardUrl: (runId: string) => `${apiBaseUrl()}/runs/${runId}/card.svg`,
   agentSpec: (runId: string) => request<AgentSpec>(`/runs/${runId}/agent-spec`),
   agentSpecDiff: (runId: string) => request<AgentDiff>(`/runs/${runId}/agent-spec/diff`),
   deployability: (runId: string, policy?: "strict" | "advisory") =>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQueryState, parseAsStringEnum } from "nuqs";
 import {
   BadgeCheck,
+  ImageDown,
   ArrowLeft,
   PanelRightOpen,
   Save,
@@ -27,6 +28,7 @@ import {
   useTrace
 } from "@/lib/queries";
 import { assayApi } from "@/lib/api";
+import { downloadVerdictCardPng } from "@/lib/cardExport";
 import { policyRuleSentence } from "@/lib/assay";
 import { VERDICT_LABEL, bandFromDecision, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
@@ -72,6 +74,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   // Fast, policy-honest decision (no proof-bundle wait); bundle is fallback.
   const deployabilityQuery = useDeployability(runId, { retry: false });
   const [badgeCopied, setBadgeCopied] = React.useState(false);
+  const [cardBusy, setCardBusy] = React.useState(false);
   const [exportingProof, setExportingProof] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
 
@@ -186,6 +189,24 @@ export default function RunDetail({ runId }: { runId: string }) {
             }}
           >
             <BadgeCheck size={16} /> {badgeCopied ? "Badge copied" : "Copy badge"}
+          </button>
+          <button
+            type="button"
+            className="command-button"
+            title="Download a verdict card PNG for a PR or deck"
+            disabled={cardBusy}
+            onClick={async () => {
+              setCardBusy(true);
+              try {
+                await downloadVerdictCardPng(assayApi.cardUrl(runId), `assay-${runId}-card.png`);
+              } catch {
+                /* surfaced via the disabled flag resetting */
+              } finally {
+                setCardBusy(false);
+              }
+            }}
+          >
+            <ImageDown size={16} /> {cardBusy ? "Rendering" : "Download card"}
           </button>
         </div>
       </header>

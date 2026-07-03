@@ -19,6 +19,7 @@ from ..database import (
     get_scorecard,
     get_scorecards,
     list_events,
+    list_run_summaries,
     list_runs,
     proof_bundle,
     save_run,
@@ -61,9 +62,7 @@ def runs() -> list[dict]:
 
 @router.get("/runs/summary")
 def run_summaries() -> list[dict]:
-    run_records = list_runs()
-    scorecards = get_scorecards([run.id for run in run_records if run.status == "completed"])
-    return [_run_summary(run, scorecards.get(run.id)) for run in run_records]
+    return list_run_summaries()
 
 
 @router.post("/runs", dependencies=[Depends(rate_limit("create_run"))])
@@ -225,6 +224,57 @@ def run_badge(run_id: str) -> Response:
         media_type="image/svg+xml",
         headers={"Cache-Control": "max-age=60, public"},
     )
+
+
+@router.get("/runs/{run_id}/card.svg")
+def run_card(run_id: str) -> Response:
+    """Shareable verdict card (SVG) — a richer proof artifact than the badge.
+
+    Public like the badge (embeddable as an <img>); the web app rasterizes it to
+    a downloadable PNG. Always 200 so an embed never breaks.
+    """
+    from ..verdict_card import card_svg
+
+    run = get_run(run_id)
+    scorecard = get_scorecard(run_id) if run is not None else None
+    if run is None or scorecard is None:
+        svg = card_svg(
+            agent_name="Agent", run_id=run_id, band="pending", score=None,
+            pass_count=0, pass_total=0, tas=None, max_gap=0.0,
+        )
+        return Response(content=svg, media_type="image/svg+xml",
+                        headers={"Cache-Control": "max-age=30, public"})
+
+    decision = evaluate_scorecard(scorecard, policy_for_run(run))
+    band = {"ship": "ship", "probation": "risky", "do_not_ship": "hold"}.get(decision.verdict, "pending")
+    passes = scorecard.pass_at_k or {}
+    held = list((scorecard.held_out_scores or {}).values())
+    score = round(sum(held) / len(held) * 100) if held else None
+    gaps = list((scorecard.transfer_gap or {}).values())
+    candidate = get_candidate(run.candidate_id)
+    finding = decision.blocking_reasons[0] if decision.blocking_reasons else (
+        decision.warnings[0] if decision.warnings else ""
+    )
+    svg = card_svg(
+        agent_name=candidate.name if candidate else "Agent",
+        run_id=run_id,
+        band=band,
+        score=score,
+        pass_count=sum(1 for v in passes.values() if v),
+        pass_total=len(passes),
+        tas=scorecard.trace_audit.tas_score if scorecard.trace_audit.status == "ok" else None,
+        max_gap=max(gaps) if gaps else 0.0,
+        top_finding=_prettify_card_finding(finding),
+        policy_name=decision.policy.name,
+    )
+    return Response(content=svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "max-age=60, public"})
+
+
+def _prettify_card_finding(reason: str) -> str:
+    import re
+
+    return re.sub(r"\b[a-z]+(?:_[a-z]+)+\b", lambda m: m.group(0).replace("_", " ").title(), reason or "")
 
 
 @router.get("/runs/{run_id}/trace")
@@ -400,29 +450,6 @@ def _scorecard_payload(scorecard, *, include_trace_raw: bool = True) -> dict:
     if include_trace_raw:
         return payload
     return _strip_scorecard_trace_raw(payload)
-
-
-def _run_summary(run: RunRecord, scorecard=None) -> dict:
-    item = {
-        "id": run.id,
-        "candidate_id": run.candidate_id,
-        "exam_pack_id": run.exam_pack_id,
-        "source_pack_id": run.source_pack_id,
-        "status": run.status,
-        "k": run.k,
-        "created_at": run.created_at.isoformat(),
-        "updated_at": run.updated_at.isoformat(),
-        "baseline_run_id": run.baseline_run_id,
-    }
-    if run.status == "completed" and scorecard is not None:
-        passes = scorecard.pass_at_k or {}
-        item["certified"] = scorecard.certified
-        item["pass_count"] = sum(1 for v in passes.values() if v)
-        item["total_count"] = len(passes)
-        item["degraded"] = scorecard.degraded
-        item["qualification_status"] = scorecard.qualification_status
-        item["role_brief_summary"] = scorecard.role_brief_summary
-    return item
 
 
 def _strip_scorecard_trace_raw(payload: dict) -> dict:

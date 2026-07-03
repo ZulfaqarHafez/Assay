@@ -15,12 +15,12 @@ EXEMPT_PATHS = {"/health", "/health/database"}
 def is_public_path(path: str) -> bool:
     """True for endpoints that must work without an API key.
 
-    Health probes for load balancers, plus the run status badge — a shareable
-    proof artifact embedded as an ``<img>`` in a README/PR, which cannot send an
-    auth header. The badge only exposes a run's ship/risky/hold verdict, which is
-    the whole point of a public trust signal.
+    Health probes for load balancers, plus the run status badge and verdict card
+    — shareable proof artifacts embedded as an ``<img>`` in a README/PR, which
+    cannot send an auth header. They only expose a run's ship/risky/hold verdict,
+    which is the whole point of a public trust signal.
     """
-    return path in EXEMPT_PATHS or path.endswith("/badge.svg")
+    return path in EXEMPT_PATHS or path.endswith(("/badge.svg", "/card.svg"))
 
 
 def configured_api_keys() -> set[str]:
