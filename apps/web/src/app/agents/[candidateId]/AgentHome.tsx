@@ -99,7 +99,7 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
                   return (
                     <tr key={run.id}>
                       <td data-label="Run">
-                        <Link href={`/runs/${run.id}`} className="ws-cell-strong mono">{run.id}</Link>
+                        <Link prefetch={false} href={`/runs/${run.id}`} className="ws-cell-strong mono">{run.id}</Link>
                         <div className="ws-cell-sub">{run.created_at?.slice(0, 16).replace("T", " ") ?? ""}</div>
                       </td>
                       <td data-label="Verdict">
@@ -113,7 +113,7 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
                       </td>
                       <td className="num" data-label="Score">{score}</td>
                       <td data-label="Status"><span className="ws-status done"><Circle size={9} /> {run.status}</span></td>
-                      <td className="num ws-row-action"><Link href={`/runs/${run.id}`} className="ws-row-link">Open →</Link></td>
+                      <td className="num ws-row-action"><Link prefetch={false} href={`/runs/${run.id}`} className="ws-row-link">Open →</Link></td>
                     </tr>
                   );
                 })}

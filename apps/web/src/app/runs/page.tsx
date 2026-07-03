@@ -82,7 +82,7 @@ function RunRow({ run, agentName }: { run: RunRecord; agentName: string }) {
   return (
     <tr>
       <td data-label="Agent">
-        <Link href={`/runs/${run.id}`} className="ws-cell-strong">{agentName}</Link>
+        <Link prefetch={false} href={`/runs/${run.id}`} className="ws-cell-strong">{agentName}</Link>
         <div className="ws-cell-sub mono">{run.id}</div>
       </td>
       <td data-label="Suite">
@@ -104,7 +104,7 @@ function RunRow({ run, agentName }: { run: RunRecord; agentName: string }) {
       <td className="num" data-label="Score">{scored ? `${passCount}/${total}` : "—"}</td>
       <td className="num" data-label="k">{run.k}×</td>
       <td data-label="Status"><RunStatus status={run.status} /></td>
-      <td className="num ws-row-action"><Link href={`/runs/${run.id}`} className="ws-row-link">Open →</Link></td>
+      <td className="num ws-row-action"><Link prefetch={false} href={`/runs/${run.id}`} className="ws-row-link">Open →</Link></td>
     </tr>
   );
 }

@@ -61,7 +61,7 @@ export default function AgentsPage() {
                 <tr key={r.name}>
                   <td data-label="Agent">
                     {r.candidateId ? (
-                      <Link href={`/agents/${r.candidateId}`} className="ws-cell-strong">{r.name}</Link>
+                      <Link prefetch={false} href={`/agents/${r.candidateId}`} className="ws-cell-strong">{r.name}</Link>
                     ) : (
                       <span className="ws-cell-strong">{r.name}</span>
                     )}
@@ -80,7 +80,7 @@ export default function AgentsPage() {
                   </td>
                   <td className="num" data-label="Latest score">{r.score ?? "—"}</td>
                   <td className="num ws-row-action">
-                    {r.candidateId ? <Link href={`/agents/${r.candidateId}`} className="ws-row-link">Open →</Link> : null}
+                    {r.candidateId ? <Link prefetch={false} href={`/agents/${r.candidateId}`} className="ws-row-link">Open →</Link> : null}
                   </td>
                 </tr>
               ))}
