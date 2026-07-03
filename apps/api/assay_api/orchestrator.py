@@ -18,7 +18,7 @@ from .models import (
     Scorecard,
 )
 from .run_recorder import RunRecorder
-from .scoring import GradeResult, grade_response, panel_disagreement
+from .scoring import GradeResult, grade_response, grade_scenario, panel_disagreement
 from .trace_audit import TraceAuditService
 
 
@@ -174,6 +174,7 @@ class RunOrchestrator:
         trial: int,
         variant: str,
         lessons: list[str],
+        scenario: Any = None,
     ) -> CandidateResponse:
         context = self._context(candidate, lessons, run)
         self._recorder.event(
@@ -183,7 +184,14 @@ class RunOrchestrator:
             {"competency": competency, "trial": trial, "variant": variant, "question": question},
         )
         try:
-            response = await adapter.ask(context=context, question=question, trial=trial)
+            # Guardrail scenarios exercise the agent's REAL tool calls in a
+            # simulated sandbox; plain items use the text-only ask path.
+            if scenario is not None and hasattr(adapter, "ask_scenario"):
+                response = await adapter.ask_scenario(
+                    context=context, question=question, scenario=scenario, trial=trial
+                )
+            else:
+                response = await adapter.ask(context=context, question=question, trial=trial)
         except CandidateAdapterError:
             raise
 
@@ -233,7 +241,7 @@ class RunOrchestrator:
         panel_results: list[dict[str, float]] = []
         lesson_feedback: dict[str, str] = {}
         judge_results: list[dict[str, Any]] = []
-        # (competency, variant, phrase) → structured critical finding, deduped
+        # (competency, variant, phrase) -> structured critical finding, deduped
         # across the k trials.
         critical_by_key: dict[tuple[str, str, str], str] = {}
 
@@ -247,9 +255,11 @@ class RunOrchestrator:
 
         async def evaluate(item: Any, trial: int, variant: str) -> tuple[Any, int, str, GradeResult]:
             question = item.prompt if variant == "seen" else item.held_out_prompt
+            scenario = getattr(item, "scenario", None)
             async with semaphore:
                 response = await self._ask_candidate(
-                    run, adapter, candidate, item.competency, question, trial, variant, seed_lessons
+                    run, adapter, candidate, item.competency, question, trial, variant, seed_lessons,
+                    scenario=scenario,
                 )
                 grade = self._grade(
                     run, item, item.competency, variant, trial, response, run.competency_threshold
@@ -269,11 +279,20 @@ class RunOrchestrator:
         def record_criticals(competency: str, variant: str, grade: Any) -> None:
             for phrase in getattr(grade, "forbidden_hits", None) or []:
                 key = (competency, variant, str(phrase))
-                critical_by_key.setdefault(
-                    key,
-                    f"CRITICAL forbidden_content: {competency} ({variant}) emitted a "
-                    f"forbidden phrase — {phrase!r}.",
-                )
+                text = str(phrase)
+                if text.startswith("tripwire "):
+                    # Behavioral guardrail breach: the agent actually invoked a
+                    # tool it must never call. Evidence already embedded.
+                    critical_by_key.setdefault(
+                        key,
+                        f"CRITICAL guardrail_breach: {competency} ({variant}) - {text}.",
+                    )
+                else:
+                    critical_by_key.setdefault(
+                        key,
+                        f"CRITICAL forbidden_content: {competency} ({variant}) emitted a "
+                        f"forbidden phrase - {phrase!r}.",
+                    )
 
         for item, _trial, variant, grade in results:
             record_criticals(item.competency, variant, grade)
@@ -308,7 +327,10 @@ class RunOrchestrator:
         response: CandidateResponse,
         threshold: float,
     ) -> GradeResult:
-        result = grade_response(item, response, threshold, judge_cache=self._judge_cache)
+        if getattr(item, "scenario", None) is not None:
+            result = grade_scenario(item, response, threshold, judge_cache=self._judge_cache)
+        else:
+            result = grade_response(item, response, threshold, judge_cache=self._judge_cache)
         self._recorder.event(
             run.id,
             "grader_panel",

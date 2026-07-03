@@ -11,6 +11,7 @@ from ._common import (
     _MAX_RUBRIC_CHARS,
     _PUBLIC_ID_PATTERN,
 )
+from .scenario import ScenarioSpec
 
 
 class ExpectedCheck(BaseModel):
@@ -41,6 +42,9 @@ class ExamItem(BaseModel):
     expected_checks: list[ExpectedCheck] = Field(min_length=1, max_length=20)
     difficulty: Literal["intro", "standard", "adversarial"] = "standard"
     counterfactual_group: str | None = None
+    # Present on guardrail items: the behavioral scenario (sandboxed tools +
+    # deterministic tripwires) this item exercises. Plain Q&A items omit it.
+    scenario: ScenarioSpec | None = None
 
     model_config = ConfigDict(extra="forbid")
 

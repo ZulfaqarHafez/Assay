@@ -382,6 +382,10 @@ EXAM_PACKS = {
     CODING_AGENT_V1.id: CODING_AGENT_V1,
 }
 
+from .scenario_packs import SCENARIO_PACKS  # noqa: E402
+
+EXAM_PACKS.update(SCENARIO_PACKS)
+
 
 def list_exam_packs() -> list[ExamPack]:
     return list(EXAM_PACKS.values())

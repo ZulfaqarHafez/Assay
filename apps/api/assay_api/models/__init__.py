@@ -51,6 +51,7 @@ from .role import (
     RoleBrief,
 )
 from .run import RunCreate, RunEvent, RunRecord, Scorecard
+from .scenario import ScenarioSpec, ToolStub, Tripwire, TripwireHit
 from .trace import TraceAuditSummary
 
 __all__ = [
@@ -102,6 +103,11 @@ __all__ = [
     "RunEvent",
     "RunRecord",
     "Scorecard",
+    # guardrail scenarios
+    "ScenarioSpec",
+    "ToolStub",
+    "Tripwire",
+    "TripwireHit",
     # trace
     "TraceAuditSummary",
 ]
