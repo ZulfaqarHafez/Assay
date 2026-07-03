@@ -75,6 +75,8 @@ jobs:
         run: npm --workspace apps/web run test -- --run
 
       - name: Build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8010
         run: npm --workspace apps/web run build
 
       - name: Install Playwright Chromium
