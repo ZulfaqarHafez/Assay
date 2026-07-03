@@ -12,7 +12,6 @@ import {
 import { useRunStream } from "@/lib/useRunStream";
 import { errorMessage, type LoadState } from "@/lib/derive";
 import AgentIntake, { type IntakePolicy } from "@/components/assay/AgentIntake";
-import Landing from "@/components/assay/Landing";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
   AgentSpec,
@@ -44,6 +43,11 @@ const VerdictPanel = dynamic(() => import("@/components/assay/VerdictPanel"), {
 });
 
 const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
+  loading: () => null
+});
+
+const Landing = dynamic(() => import("@/components/assay/Landing"), {
+  ssr: false,
   loading: () => null
 });
 
