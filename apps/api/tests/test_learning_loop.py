@@ -170,7 +170,9 @@ def test_explicit_baseline_compares_improved_candidate_to_source_run(
 
     with TestClient(app) as client:
         candidate_id = client.get("/candidates").json()[0]["id"]
-        baseline_run = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        baseline_run = client.post(
+            "/runs", json={"candidate_id": candidate_id, "exam_pack_id": "hr-v1"}
+        ).json()
         client.post(f"/runs/{baseline_run['id']}/start")
 
         improved_candidate = client.post(
