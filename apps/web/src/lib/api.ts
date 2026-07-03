@@ -1,4 +1,4 @@
-import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunPayoff, RunRecord, RunSummary, RunSurfaces, RunVerdict, Scorecard, TracePayload, WorkspaceBoot } from "@/types/assay";
+import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, ExamPackSummary, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunPayoff, RunRecord, RunSummary, RunSurfaces, RunVerdict, Scorecard, TracePayload, WorkspaceBoot } from "@/types/assay";
 
 function apiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
@@ -40,6 +40,7 @@ export const assayApi = {
   health: () => request<Health>("/health"),
   databaseHealth: () => request<DatabaseHealth>("/health/database"),
   examPacks: () => request<ExamPack[]>("/exam-packs"),
+  examPackSummaries: () => request<ExamPackSummary[]>("/exam-packs/summary"),
   importExamPackFile: (content: string, format: "json" | "yaml" | "yml") =>
     request<ExamPack>("/exam-packs/import-file", {
       method: "POST",

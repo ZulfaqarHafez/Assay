@@ -4,7 +4,7 @@ import * as React from "react";
 import { Download, Upload } from "lucide-react";
 import { assayApi } from "@/lib/api";
 import { downloadJson, errorMessage } from "@/lib/derive";
-import { useExamPacks, useImportExamPackFile } from "@/lib/queries";
+import { useExamPackSummaries, useImportExamPackFile } from "@/lib/queries";
 import { ProbeArrayArt } from "@/components/ui/EmptyArt";
 
 /**
@@ -12,7 +12,7 @@ import { ProbeArrayArt } from "@/components/ui/EmptyArt";
  * versioned set of probes with seen + held-out variants and documented checks.
  */
 export default function SuitesPage() {
-  const packsQuery = useExamPacks();
+  const packsQuery = useExamPackSummaries();
   const importPack = useImportExamPackFile();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [message, setMessage] = React.useState<string | null>(null);
@@ -89,13 +89,13 @@ export default function SuitesPage() {
       ) : (
         <div className="ws-grid">
           {packs.map((pack) => {
-            const competencies = Array.from(new Set(pack.items.map((i) => i.competency)));
+            const competencies = pack.competencies;
             return (
               <article className="ws-card" key={pack.id}>
                 <h2 className="ws-card-title">{pack.name}</h2>
                 <p className="ws-card-sub mono">{pack.id}</p>
                 <div className="ws-card-meta">
-                  <span className="ws-chip accent">{pack.items.length} probes</span>
+                  <span className="ws-chip accent">{pack.item_count} probes</span>
                   <span className="ws-chip">{competencies.length} competencies</span>
                   <span className="ws-chip">seen + held-out</span>
                 </div>

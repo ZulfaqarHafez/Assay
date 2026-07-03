@@ -7,7 +7,7 @@ import { CommandPalette } from "./CommandPalette";
 const pushMock = vi.hoisted(() => vi.fn());
 const queryMocks = vi.hoisted(() => ({
   useRunSummaries: vi.fn(() => ({ data: [] })),
-  useExamPacks: vi.fn(() => ({ data: [] })),
+  useExamPackSummaries: vi.fn(() => ({ data: [] })),
   useCandidateSummaries: vi.fn(() => ({ data: [] }))
 }));
 
@@ -17,7 +17,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/queries", () => ({
   useRunSummaries: queryMocks.useRunSummaries,
-  useExamPacks: queryMocks.useExamPacks,
+  useExamPackSummaries: queryMocks.useExamPackSummaries,
   useCandidateSummaries: queryMocks.useCandidateSummaries
 }));
 
@@ -32,7 +32,7 @@ describe("CommandPalette", () => {
   afterEach(() => {
     pushMock.mockReset();
     queryMocks.useRunSummaries.mockClear();
-    queryMocks.useExamPacks.mockClear();
+    queryMocks.useExamPackSummaries.mockClear();
     queryMocks.useCandidateSummaries.mockClear();
   });
 
@@ -52,13 +52,13 @@ describe("CommandPalette", () => {
     renderWithClient(<CommandPalette />);
 
     expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: false });
-    expect(queryMocks.useExamPacks).toHaveBeenLastCalledWith({ enabled: false });
+    expect(queryMocks.useExamPackSummaries).toHaveBeenLastCalledWith({ enabled: false });
     expect(queryMocks.useCandidateSummaries).toHaveBeenLastCalledWith({ enabled: false });
 
     fireEvent(window, new Event("assay:open-cmdk"));
 
     await waitFor(() => expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: true }));
-    expect(queryMocks.useExamPacks).toHaveBeenLastCalledWith({ enabled: true });
+    expect(queryMocks.useExamPackSummaries).toHaveBeenLastCalledWith({ enabled: true });
     expect(queryMocks.useCandidateSummaries).toHaveBeenLastCalledWith({ enabled: true });
   });
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   FlaskConical, Layers, Bot, Beaker, Clock, MoonStar, CheckCircle2, AlertTriangle, CornerDownLeft
 } from "lucide-react";
-import { useRunSummaries, useExamPacks, useCandidateSummaries } from "@/lib/queries";
+import { useRunSummaries, useExamPackSummaries, useCandidateSummaries } from "@/lib/queries";
 
 type Item = {
   id: string;
@@ -30,7 +30,7 @@ export function CommandPalette() {
   const listRef = React.useRef<HTMLDivElement>(null);
 
   const runsQuery = useRunSummaries({ enabled: open });
-  const packsQuery = useExamPacks({ enabled: open });
+  const packsQuery = useExamPackSummaries({ enabled: open });
   const candidatesQuery = useCandidateSummaries({ enabled: open });
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
   const packs = React.useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
@@ -85,7 +85,7 @@ export function CommandPalette() {
     const suiteItems: Item[] = packs.map((p) => ({
       id: `suite-${p.id}`,
       label: p.name,
-      sublabel: `${p.id} · ${p.items.length} probes`,
+      sublabel: `${p.id} · ${p.item_count} probes`,
       group: "Suites",
       icon: <Layers size={15} />,
       run: () => go("/suites")

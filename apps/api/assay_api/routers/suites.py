@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..cache_headers import public_read_json_headers
 from ..exam_packs import (
     exam_pack_export,
+    list_exam_pack_summaries,
     list_exam_packs,
     parse_exam_pack_content,
     register_exam_pack,
@@ -30,6 +31,14 @@ class ExamPackImportFileRequest(BaseModel):
 def exam_packs() -> JSONResponse:
     return JSONResponse(
         content=[pack.model_dump(mode="json") for pack in list_exam_packs()],
+        headers=public_read_json_headers(max_age=300, stale_while_revalidate=1800),
+    )
+
+
+@router.get("/exam-packs/summary")
+def exam_pack_summaries() -> JSONResponse:
+    return JSONResponse(
+        content=list_exam_pack_summaries(),
         headers=public_read_json_headers(max_age=300, stale_while_revalidate=1800),
     )
 

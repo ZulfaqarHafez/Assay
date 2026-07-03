@@ -387,6 +387,20 @@ def list_exam_packs() -> list[ExamPack]:
     return list(EXAM_PACKS.values())
 
 
+def exam_pack_summary(pack: ExamPack) -> dict[str, object]:
+    return {
+        "id": pack.id,
+        "name": pack.name,
+        "simulator_model": pack.simulator_model,
+        "item_count": len(pack.items),
+        "competencies": sorted({item.competency for item in pack.items}),
+    }
+
+
+def list_exam_pack_summaries() -> list[dict[str, object]]:
+    return [exam_pack_summary(pack) for pack in list_exam_packs()]
+
+
 def get_exam_pack(pack_id: str) -> ExamPack:
     return EXAM_PACKS[pack_id]
 

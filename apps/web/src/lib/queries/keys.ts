@@ -18,6 +18,7 @@ export const queryKeys = {
   health: () => ["health"] as const,
   databaseHealth: () => ["health", "database"] as const,
   examPacks: () => ["exam-packs"] as const,
+  examPackSummaries: () => ["exam-packs", "summary"] as const,
   connectors: () => ["connectors"] as const,
   connectorProbes: () => ["connectors", "probe"] as const,
   candidates: () => ["candidates"] as const,

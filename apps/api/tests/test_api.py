@@ -220,8 +220,10 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
         candidate_summary_response = client.get("/candidates/summary")
         run_summary_response = client.get("/runs/summary")
         exam_packs_response = client.get("/exam-packs")
+        exam_pack_summary_response = client.get("/exam-packs/summary")
         candidate_summary = candidate_summary_response.json()[0]
         run_summary = run_summary_response.json()[0]
+        exam_pack_summary = exam_pack_summary_response.json()[0]
 
     assert candidate_summary["id"] == candidate["id"]
     assert candidate_summary["name"] == "Verbose Agent"
@@ -243,6 +245,14 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert exam_packs_response.status_code == 200
     assert exam_packs_response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=1800"
     assert "origin" in exam_packs_response.headers["vary"].lower()
+
+    assert exam_pack_summary_response.status_code == 200
+    assert exam_pack_summary["id"]
+    assert exam_pack_summary["item_count"] >= 1
+    assert exam_pack_summary["competencies"]
+    assert "items" not in exam_pack_summary
+    assert exam_pack_summary_response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=1800"
+    assert "origin" in exam_pack_summary_response.headers["vary"].lower()
 
 
 def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
