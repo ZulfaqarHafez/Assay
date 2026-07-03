@@ -40,19 +40,20 @@ class _CountingAdapter:
 
 @pytest.mark.asyncio
 async def test_run_items_execute_concurrently(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ASSAY_RUN_CONCURRENCY", "5")
+    monkeypatch.setenv("ASSAY_RUN_CONCURRENCY", "10")
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
     from assay_api.database import init_db
     init_db()
     adapter = _CountingAdapter()
     monkeypatch.setattr(orch, "adapter_for", lambda candidate: adapter)
 
-    run = RunRecord(candidate_id="c", exam_pack_id="hr-v1", k=2)  # 5 items x 2 trials = 10 units
+    run = RunRecord(candidate_id="c", exam_pack_id="hr-v1", k=1)  # 5 items x 2 variants = 10 asks
     candidate = CandidateConfig(id="c", name="x", adapter_type="mock")
     scorecard = await orch.RunOrchestrator().start(run, candidate)
 
-    # The exam ran in parallel (sequential would peak at 1) and still produced a scorecard.
-    assert adapter.peak >= 2
+    # Seen and held-out variants run as independent bounded units. The older
+    # per-item scheduler could only peak at 5 asks here.
+    assert adapter.peak >= 8
     assert scorecard.run_id == run.id
     assert scorecard.competency_scores
 

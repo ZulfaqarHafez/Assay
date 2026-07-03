@@ -237,33 +237,34 @@ class RunOrchestrator:
         # across the k trials.
         critical_by_key: dict[tuple[str, str, str], str] = {}
 
-        # Evaluate (item, trial) units concurrently with a bounded pool. Prior-run
-        # lessons (the seed) apply to every unit; within-run lesson accumulation
-        # across items is intentionally dropped here in favour of parallelism (the
-        # closed learning loop persists cross-run, which is the load-bearing part).
+        # Evaluate each (item, trial, variant) concurrently with a bounded pool.
+        # Prior-run lessons (the seed) apply to every unit; within-run lesson
+        # accumulation across items is intentionally dropped here in favour of
+        # parallelism (the closed learning loop persists cross-run, which is the
+        # load-bearing part).
         seed_lessons = list(lessons)
         semaphore = asyncio.Semaphore(_run_concurrency())
 
-        async def evaluate(item: Any, trial: int) -> tuple[Any, int, GradeResult, GradeResult]:
+        async def evaluate(item: Any, trial: int, variant: str) -> tuple[Any, int, str, GradeResult]:
+            question = item.prompt if variant == "seen" else item.held_out_prompt
             async with semaphore:
-                seen_response = await self._ask_candidate(
-                    run, adapter, candidate, item.competency, item.prompt, trial, "seen", seed_lessons
+                response = await self._ask_candidate(
+                    run, adapter, candidate, item.competency, question, trial, variant, seed_lessons
                 )
-                seen_grade = self._grade(
-                    run, item.id, item.competency, "seen", trial, seen_response, run.competency_threshold
+                grade = self._grade(
+                    run, item.id, item.competency, variant, trial, response, run.competency_threshold
                 )
-                held_response = await self._ask_candidate(
-                    run, adapter, candidate, item.competency, item.held_out_prompt, trial, "held_out", seed_lessons
-                )
-                held_grade = self._grade(
-                    run, item.id, item.competency, "held_out", trial, held_response, run.competency_threshold
-                )
-                return item, trial, seen_grade, held_grade
+                return item, trial, variant, grade
 
-        units = [(item, trial) for item in pack.items for trial in range(1, run.k + 1)]
+        units = [
+            (item, trial, variant)
+            for item in pack.items
+            for trial in range(1, run.k + 1)
+            for variant in ("seen", "held_out")
+        ]
         # gather preserves argument order, so aggregation below is deterministic
         # regardless of completion order.
-        results = await asyncio.gather(*(evaluate(item, trial) for item, trial in units))
+        results = await asyncio.gather(*(evaluate(item, trial, variant) for item, trial, variant in units))
 
         def record_criticals(competency: str, variant: str, grade: Any) -> None:
             for phrase in getattr(grade, "forbidden_hits", None) or []:
@@ -274,29 +275,21 @@ class RunOrchestrator:
                     f"forbidden phrase — {phrase!r}.",
                 )
 
-        for item, _trial, seen_grade, held_grade in results:
-            record_criticals(item.competency, "seen", seen_grade)
-            record_criticals(item.competency, "held_out", held_grade)
-            seen_scores[item.competency].append(seen_grade.score)
-            panel_results.append(seen_grade.panel_scores)
-            if seen_grade.judge is not None:
-                judge_results.append(seen_grade.judge)
-            if not seen_grade.passed:
-                lesson = f"{item.competency}: {seen_grade.feedback}"
+        for item, _trial, variant, grade in results:
+            record_criticals(item.competency, variant, grade)
+            target_scores = seen_scores if variant == "seen" else held_scores
+            target_scores[item.competency].append(grade.score)
+            panel_results.append(grade.panel_scores)
+            if grade.judge is not None:
+                judge_results.append(grade.judge)
+            if not grade.passed:
+                lesson = f"{item.competency}: {grade.feedback}"
                 lessons.append(lesson)
-                lesson_feedback.setdefault(item.competency, seen_grade.feedback)
-                self._recorder.event(run.id, "lesson_library", "lesson_added",
-                            {"competency": item.competency, "lesson": lesson})
-
-            held_scores[item.competency].append(held_grade.score)
-            panel_results.append(held_grade.panel_scores)
-            if held_grade.judge is not None:
-                judge_results.append(held_grade.judge)
-            if not held_grade.passed:
-                lesson = f"{item.competency}: {held_grade.feedback}"
-                lessons.append(lesson)
-                # Held-out feedback is the stronger signal; let it win.
-                lesson_feedback[item.competency] = held_grade.feedback
+                if variant == "held_out":
+                    # Held-out feedback is the stronger signal; let it win.
+                    lesson_feedback[item.competency] = grade.feedback
+                else:
+                    lesson_feedback.setdefault(item.competency, grade.feedback)
                 self._recorder.event(run.id, "lesson_library", "lesson_added",
                             {"competency": item.competency, "lesson": lesson})
 
