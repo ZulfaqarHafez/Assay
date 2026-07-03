@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from assay_api.agent_refinery import build_agent_spec
+from assay_api.agent_refinery import agent_spec_payload, build_agent_spec
 from assay_api.exam_packs import get_exam_pack
 from assay_api.models import (
     CandidateConfig,
@@ -83,6 +83,39 @@ def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
     # No competency failed, so no specialist helper is marked recommended.
     assert all(agent.priority == "optional" for agent in spec.sub_agents)
     assert spec.metrics["recommended_subagents"] == 0
+
+
+def test_agent_spec_payload_reuses_preloaded_run_evidence(monkeypatch) -> None:
+    run = RunRecord(id="run_preloaded", candidate_id="cand_preloaded", exam_pack_id="hr-v1")
+    candidate = CandidateConfig(id="cand_preloaded", name="Preloaded Agent", adapter_type="mock")
+    scorecard = _scorecard(
+        run.id,
+        held={"compliance": 0.9},
+        transfer_gap={"compliance": 0.0},
+        pass_at_k={"compliance": True},
+        certified=True,
+        audit=_ok_audit(),
+    )
+
+    def fail_db_call(*_args, **_kwargs):
+        raise AssertionError("preloaded agent spec should not hit the database")
+
+    monkeypatch.setattr("assay_api.database.get_run", fail_db_call)
+    monkeypatch.setattr("assay_api.database.get_candidate", fail_db_call)
+    monkeypatch.setattr("assay_api.database.get_scorecard", fail_db_call)
+    monkeypatch.setattr("assay_api.database.list_events", fail_db_call)
+
+    payload = agent_spec_payload(
+        run.id,
+        run_record=run,
+        candidate=candidate,
+        scorecard=scorecard,
+        events=[],
+    )
+
+    assert payload is not None
+    assert payload["schema"] == "assay.agent_spec.v1"
+    assert payload["candidate_id"] == candidate.id
 
 
 def test_failing_competency_recommends_specialist_subagent() -> None:

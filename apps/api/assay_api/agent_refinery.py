@@ -659,7 +659,14 @@ def _fmt_tas(value: float | int | None) -> str:
     return f"{value:.0f}" if isinstance(value, (int, float)) else "n/a"
 
 
-def load_agent_spec(run_id: str) -> AgentSpec | None:
+def load_agent_spec(
+    run_id: str,
+    *,
+    run_record: RunRecord | None = None,
+    candidate: CandidateConfig | None = None,
+    scorecard: Scorecard | None = None,
+    events: list[RunEvent] | None = None,
+) -> AgentSpec | None:
     """Compose an :class:`AgentSpec` for a persisted, completed run.
 
     Returns ``None`` when the run, candidate, or scorecard is missing. Raises
@@ -669,21 +676,34 @@ def load_agent_spec(run_id: str) -> AgentSpec | None:
     from .database import get_candidate, get_run, get_scorecard, list_events
     from .exam_packs import get_exam_pack
 
-    run = get_run(run_id)
+    run = run_record or get_run(run_id)
     if run is None:
         return None
-    candidate = get_candidate(run.candidate_id)
-    scorecard = get_scorecard(run_id)
+    candidate = candidate or get_candidate(run.candidate_id)
+    scorecard = scorecard or get_scorecard(run_id)
     if candidate is None or scorecard is None:
         return None
     pack = get_exam_pack(run.exam_pack_id)
-    events = list_events(run_id)
+    events = events if events is not None else list_events(run_id)
     return build_agent_spec(run, candidate, scorecard, pack, events)
 
 
-def agent_spec_payload(run_id: str) -> dict[str, Any] | None:
+def agent_spec_payload(
+    run_id: str,
+    *,
+    run_record: RunRecord | None = None,
+    candidate: CandidateConfig | None = None,
+    scorecard: Scorecard | None = None,
+    events: list[RunEvent] | None = None,
+) -> dict[str, Any] | None:
     """Return the schema-tagged JSON payload for the agent spec, or ``None``."""
-    spec = load_agent_spec(run_id)
+    spec = load_agent_spec(
+        run_id,
+        run_record=run_record,
+        candidate=candidate,
+        scorecard=scorecard,
+        events=events,
+    )
     if spec is None:
         return None
     return {"schema": "assay.agent_spec.v1", **spec.model_dump(mode="json")}

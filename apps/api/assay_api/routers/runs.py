@@ -261,13 +261,25 @@ def run_surfaces(run_id: str) -> JSONResponse:
     run = get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
+    scorecard = get_scorecard(run_id)
+    events = list_events(run_id)
 
     try:
-        agent_spec = agent_spec_payload(run_id)
+        agent_spec = agent_spec_payload(
+            run_id,
+            run_record=run,
+            scorecard=scorecard,
+            events=events,
+        )
     except KeyError as exc:
         raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
 
-    product_review = product_review_for_run(run_id)
+    product_review = product_review_for_run(
+        run_id,
+        run_record=run,
+        scorecard=scorecard,
+        events=events,
+    )
     progress_payload = candidate_progress(run.candidate_id)
     diagnostic_library = [
         lesson.model_dump(mode="json") for lesson in lesson_library(run.candidate_id)
@@ -300,8 +312,14 @@ def run_payoff(run_id: str) -> JSONResponse:
     scorecard = get_scorecard(run_id)
     if scorecard is None:
         raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
+    events = list_events(run_id)
     try:
-        agent_spec = agent_spec_payload(run_id)
+        agent_spec = agent_spec_payload(
+            run_id,
+            run_record=run,
+            scorecard=scorecard,
+            events=events,
+        )
     except KeyError as exc:
         raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
     payload = {

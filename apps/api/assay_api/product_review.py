@@ -12,12 +12,16 @@ def product_review_for_run(
     db_health: dict[str, Any] | None = None,
     *,
     load_events: bool = True,
+    run_record: RunRecord | None = None,
+    scorecard: Scorecard | None = None,
+    events: list[Any] | None = None,
 ) -> ProductReview | None:
-    run = get_run(run_id)
+    run = run_record or get_run(run_id)
     if run is None:
         return None
-    scorecard = get_scorecard(run_id)
-    events = list_events(run_id) if load_events else None
+    scorecard = scorecard or get_scorecard(run_id)
+    if events is None:
+        events = list_events(run_id) if load_events else None
     event_count = len(events) if events is not None else None
     if db_health is None:
         try:
