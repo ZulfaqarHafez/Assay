@@ -157,13 +157,9 @@ export default function Home() {
 
   async function hydrateRunArtifacts(runId: string) {
     try {
-      const [eventPayload, tracePayload, bundlePayload] = await Promise.all([
-        assayApi.events(runId),
-        assayApi.trace(runId),
-        assayApi.proofBundle(runId)
-      ]);
-      setEvents(eventPayload);
-      setTrace(tracePayload);
+      const bundlePayload = await assayApi.proofBundle(runId);
+      setEvents([]);
+      setTrace(null);
       setProofBundle(bundlePayload);
       setAgentSpec(bundlePayload.agent_spec ?? null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });

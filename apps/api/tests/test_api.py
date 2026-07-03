@@ -50,15 +50,19 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         pending_verdict_response = client.get(f"/runs/{run['id']}/verdict")
         scorecard = client.post(f"/runs/{run['id']}/start").json()
         reviewers = client.get(f"/runs/{run['id']}/reviewers").json()
-        events = client.get(f"/runs/{run['id']}/events").json()
-        public_scorecard = client.get(f"/runs/{run['id']}/scorecard").json()
+        events_response = client.get(f"/runs/{run['id']}/events")
+        events = events_response.json()
+        public_scorecard_response = client.get(f"/runs/{run['id']}/scorecard")
+        public_scorecard = public_scorecard_response.json()
         verdict_response = client.get(f"/runs/{run['id']}/verdict")
         verdict = verdict_response.json()
         surfaces_response = client.get(f"/runs/{run['id']}/surfaces")
         surfaces = surfaces_response.json()
-        trace = client.get(f"/runs/{run['id']}/trace").json()
+        trace_response = client.get(f"/runs/{run['id']}/trace")
+        trace = trace_response.json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
-        detail = client.get(f"/runs/{run['id']}/detail").json()
+        detail_response = client.get(f"/runs/{run['id']}/detail")
+        detail = detail_response.json()
         monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
         protected_verdict_response = client.get(
             f"/runs/{run['id']}/verdict",
@@ -66,6 +70,14 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         )
         protected_surfaces_response = client.get(
             f"/runs/{run['id']}/surfaces",
+            headers={"X-API-Key": "secret-key-1"},
+        )
+        protected_trace_response = client.get(
+            f"/runs/{run['id']}/trace",
+            headers={"X-API-Key": "secret-key-1"},
+        )
+        protected_detail_response = client.get(
+            f"/runs/{run['id']}/detail",
             headers={"X-API-Key": "secret-key-1"},
         )
 
@@ -78,10 +90,16 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert events
     assert public_scorecard["trace_audit"]["raw"] == {}
     assert pending_verdict_response.headers["cache-control"] == "no-store"
+    assert events_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert public_scorecard_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert verdict_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert protected_verdict_response.headers["cache-control"] == "no-store"
     assert surfaces_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert protected_surfaces_response.headers["cache-control"] == "no-store"
+    assert trace_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert detail_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert protected_trace_response.headers["cache-control"] == "no-store"
+    assert protected_detail_response.headers["cache-control"] == "no-store"
     assert "origin" in verdict_response.headers["vary"].lower()
     assert "origin" in surfaces_response.headers["vary"].lower()
     assert verdict["schema"] == "assay.run_verdict.v1"

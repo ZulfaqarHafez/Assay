@@ -164,18 +164,26 @@ def run_role_brief(run_id: str) -> dict:
 
 
 @router.get("/runs/{run_id}/events")
-def run_events(run_id: str) -> list[dict]:
-    if get_run(run_id) is None:
+def run_events(run_id: str) -> JSONResponse:
+    run = get_run(run_id)
+    if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
-    return [event.model_dump(mode="json") for event in list_events(run_id)]
+    return JSONResponse(
+        content=[event.model_dump(mode="json") for event in list_events(run_id)],
+        headers=_run_json_cache_headers(run),
+    )
 
 
 @router.get("/runs/{run_id}/scorecard")
-def run_scorecard(run_id: str) -> dict:
+def run_scorecard(run_id: str) -> JSONResponse:
     scorecard = get_scorecard(run_id)
     if scorecard is None:
         raise HTTPException(status_code=404, detail="Scorecard not found")
-    return _scorecard_payload(scorecard, include_trace_raw=False)
+    run = get_run(run_id)
+    return JSONResponse(
+        content=_scorecard_payload(scorecard, include_trace_raw=False),
+        headers=_run_json_cache_headers(run) if run else public_read_json_headers(cacheable=False),
+    )
 
 
 def _run_json_cache_headers(run: RunRecord) -> dict[str, str]:
@@ -363,15 +371,19 @@ def _prettify_card_finding(reason: str) -> str:
 
 
 @router.get("/runs/{run_id}/trace")
-def run_trace(run_id: str) -> dict:
-    if get_run(run_id) is None:
+def run_trace(run_id: str) -> JSONResponse:
+    run = get_run(run_id)
+    if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     scorecard = get_scorecard(run_id)
-    return {
-        "run_id": run_id,
-        "events": [event.model_dump(mode="json") for event in list_events(run_id)],
-        "scorecard": _scorecard_payload(scorecard, include_trace_raw=False) if scorecard else None,
-    }
+    return JSONResponse(
+        content={
+            "run_id": run_id,
+            "events": [event.model_dump(mode="json") for event in list_events(run_id)],
+            "scorecard": _scorecard_payload(scorecard, include_trace_raw=False) if scorecard else None,
+        },
+        headers=_run_json_cache_headers(run),
+    )
 
 
 @router.get("/runs/{run_id}/comparison")
@@ -491,7 +503,7 @@ def run_proof_bundle(run_id: str) -> dict:
 
 
 @router.get("/runs/{run_id}/detail")
-def run_detail(run_id: str) -> dict:
+def run_detail(run_id: str) -> JSONResponse:
     try:
         backend = database_backend_name()
     except Exception:
@@ -522,12 +534,16 @@ def run_detail(run_id: str) -> dict:
         diagnostic_library = [
             lesson.model_dump(mode="json") for lesson in lesson_library(run_record.candidate_id)
         ]
-    return bundle | {
+    payload = bundle | {
         "detail_profile": "fast",
         "agent_spec": agent_spec,
         "candidate_progress": progress_bundle,
         "diagnostic_library": diagnostic_library,
     }
+    return JSONResponse(
+        content=payload,
+        headers=_run_json_cache_headers(run_record) if run_record else public_read_json_headers(cacheable=False),
+    )
 
 
 def _scorecard_payload(scorecard, *, include_trace_raw: bool = True) -> dict:

@@ -199,6 +199,8 @@ let examPackFetches = 0;
 let runListFetches = 0;
 let candidateListFetches = 0;
 let candidateSummaryFetches = 0;
+let proofDetailFetches = 0;
+let traceFetches = 0;
 
 beforeEach(() => {
   agentSpecOverride = null;
@@ -209,6 +211,8 @@ beforeEach(() => {
   runListFetches = 0;
   candidateListFetches = 0;
   candidateSummaryFetches = 0;
+  proofDetailFetches = 0;
+  traceFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/workspace/boot")) {
@@ -388,9 +392,11 @@ beforeEach(() => {
       return json(events);
     }
     if (url.endsWith("/runs/run_demo/trace")) {
+      traceFetches += 1;
       return json({ run_id: "run_demo", events, scorecard });
     }
     if (url.endsWith("/runs/run_demo/detail") || url.endsWith("/runs/run_demo/proof-bundle")) {
+      proofDetailFetches += 1;
       return json(agentSpecOverride ? { ...proofBundle, agent_spec: agentSpecOverride } : proofBundle);
     }
     if (url.endsWith("/runs/run_demo/reviewers")) {
@@ -499,12 +505,17 @@ describe("Assay page", () => {
     await screen.findByText("What to fix", undefined, { timeout: 10000 });
     expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0);
     expect(screen.getByText(/By capability/i)).toBeInTheDocument();
+    expect(proofDetailFetches).toBe(1);
+    expect(traceFetches).toBe(0);
     // The intake's deploy-policy choice rides on the run request.
     expect(runCreateBodies[0]).toMatchObject({
       candidate_id: "cand_demo",
       policy_name: "strict",
       competency_threshold: 0.8
     });
+
+    await user.click(screen.getByRole("button", { name: /open full trace/i }));
+    await waitFor(() => expect(traceFetches).toBe(1));
   }, 15000);
 
   it("uses the current run as the baseline when testing the improved version", async () => {
