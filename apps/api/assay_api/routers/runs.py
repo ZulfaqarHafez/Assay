@@ -28,7 +28,6 @@ from ..deployability import evaluate_scorecard, policy_for_run
 from ..exam_packs import get_exam_pack
 from ..exports import write_agent_spec_files
 from ..models import RunCreate, RunRecord
-from ..orchestrator import RunOrchestrator
 from ..product_review import product_review_for_run
 from ..progress import candidate_progress, lesson_library, run_comparison
 from ..rate_limit import rate_limit
@@ -123,6 +122,8 @@ async def start_run(run_id: str) -> dict:
     if run.status == "completed":
         scorecard = get_scorecard(run.id)
         return scorecard.model_dump(mode="json") if scorecard else run.model_dump(mode="json")
+    from ..orchestrator import RunOrchestrator
+
     scorecard = await RunOrchestrator().start(run, candidate)
     return scorecard.model_dump(mode="json")
 

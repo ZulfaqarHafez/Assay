@@ -18,7 +18,7 @@ def isolated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # the developer's real .env (which carries a live OPENAI key + Supabase backend)
     # back into the process. Tests that need a key mock resolve_openai_key directly.
     monkeypatch.setattr("assay_api.agent_research.load_local_env", lambda: None)
-    monkeypatch.setattr("assay_api.main.load_local_env", lambda: None)
+    monkeypatch.setattr("assay_api.main._load_local_env", lambda: None)
     from assay_api.database import reset_store_cache
     from assay_api import rate_limit as rl
 

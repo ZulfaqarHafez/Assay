@@ -6,7 +6,6 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .agent_research import load_local_env
 from .database import init_db, list_candidates, save_candidate
 from .logging_config import (
     REQUEST_ID_HEADER,
@@ -80,6 +79,12 @@ app.include_router(role.router)
 app.include_router(connectors.router)
 
 
+def _load_local_env() -> None:
+    from .agent_research import load_local_env
+
+    load_local_env()
+
+
 def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -98,6 +103,17 @@ def _deployed_signal_present() -> bool:
     if not _is_local_host(os.environ.get("ASSAY_HOST")) and not os.environ.get("ASSAY_CORS_ORIGINS", "").strip():
         return True
     return False
+
+
+def _startup_should_seed_demo() -> bool:
+    """Only local SQLite needs eager schema setup and demo candidate seeding.
+
+    Supabase deployments manage schema externally and lazily check tables on the
+    first real store call. Avoiding startup probes keeps serverless cold starts
+    from paying for network I/O before a lightweight read can answer.
+    """
+    backend = os.environ.get("ASSAY_DB_BACKEND", "sqlite").strip().lower() or "sqlite"
+    return backend == "sqlite"
 
 
 def production_hardening_findings() -> list[str]:
@@ -161,8 +177,10 @@ async def _unexpected_error_handler(request: Request, exc: Exception) -> JSONRes
 
 @app.on_event("startup")
 def startup() -> None:
-    load_local_env()
+    _load_local_env()
     _check_production_hardening()
+    if not _startup_should_seed_demo():
+        return
     init_db()
     candidates = list_candidates()
     if not candidates:

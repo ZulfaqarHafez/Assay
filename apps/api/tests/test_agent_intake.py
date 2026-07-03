@@ -25,7 +25,7 @@ You screen and rank candidates fairly using job-related criteria only.
 @pytest.fixture(autouse=True)
 def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
     # Mirror test_api: stop startup from re-populating Supabase env from a local .env.
-    monkeypatch.setattr("assay_api.main.load_local_env", lambda: None)
+    monkeypatch.setattr("assay_api.main._load_local_env", lambda: None)
 
 
 def test_detect_helper_extracts_title_and_tools() -> None:

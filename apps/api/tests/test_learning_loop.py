@@ -10,7 +10,7 @@ from assay_api.main import app
 def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
     # Mirror test_api.py: keep the learning-loop tests on the isolated sqlite
     # store and stop startup from re-loading a developer's local .env.
-    monkeypatch.setattr("assay_api.main.load_local_env", lambda: None)
+    monkeypatch.setattr("assay_api.main._load_local_env", lambda: None)
 
 
 class _FakeAudit:

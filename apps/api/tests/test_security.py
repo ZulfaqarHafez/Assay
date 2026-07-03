@@ -12,7 +12,7 @@ from assay_api.main import app
 def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep these tests on the isolated sqlite store (see test_api.py)."""
 
-    monkeypatch.setattr("assay_api.main.load_local_env", lambda: None)
+    monkeypatch.setattr("assay_api.main._load_local_env", lambda: None)
     monkeypatch.delenv("ASSAY_API_KEYS", raising=False)
 
 

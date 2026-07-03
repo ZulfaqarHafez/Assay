@@ -18,7 +18,7 @@ def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
     developer's local ``.env`` and silently swap the backend to Supabase. Neutralize
     that load so persistence stays on the temp sqlite database for every test here.
     """
-    monkeypatch.setattr("assay_api.main.load_local_env", lambda: None)
+    monkeypatch.setattr("assay_api.main._load_local_env", lambda: None)
 
 
 def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
@@ -162,6 +162,23 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert run_summary["pass_count"] >= 0
     assert "job_scope" not in run_summary
     assert "tailored_exam_pack" not in run_summary
+
+
+def test_supabase_startup_skips_eager_db_probe(monkeypatch) -> None:
+    """Production Supabase cold starts should not probe or seed the DB eagerly."""
+    from assay_api import main
+
+    called: list[str] = []
+    monkeypatch.setenv("ASSAY_DB_BACKEND", "supabase")
+    monkeypatch.setattr(main, "_load_local_env", lambda: called.append("load_env"))
+    monkeypatch.setattr(main, "_check_production_hardening", lambda: called.append("hardening"))
+    monkeypatch.setattr(main, "init_db", lambda: called.append("init_db"))
+    monkeypatch.setattr(main, "list_candidates", lambda: called.append("list_candidates") or [])
+    monkeypatch.setattr(main, "save_candidate", lambda candidate: called.append("save_candidate"))
+
+    main.startup()
+
+    assert called == ["load_env", "hardening"]
 
 
 def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
