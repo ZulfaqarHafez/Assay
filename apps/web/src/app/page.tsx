@@ -2,13 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { assayApi } from "@/lib/api";
 import {
   useCandidates,
   useExamPacks,
   useHealth,
-  useRuns
+  queryKeys
 } from "@/lib/queries";
 import { useRunStream } from "@/lib/useRunStream";
 import { errorMessage, type LoadState } from "@/lib/derive";
@@ -49,11 +50,11 @@ const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
 });
 
 export default function Home() {
+  const queryClient = useQueryClient();
   // Boot data via TanStack Query (cache, retry, dedupe handled by the client).
   const healthQuery = useHealth();
   const examPacksQuery = useExamPacks();
   const candidatesQuery = useCandidates();
-  const runsQuery = useRuns();
 
   const health = healthQuery.data ?? null;
   const examPacks = useMemo(() => examPacksQuery.data ?? [], [examPacksQuery.data]);
@@ -62,8 +63,7 @@ export default function Home() {
   const bootLoading =
     healthQuery.isLoading ||
     examPacksQuery.isLoading ||
-    candidatesQuery.isLoading ||
-    runsQuery.isLoading;
+    candidatesQuery.isLoading;
 
   // The API is unreachable at boot when the core queries error out — surface
   // that on the intake screen so the user isn't ambushed only after clicking Run.
@@ -171,7 +171,7 @@ export default function Home() {
       setTrace(tracePayload);
       setProofBundle(bundlePayload);
       setAgentSpec(bundlePayload.agent_spec ?? null);
-      void runsQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
     } catch (exc) {
       setError(errorMessage(exc));
     }

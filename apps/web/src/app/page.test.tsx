@@ -193,10 +193,12 @@ const proofBundle = {
 
 let agentSpecOverride: typeof agentSpec | null = null;
 let runCreateBodies: Array<Record<string, unknown>> = [];
+let runListFetches = 0;
 
 beforeEach(() => {
   agentSpecOverride = null;
   runCreateBodies = [];
+  runListFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith("/health")) {
@@ -329,6 +331,7 @@ beforeEach(() => {
       return json([candidate]);
     }
     if (url.endsWith("/runs") && init?.method !== "POST") {
+      runListFetches += 1;
       return json([runRecord]);
     }
     if (url.endsWith("/runs") && init?.method === "POST") {
@@ -431,6 +434,8 @@ describe("Assay page", () => {
     expect(screen.getByRole("button", { name: /run demo litmus test/i })).toBeInTheDocument();
     // Zero-input path: a one-click sample run is offered on the hero.
     expect(screen.getByRole("button", { name: /run the sample agent/i })).toBeInTheDocument();
+    // The intake path should not fetch historical runs until a workspace route needs them.
+    expect(runListFetches).toBe(0);
   });
 
   it("runs an uploaded agent.md and lands on a verdict", async () => {
