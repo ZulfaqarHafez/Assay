@@ -282,6 +282,32 @@ def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
     assert "origin" in response.headers["vary"].lower()
 
 
+def test_health_payload_caches_readiness_probes(monkeypatch) -> None:
+    from assay_api.routers import health as health_router
+
+    calls = {"tracerazor": 0, "openai": 0}
+    health_router.reset_health_cache()
+    monkeypatch.setattr(
+        health_router,
+        "_load_tracerazor_client",
+        lambda: calls.__setitem__("tracerazor", calls["tracerazor"] + 1) or object(),
+    )
+    monkeypatch.setattr(
+        health_router,
+        "resolve_openai_key",
+        lambda: calls.__setitem__("openai", calls["openai"] + 1) or "test-key",
+    )
+
+    first = health_router.health_payload()
+    second = health_router.health_payload()
+
+    assert first["tracerazor_importable"] is True
+    assert first["openai_configured"] is True
+    assert second["tracerazor_importable"] is True
+    assert second["openai_configured"] is True
+    assert calls == {"tracerazor": 1, "openai": 1}
+
+
 def test_supabase_startup_skips_eager_db_probe(monkeypatch) -> None:
     """Production Supabase cold starts should not probe or seed the DB eagerly."""
     from assay_api import main

@@ -486,17 +486,20 @@ class SupabaseStore(DataStore):
             raise RuntimeError("Install the 'supabase' Python package to use Supabase persistence.") from exc
         self.client = create_client(url, key)
         self.tables = resolve_supabase_tables()
-        self._available_tables: set[str] = set(self.tables)
-        self._tenant_tables: set[str] = set(self.tables)
+        self._available_tables: set[str] = set()
+        self._tenant_tables: set[str] = set()
+        self._table_availability_checked: set[str] = set()
+        self._tenant_scope_checked: set[str] = set()
         self._schema_checked = False
+        self._full_schema_checked = False
 
     def init(self) -> None:
         # Supabase schema is managed by supabase/migrations/*.sql.
-        self._ensure_schema()
+        self._ensure_full_schema()
         self.client.table(self.tables["candidates"]).select("id").limit(1).execute()
 
     def health(self) -> dict[str, Any]:
-        self._ensure_schema()
+        self._ensure_full_schema()
         table_status: dict[str, Any] = {}
         for logical_name, table in self.tables.items():
             if logical_name not in self._available_tables:
@@ -595,7 +598,7 @@ class SupabaseStore(DataStore):
             if (_row_get(row, "status") or _payload_dict(_row_get(row, "payload")).get("status")) == "completed"
         ]
         scorecards: dict[str, dict[str, Any]] = {}
-        if completed_ids and "scorecards" in self._available_tables:
+        if completed_ids and self._table_available("scorecards"):
             query = self.client.table(self.tables["scorecards"]).select("run_id, payload").in_("run_id", completed_ids)
             response = self._with_tenant_filter("scorecards", query).execute()
             scorecards = {
@@ -631,6 +634,8 @@ class SupabaseStore(DataStore):
 
     def list_events(self, run_id: str, after: int | None = None) -> list[RunEvent]:
         self._ensure_schema()
+        if not self._table_available("events"):
+            return []
         query = self.client.table(self.tables["events"]).select("payload").eq("run_id", run_id)
         if after is not None:
             query = query.gt("sequence", after)
@@ -662,7 +667,7 @@ class SupabaseStore(DataStore):
 
     def get_scorecards(self, run_ids: list[str]) -> dict[str, Scorecard]:
         self._ensure_schema()
-        if not run_ids or "scorecards" not in self._available_tables:
+        if not run_ids or not self._table_available("scorecards"):
             return {}
         query = self.client.table(self.tables["scorecards"]).select("payload").in_("run_id", run_ids)
         response = self._with_tenant_filter("scorecards", query).execute()
@@ -671,13 +676,15 @@ class SupabaseStore(DataStore):
 
     def list_runs_for_candidate(self, candidate_id: str) -> list[RunRecord]:
         self._ensure_schema()
+        if not self._table_available("runs"):
+            return []
         query = self.client.table(self.tables["runs"]).select("payload").eq("candidate_id", candidate_id)
         response = self._with_tenant_filter("runs", query).order("created_at").execute()
         return [RunRecord.model_validate(row["payload"]) for row in response.data or []]
 
     def save_lesson(self, lesson: DiagnosticLesson) -> DiagnosticLesson:
         self._ensure_schema()
-        if "lessons" not in self._available_tables:
+        if not self._table_available("lessons"):
             return lesson
         lesson = _with_current_tenant(lesson)
         lesson.updated_at = utc_now()
@@ -709,7 +716,7 @@ class SupabaseStore(DataStore):
         active_only: bool = True,
     ) -> list[DiagnosticLesson]:
         self._ensure_schema()
-        if "lessons" not in self._available_tables:
+        if not self._table_available("lessons"):
             return []
         query = self.client.table(self.tables["lessons"]).select("payload").eq("candidate_id", candidate_id)
         query = self._with_tenant_filter("lessons", query)
@@ -724,13 +731,13 @@ class SupabaseStore(DataStore):
 
     def get_lesson(self, lesson_id: str) -> DiagnosticLesson | None:
         self._ensure_schema()
-        if "lessons" not in self._available_tables:
+        if not self._table_available("lessons"):
             return None
         row = self._single("lessons", "id", lesson_id)
         return DiagnosticLesson.model_validate(row["payload"]) if row else None
 
     def _upsert(self, logical_table: str, row: dict[str, Any], on_conflict: str) -> None:
-        if logical_table not in self._available_tables:
+        if not self._table_available(logical_table):
             return
         self.client.table(self.tables[logical_table]).upsert(row, on_conflict=on_conflict).execute()
 
@@ -741,14 +748,14 @@ class SupabaseStore(DataStore):
         desc: bool = False,
         columns: str = "payload",
     ) -> list[dict[str, Any]]:
-        if logical_table not in self._available_tables:
+        if not self._table_available(logical_table):
             return []
         query = self.client.table(self.tables[logical_table]).select(columns)
         response = self._with_tenant_filter(logical_table, query).order(order, desc=desc).execute()
         return response.data or []
 
     def _single(self, logical_table: str, column: str, value: str) -> dict[str, Any] | None:
-        if logical_table not in self._available_tables:
+        if not self._table_available(logical_table):
             return None
         query = self.client.table(self.tables[logical_table]).select("payload").eq(column, value)
         response = self._with_tenant_filter(logical_table, query).limit(1).execute()
@@ -756,12 +763,12 @@ class SupabaseStore(DataStore):
         return rows[0] if rows else None
 
     def _with_tenant_filter(self, logical_table: str, query: Any) -> Any:
-        if logical_table in self._tenant_tables:
+        if self._table_tenant_scoped(logical_table):
             query = query.eq("tenant_id", current_tenant_id())
         return query
 
     def _with_tenant(self, logical_table: str, row: dict[str, Any], tenant_id: str) -> dict[str, Any]:
-        if logical_table in self._tenant_tables:
+        if self._table_tenant_scoped(logical_table):
             return {**row, "tenant_id": tenant_id}
         return row
 
@@ -783,17 +790,45 @@ class SupabaseStore(DataStore):
                 legacy = resolve_supabase_tables(_LEGACY_TABLE_PREFIX, per_product=False)
                 if self._can_select(legacy["candidates"], "id"):
                     self.tables = legacy
-        self._available_tables = {
-            logical_name
-            for logical_name, table in self.tables.items()
-            if self._can_select(table, "payload")
-        }
-        self._tenant_tables = {
-            logical_name
-            for logical_name, table in self.tables.items()
-            if logical_name in self._available_tables and self._can_select(table, "tenant_id")
-        }
         self._schema_checked = True
+
+    def _ensure_full_schema(self) -> None:
+        if self._full_schema_checked:
+            return
+        self._ensure_schema()
+        for logical_name in self.tables:
+            if self._table_available(logical_name):
+                self._table_tenant_scoped(logical_name)
+        self._full_schema_checked = True
+
+    def _table_available(self, logical_table: str) -> bool:
+        self._ensure_schema()
+        if logical_table in self._table_availability_checked:
+            return logical_table in self._available_tables
+        table = self.tables.get(logical_table)
+        available = bool(table and self._can_select(table, "payload"))
+        self._table_availability_checked.add(logical_table)
+        if available:
+            self._available_tables.add(logical_table)
+        else:
+            self._available_tables.discard(logical_table)
+        return available
+
+    def _table_tenant_scoped(self, logical_table: str) -> bool:
+        self._ensure_schema()
+        if logical_table in self._tenant_scope_checked:
+            return logical_table in self._tenant_tables
+        if not self._table_available(logical_table):
+            self._tenant_scope_checked.add(logical_table)
+            self._tenant_tables.discard(logical_table)
+            return False
+        tenant_scoped = self._can_select(self.tables[logical_table], "tenant_id")
+        self._tenant_scope_checked.add(logical_table)
+        if tenant_scoped:
+            self._tenant_tables.add(logical_table)
+        else:
+            self._tenant_tables.discard(logical_table)
+        return tenant_scoped
 
     def _can_select(self, table: str, column: str) -> bool:
         try:

@@ -76,6 +76,64 @@ def test_supabase_store_builds_rows_without_sqlite(monkeypatch: pytest.MonkeyPat
     assert store_instance.health()["backend"] == "supabase"
 
 
+def test_supabase_candidate_summaries_only_probe_candidate_table(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str | None]] = []
+    candidate_payload = {
+        "id": "cand_fast",
+        "name": "Fast Boot Agent",
+        "adapter_type": "mock",
+        "created_at": "2026-07-03T00:00:00+00:00",
+    }
+
+    class FakeQuery:
+        def __init__(self, table: str):
+            self.table = table
+            self.columns: str | None = None
+
+        def select(self, columns: str = "*", **_kwargs):
+            self.columns = columns
+            calls.append((self.table, columns))
+            return self
+
+        def eq(self, *_args, **_kwargs):
+            return self
+
+        def order(self, *_args, **_kwargs):
+            return self
+
+        def limit(self, *_args, **_kwargs):
+            return self
+
+        def execute(self):
+            data = []
+            if self.table == "assay_candidates" and self.columns == "id, payload, created_at":
+                data = [{"id": "cand_fast", "payload": candidate_payload, "created_at": candidate_payload["created_at"]}]
+            return type("Response", (), {"data": data, "count": len(data)})()
+
+    class FakeClient:
+        def table(self, table: str):
+            return FakeQuery(table)
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "supabase",
+        type("FakeSupabase", (), {"create_client": lambda url, key: FakeClient()}),
+    )
+    store_instance = SupabaseStore("https://project.supabase.co", "server-key")
+
+    summaries = store_instance.list_candidate_summaries()
+
+    assert summaries == [{
+        "id": "cand_fast",
+        "name": "Fast Boot Agent",
+        "adapter_type": "mock",
+        "created_at": "2026-07-03T00:00:00+00:00",
+    }]
+    assert {table for table, _columns in calls} == {"assay_candidates"}
+    assert ("assay_runs", "payload") not in calls
+    assert ("assay_scorecards", "payload") not in calls
+
+
 def test_resolve_supabase_tables_defaults_to_assay(monkeypatch: pytest.MonkeyPatch) -> None:
     # No per-product overrides -> the historical shared assay_<table> names.
     for env in ("ASSAY_SUPABASE_PREFIX_AGENTS", "ASSAY_SUPABASE_PREFIX_RUNS", "ASSAY_SUPABASE_PREFIX_DIAGNOSTICS"):
@@ -364,6 +422,8 @@ def test_supabase_list_events_pushes_after_filter_to_query(monkeypatch: pytest.M
     store_instance._schema_checked = True
     store_instance._available_tables = set(store_instance.tables)
     store_instance._tenant_tables = set(store_instance.tables)
+    store_instance._table_availability_checked = set(store_instance.tables)
+    store_instance._tenant_scope_checked = set(store_instance.tables)
 
     events = store_instance.list_events("run_delta", after=1)
 

@@ -20,12 +20,15 @@ def isolated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("assay_api.agent_research.load_local_env", lambda: None)
     monkeypatch.setattr("assay_api.main._load_local_env", lambda: None)
     from assay_api.database import reset_store_cache
+    from assay_api.routers.health import reset_health_cache
     from assay_api import rate_limit as rl
 
     reset_store_cache()
+    reset_health_cache()
     rl._storage.reset()
     rl._parsed_cache.clear()
     yield
     reset_store_cache()
+    reset_health_cache()
     rl._storage.reset()
     rl._parsed_cache.clear()
