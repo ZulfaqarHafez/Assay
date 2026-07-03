@@ -25,10 +25,8 @@ def isolated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
     reset_store_cache()
     reset_health_cache()
-    rl._storage.reset()
-    rl._parsed_cache.clear()
+    rl.reset_rate_limit_state()
     yield
     reset_store_cache()
     reset_health_cache()
-    rl._storage.reset()
-    rl._parsed_cache.clear()
+    rl.reset_rate_limit_state()

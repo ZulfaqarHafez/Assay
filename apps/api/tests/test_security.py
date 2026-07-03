@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import socket
+import subprocess
+import sys
 
 import pytest
 from fastapi.testclient import TestClient
@@ -200,14 +202,30 @@ def test_rate_limit_enabled_by_default_and_generous(monkeypatch: pytest.MonkeyPa
             assert response.status_code != 429
 
 
+def test_rate_limit_module_imports_without_heavy_backends() -> None:
+    code = (
+        "import sys; "
+        "import assay_api.rate_limit; "
+        "print('slowapi' in sys.modules, 'limits' in sys.modules)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd="apps/api",
+    )
+
+    assert result.stdout.strip() == "False False"
+
+
 def test_rate_limit_enforced_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ASSAY_RATE_LIMIT_ENABLED", "1")
     monkeypatch.setenv("ASSAY_RATE_LIMIT_CREATE_RUN", "2/minute")
     # Reset the in-process limiter storage so prior tests don't bleed counts in.
     from assay_api import rate_limit as rl
 
-    rl._storage.reset()
-    rl._parsed_cache.clear()
+    rl.reset_rate_limit_state()
 
     with TestClient(app) as client:
         candidate_id = _candidate_id(client)

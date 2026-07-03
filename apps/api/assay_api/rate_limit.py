@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import os
-from typing import Callable
+from typing import Any, Callable
 
 from fastapi import HTTPException, Request, status
-from limits import RateLimitItem, parse
-from limits.storage import MemoryStorage
-from limits.strategies import MovingWindowRateLimiter
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 # Rate limiting is on by default with generous limits. Set
 # ASSAY_RATE_LIMIT_ENABLED=0/false/off to disable it for local troubleshooting.
@@ -46,30 +41,73 @@ def limit_for(name: str) -> str:
     return os.environ.get(env_name, "").strip() or default
 
 
-# A slowapi ``Limiter`` is wired into ``app.state`` (slowapi reads it there and it
-# provides the storage/strategy machinery this module builds on). We drive the
-# actual per-endpoint checks through a FastAPI dependency below — that keeps
-# request-body forward-ref resolution intact under ``from __future__ import
-# annotations`` (the ``@limiter.limit`` decorator wraps the endpoint and breaks
-# FastAPI's ability to resolve Pydantic body models).
-limiter = Limiter(
-    key_func=get_remote_address,
-    enabled=rate_limiting_enabled(),
-    default_limits=[],
-)
+class _LazyLimiter:
+    """Compatibility shim for code that expects ``app.state.limiter``.
 
-_storage = MemoryStorage()
-_strategy = MovingWindowRateLimiter(_storage)
-_parsed_cache: dict[str, RateLimitItem] = {}
+    Assay enforces limits through the FastAPI dependency below, so boot/health
+    requests should not import SlowAPI's full backend registry on cold start.
+    """
+
+    _instance: Any | None = None
+
+    def _get(self) -> Any:
+        if self._instance is None:
+            from slowapi import Limiter
+
+            self._instance = Limiter(
+                key_func=_client_identifier,
+                enabled=rate_limiting_enabled(),
+                default_limits=[],
+            )
+        return self._instance
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get(), name)
 
 
-def _parsed_limit(name: str) -> RateLimitItem:
+limiter = _LazyLimiter()
+_storage: Any | None = None
+_strategy: Any | None = None
+_parsed_cache: dict[str, Any] = {}
+
+
+def _client_identifier(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+    if forwarded:
+        return forwarded
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _rate_limiter() -> Any:
+    global _storage, _strategy
+    if _storage is None:
+        from limits.storage import MemoryStorage
+
+        _storage = MemoryStorage()
+    if _strategy is None:
+        from limits.strategies import MovingWindowRateLimiter
+
+        _strategy = MovingWindowRateLimiter(_storage)
+    return _strategy
+
+
+def _parsed_limit(name: str) -> Any:
+    from limits import parse
+
     spec = limit_for(name)
     item = _parsed_cache.get(spec)
     if item is None:
         item = parse(spec)
         _parsed_cache[spec] = item
     return item
+
+
+def reset_rate_limit_state() -> None:
+    if _storage is not None:
+        _storage.reset()
+    _parsed_cache.clear()
 
 
 def rate_limit(name: str) -> Callable[[Request], None]:
@@ -79,8 +117,8 @@ def rate_limit(name: str) -> Callable[[Request], None]:
         if not rate_limiting_enabled():
             return
         item = _parsed_limit(name)
-        identifier = get_remote_address(request)
-        if not _strategy.hit(item, name, identifier):
+        identifier = _client_identifier(request)
+        if not _rate_limiter().hit(item, name, identifier):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded",
