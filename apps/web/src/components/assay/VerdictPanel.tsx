@@ -7,7 +7,7 @@ import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, t
 import RoleBriefCard from "@/components/assay/RoleBriefCard";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import RunComparison from "@/components/scorecard/RunComparison";
-import { VERDICT_SCALE } from "@/lib/verdict";
+import { VERDICT_LABEL, VERDICT_SCALE } from "@/lib/verdict";
 import type { Scorecard, AgentSpec, DeployabilityDecision } from "@/types/assay";
 
 /**
@@ -80,6 +80,9 @@ export function VerdictPanel({
         </div>
         <div className="assay-verdict-copy">
           <span className="assay-verdict-eyebrow">{agentName}</span>
+          <span className={`stamp assay-verdict-stamp ${verdict.verdict}`}>
+            {VERDICT_LABEL[verdict.verdict]}
+          </span>
           <h2>{verdict.label}</h2>
           <p>{verdict.headline}</p>
         </div>
@@ -159,7 +162,7 @@ export function VerdictPanel({
       </div>
 
       <div className="assay-fixes">
-        <h3 className="assay-section-label">What to fix</h3>
+        <h3 className="assay-section-label"><span className="section-no">01</span>What to fix</h3>
         <ol className="assay-fix-list">
           {fixes.map((fix) => (
             <li key={fix.id} className={`assay-fix ${fix.severity}`}>
@@ -174,7 +177,7 @@ export function VerdictPanel({
       </div>
 
       <div className="assay-categories">
-        <h3 className="assay-section-label">By capability</h3>
+        <h3 className="assay-section-label"><span className="section-no">02</span>By capability</h3>
         {scorecard.degraded && (
           <p className="assay-muted assay-demo-note">
             Demo scores — graded from deterministic stand-in answers shaped by your agent.md, not a
@@ -199,6 +202,7 @@ export function VerdictPanel({
           verdict → score → biggest problem → top fixes, not a wall of panels. */}
       <details className="assay-improve-more">
         <summary>
+          <span className="section-no">03</span>
           <Sparkles size={15} /> How to improve — refined agent.md, coaching, and run comparison
         </summary>
         <div className="assay-improve-more-body">

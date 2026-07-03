@@ -65,8 +65,9 @@ export function deriveVerdict(
   // proof bundle report, so the hero verdict never disagrees with them.
   if (decision) {
     const verdict = bandFromDecision(decision.verdict);
-    const headline =
-      decision.blocking_reasons[0] ?? decision.warnings[0] ?? decision.summary ?? biggestProblem(scorecard, verdict);
+    const headline = prettifyReason(
+      decision.blocking_reasons[0] ?? decision.warnings[0] ?? decision.summary ?? biggestProblem(scorecard, verdict)
+    );
     return { verdict, label: VERDICT_HEADLINE[verdict], score, headline, passedChecks, totalChecks };
   }
 
@@ -96,6 +97,12 @@ export function policyRuleSentence(policy: DeployabilityPolicy): string {
       : `≤${policy.critical_findings_allowed} critical findings`
   );
   return parts.join(" · ");
+}
+
+/** Human-ready copy for a gate reason: snake_case competency keys become Title Case
+ * ("refusal_boundaries failed pass^3" → "Refusal Boundaries failed pass^3"). */
+function prettifyReason(reason: string): string {
+  return reason.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, (token) => labelize(token));
 }
 
 function biggestProblem(scorecard: Scorecard, verdict: Verdict): string {
