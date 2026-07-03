@@ -29,9 +29,9 @@ export function CommandPalette() {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
 
-  const runsQuery = useRuns();
-  const packsQuery = useExamPacks();
-  const candidatesQuery = useCandidates();
+  const runsQuery = useRuns({ enabled: open });
+  const packsQuery = useExamPacks({ enabled: open });
+  const candidatesQuery = useCandidates({ enabled: open });
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
   const packs = React.useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
   const candidates = React.useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);

@@ -23,7 +23,6 @@ import {
   useDeployability,
   useProofBundle,
   useRunComparison,
-  useRuns,
   useScorecard,
   useTrace
 } from "@/lib/queries";
@@ -87,8 +86,8 @@ export default function RunDetail({ runId }: { runId: string }) {
   // This run tested a refined agent when it carries a baseline; conversely a
   // later run pointing back here means this run's refinery output was validated.
   const baselineRunId = proofBundle?.run?.baseline_run_id ?? null;
-  const runsQuery = useRuns({ enabled: Boolean(agentSpec?.agent_markdown?.trim()) });
-  const validationRun = (runsQuery.data ?? []).find((item) => item.baseline_run_id === runId) ?? null;
+  const validationRun =
+    proofBundle?.candidate_progress?.runs.find((item) => item.baseline_run_id === runId) ?? null;
   const comparisonFallback = React.useMemo<RunComparisonData | undefined>(() => {
     if (!scorecard || scorecard.prior_run_id) return undefined;
     return {

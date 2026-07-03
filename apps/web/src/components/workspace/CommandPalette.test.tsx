@@ -5,15 +5,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "./CommandPalette";
 
 const pushMock = vi.hoisted(() => vi.fn());
+const queryMocks = vi.hoisted(() => ({
+  useRuns: vi.fn(() => ({ data: [] })),
+  useExamPacks: vi.fn(() => ({ data: [] })),
+  useCandidates: vi.fn(() => ({ data: [] }))
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock })
 }));
 
 vi.mock("@/lib/queries", () => ({
-  useRuns: () => ({ data: [] }),
-  useExamPacks: () => ({ data: [] }),
-  useCandidates: () => ({ data: [] })
+  useRuns: queryMocks.useRuns,
+  useExamPacks: queryMocks.useExamPacks,
+  useCandidates: queryMocks.useCandidates
 }));
 
 function renderWithClient(ui: React.ReactElement) {
@@ -26,6 +31,9 @@ function renderWithClient(ui: React.ReactElement) {
 describe("CommandPalette", () => {
   afterEach(() => {
     pushMock.mockReset();
+    queryMocks.useRuns.mockClear();
+    queryMocks.useExamPacks.mockClear();
+    queryMocks.useCandidates.mockClear();
   });
 
   it("opens with Ctrl-K, filters commands, and navigates on Enter", async () => {
@@ -38,6 +46,20 @@ describe("CommandPalette", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/suites"));
+  });
+
+  it("defers dynamic index queries until the palette opens", async () => {
+    renderWithClient(<CommandPalette />);
+
+    expect(queryMocks.useRuns).toHaveBeenLastCalledWith({ enabled: false });
+    expect(queryMocks.useExamPacks).toHaveBeenLastCalledWith({ enabled: false });
+    expect(queryMocks.useCandidates).toHaveBeenLastCalledWith({ enabled: false });
+
+    fireEvent(window, new Event("assay:open-cmdk"));
+
+    await waitFor(() => expect(queryMocks.useRuns).toHaveBeenLastCalledWith({ enabled: true }));
+    expect(queryMocks.useExamPacks).toHaveBeenLastCalledWith({ enabled: true });
+    expect(queryMocks.useCandidates).toHaveBeenLastCalledWith({ enabled: true });
   });
 
   it("shows an empty state for unmatched filters", async () => {
