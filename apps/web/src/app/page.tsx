@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { assayApi } from "@/lib/api";
@@ -11,11 +12,8 @@ import {
 } from "@/lib/queries";
 import { useRunStream } from "@/lib/useRunStream";
 import { errorMessage, type LoadState } from "@/lib/derive";
-import TraceDrawer from "@/components/trace/TraceDrawer";
 import AgentIntake, { type IntakePolicy } from "@/components/assay/AgentIntake";
 import Landing from "@/components/assay/Landing";
-import JudgingWaterfall from "@/components/assay/JudgingWaterfall";
-import VerdictPanel from "@/components/assay/VerdictPanel";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
   AgentSpec,
@@ -26,6 +24,29 @@ import type {
   Scorecard,
   TracePayload
 } from "@/types/assay";
+
+const JudgingWaterfall = dynamic(() => import("@/components/assay/JudgingWaterfall"), {
+  loading: () => (
+    <section className="assay-judging" aria-label="Live judging loading">
+      <div className="assay-progress" aria-hidden="true">
+        <div className="assay-progress-fill" style={{ width: "8%" }} />
+      </div>
+      <p className="assay-muted">Preparing the live examiner...</p>
+    </section>
+  )
+});
+
+const VerdictPanel = dynamic(() => import("@/components/assay/VerdictPanel"), {
+  loading: () => (
+    <section className="assay-verdict" aria-label="Verdict loading">
+      <p className="assay-muted">Assembling the verdict...</p>
+    </section>
+  )
+});
+
+const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
+  loading: () => null
+});
 
 export default function Home() {
   // Boot data via TanStack Query (cache, retry, dedupe handled by the client).
@@ -386,16 +407,18 @@ export default function Home() {
         )}
       </div>
 
-      <TraceDrawer
-        events={events}
-        trace={trace}
-        scorecard={scorecard}
-        proofBundle={proofBundle}
-        agentSpec={agentSpec}
-        agentResearch={null}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-      />
+      {drawerOpen && (
+        <TraceDrawer
+          events={events}
+          trace={trace}
+          scorecard={scorecard}
+          proofBundle={proofBundle}
+          agentSpec={agentSpec}
+          agentResearch={null}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+        />
+      )}
     </main>
   );
 }
