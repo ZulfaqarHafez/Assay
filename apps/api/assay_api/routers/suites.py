@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..cache_headers import public_read_json_headers
 from ..exam_packs import (
     exam_pack_export,
     list_exam_packs,
@@ -25,8 +27,11 @@ class ExamPackImportFileRequest(BaseModel):
 
 
 @router.get("/exam-packs")
-def exam_packs() -> list[dict]:
-    return [pack.model_dump(mode="json") for pack in list_exam_packs()]
+def exam_packs() -> JSONResponse:
+    return JSONResponse(
+        content=[pack.model_dump(mode="json") for pack in list_exam_packs()],
+        headers=public_read_json_headers(max_age=300, stale_while_revalidate=1800),
+    )
 
 
 @router.post("/exam-packs/import")

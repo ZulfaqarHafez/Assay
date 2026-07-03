@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..agent_formats import normalize_agent_definition
+from ..cache_headers import public_read_json_headers
 from ..agent_intake import detect_agent_facts
 from ..agent_research import resolve_openai_key
 from ..database import get_candidate, list_candidate_summaries, list_candidates, save_candidate
@@ -54,8 +56,11 @@ def candidates() -> list[dict]:
 
 
 @router.get("/candidates/summary")
-def candidate_summaries() -> list[dict]:
-    return list_candidate_summaries()
+def candidate_summaries() -> JSONResponse:
+    return JSONResponse(
+        content=list_candidate_summaries(),
+        headers=public_read_json_headers(),
+    )
 
 
 @router.post("/candidates")

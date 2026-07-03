@@ -175,14 +175,19 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
             },
         ).json()
         client.post(f"/runs/{run['id']}/start")
-        candidate_summary = client.get("/candidates/summary").json()[0]
-        run_summary = client.get("/runs/summary").json()[0]
+        candidate_summary_response = client.get("/candidates/summary")
+        run_summary_response = client.get("/runs/summary")
+        exam_packs_response = client.get("/exam-packs")
+        candidate_summary = candidate_summary_response.json()[0]
+        run_summary = run_summary_response.json()[0]
 
     assert candidate_summary["id"] == candidate["id"]
     assert candidate_summary["name"] == "Verbose Agent"
     assert candidate_summary["adapter_type"] == "mock"
     assert "system_prompt" not in candidate_summary
     assert "metadata" not in candidate_summary
+    assert candidate_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert "origin" in candidate_summary_response.headers["vary"].lower()
 
     assert run_summary["id"] == run["id"]
     assert run_summary["candidate_id"] == candidate["id"]
@@ -190,6 +195,12 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert run_summary["pass_count"] >= 0
     assert "job_scope" not in run_summary
     assert "tailored_exam_pack" not in run_summary
+    assert run_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert "origin" in run_summary_response.headers["vary"].lower()
+
+    assert exam_packs_response.status_code == 200
+    assert exam_packs_response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=1800"
+    assert "origin" in exam_packs_response.headers["vary"].lower()
 
 
 def test_supabase_startup_skips_eager_db_probe(monkeypatch) -> None:

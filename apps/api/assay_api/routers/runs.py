@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, Response
 
 from ..agent_diff import diff_payload
 from ..badge import agent_hash, badge_svg
+from ..cache_headers import public_read_json_headers
 from ..agent_refinery import agent_spec_payload
 from ..agent_research import research_agent_spec
 from ..connectors import connector_probes, connector_registry
@@ -32,8 +33,6 @@ from ..product_review import product_review_for_run
 from ..progress import candidate_progress, lesson_library, run_comparison
 from ..rate_limit import rate_limit
 from ..role_intelligence import analyze_job_scope, role_analysis_for_run
-from ..security import configured_api_keys
-from ..tenancy import tenant_required
 
 router = APIRouter()
 
@@ -62,8 +61,11 @@ def runs() -> list[dict]:
 
 
 @router.get("/runs/summary")
-def run_summaries() -> list[dict]:
-    return list_run_summaries()
+def run_summaries() -> JSONResponse:
+    return JSONResponse(
+        content=list_run_summaries(),
+        headers=public_read_json_headers(),
+    )
 
 
 @router.post("/runs", dependencies=[Depends(rate_limit("create_run"))])
@@ -176,17 +178,8 @@ def run_scorecard(run_id: str) -> dict:
     return _scorecard_payload(scorecard, include_trace_raw=False)
 
 
-def _completed_run_cache_control(run: RunRecord) -> str:
-    if run.status == "completed" and not configured_api_keys() and not tenant_required():
-        return "public, max-age=30, stale-while-revalidate=300"
-    return "no-store"
-
-
 def _run_json_cache_headers(run: RunRecord) -> dict[str, str]:
-    return {
-        "Cache-Control": _completed_run_cache_control(run),
-        "Vary": "Origin",
-    }
+    return public_read_json_headers(cacheable=run.status == "completed")
 
 
 @router.get("/runs/{run_id}/verdict")

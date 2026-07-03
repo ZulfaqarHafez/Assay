@@ -49,6 +49,25 @@ def test_correct_header_allows_access_when_key_configured(monkeypatch: pytest.Mo
         assert response.status_code == 200
 
 
+def test_shared_metadata_cache_disables_when_key_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
+    headers = {"X-API-Key": "secret-key-1"}
+    with TestClient(app) as client:
+        candidates = client.get("/candidates/summary", headers=headers)
+        runs = client.get("/runs/summary", headers=headers)
+        packs = client.get("/exam-packs", headers=headers)
+
+    assert candidates.status_code == 200
+    assert runs.status_code == 200
+    assert packs.status_code == 200
+    assert candidates.headers["cache-control"] == "no-store"
+    assert runs.headers["cache-control"] == "no-store"
+    assert packs.headers["cache-control"] == "no-store"
+    assert "origin" in candidates.headers["vary"].lower()
+    assert "origin" in runs.headers["vary"].lower()
+    assert "origin" in packs.headers["vary"].lower()
+
+
 def test_tenant_header_required_in_hosted_tenant_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
     monkeypatch.setenv("ASSAY_REQUIRE_TENANT", "1")
