@@ -176,7 +176,7 @@ def run_scorecard(run_id: str) -> dict:
     return _scorecard_payload(scorecard, include_trace_raw=False)
 
 
-def _run_verdict_cache_control(run: RunRecord) -> str:
+def _completed_run_cache_control(run: RunRecord) -> str:
     if run.status == "completed" and not configured_api_keys() and not tenant_required():
         return "public, max-age=30, stale-while-revalidate=300"
     return "no-store"
@@ -218,7 +218,7 @@ def run_verdict(run_id: str) -> JSONResponse:
     }
     return JSONResponse(
         content=payload,
-        headers={"Cache-Control": _run_verdict_cache_control(run)},
+        headers={"Cache-Control": _completed_run_cache_control(run)},
     )
 
 
@@ -228,6 +228,42 @@ def run_reviewers(run_id: str) -> dict:
     if payload is None:
         raise HTTPException(status_code=404, detail="Run not found")
     return payload.model_dump(mode="json")
+
+
+@router.get("/runs/{run_id}/surfaces")
+def run_surfaces(run_id: str) -> JSONResponse:
+    """Lean secondary payload for non-critical run detail panels.
+
+    The first paint uses ``/verdict``. This endpoint batches the lower-priority
+    learning and reviewer surfaces so the web app does not fan out into several
+    Python function invocations right after the verdict strip renders.
+    """
+    run = get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    try:
+        agent_spec = agent_spec_payload(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
+
+    product_review = product_review_for_run(run_id)
+    progress_payload = candidate_progress(run.candidate_id)
+    diagnostic_library = [
+        lesson.model_dump(mode="json") for lesson in lesson_library(run.candidate_id)
+    ]
+    payload = {
+        "schema": "assay.run_surfaces.v1",
+        "run_id": run_id,
+        "agent_spec": agent_spec,
+        "product_review": product_review.model_dump(mode="json") if product_review else None,
+        "candidate_progress": progress_payload.model_dump(mode="json") if progress_payload else None,
+        "diagnostic_library": diagnostic_library,
+    }
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": _completed_run_cache_control(run)},
+    )
 
 
 @router.get("/runs/{run_id}/deployability")

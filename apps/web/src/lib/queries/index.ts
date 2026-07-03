@@ -16,6 +16,7 @@ export {
   useRunSummaries,
   useRun,
   useRunVerdict,
+  useRunSurfaces,
   useScorecard,
   useTrace,
   useEvents,

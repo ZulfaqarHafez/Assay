@@ -15,6 +15,7 @@ import type {
   RunEvent,
   RunRecord,
   RunSummary,
+  RunSurfaces,
   RunVerdict,
   Scorecard,
   TracePayload
@@ -52,6 +53,15 @@ export function useRunVerdict(runId: string | null | undefined, options?: QueryO
   return useQuery({
     queryKey: queryKeys.runVerdict(runId ?? ""),
     queryFn: () => assayApi.runVerdict(runId as string),
+    enabled: Boolean(runId),
+    ...options
+  });
+}
+
+export function useRunSurfaces(runId: string | null | undefined, options?: QueryOpts<RunSurfaces>) {
+  return useQuery({
+    queryKey: queryKeys.runSurfaces(runId ?? ""),
+    queryFn: () => assayApi.runSurfaces(runId as string),
     enabled: Boolean(runId),
     ...options
   });
@@ -221,6 +231,7 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.run(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runVerdict(runId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runSurfaces(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.scorecard(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.events(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.trace(runId) });

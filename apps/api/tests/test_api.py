@@ -54,12 +54,18 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         public_scorecard = client.get(f"/runs/{run['id']}/scorecard").json()
         verdict_response = client.get(f"/runs/{run['id']}/verdict")
         verdict = verdict_response.json()
+        surfaces_response = client.get(f"/runs/{run['id']}/surfaces")
+        surfaces = surfaces_response.json()
         trace = client.get(f"/runs/{run['id']}/trace").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
         detail = client.get(f"/runs/{run['id']}/detail").json()
         monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
         protected_verdict_response = client.get(
             f"/runs/{run['id']}/verdict",
+            headers={"X-API-Key": "secret-key-1"},
+        )
+        protected_surfaces_response = client.get(
+            f"/runs/{run['id']}/surfaces",
             headers={"X-API-Key": "secret-key-1"},
         )
 
@@ -74,6 +80,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert pending_verdict_response.headers["cache-control"] == "no-store"
     assert verdict_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert protected_verdict_response.headers["cache-control"] == "no-store"
+    assert surfaces_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert protected_surfaces_response.headers["cache-control"] == "no-store"
     assert verdict["schema"] == "assay.run_verdict.v1"
     assert verdict["run"]["id"] == run["id"]
     assert verdict["candidate"]["id"] == candidate_id
@@ -82,6 +90,14 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert verdict["deployability"]["schema"] == "assay.deployability_decision.v1"
     assert "events" not in verdict
     assert "product_review" not in verdict
+    assert surfaces["schema"] == "assay.run_surfaces.v1"
+    assert surfaces["run_id"] == run["id"]
+    assert surfaces["agent_spec"]["schema"] == "assay.agent_spec.v1"
+    assert surfaces["product_review"]["schema"] == "assay.product_review.v1"
+    assert surfaces["candidate_progress"]["schema"] == "assay.candidate_progress.v1"
+    assert isinstance(surfaces["diagnostic_library"], list)
+    assert "scorecard" not in surfaces
+    assert "events" not in surfaces
     assert trace["scorecard"]["run_id"] == run["id"]
     assert trace["scorecard"]["trace_audit"]["raw"] == {}
     assert bundle["schema"] == "assay.proof_bundle.v1"

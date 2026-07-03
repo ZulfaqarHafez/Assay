@@ -200,10 +200,16 @@ describe("RunDetail query fanout", () => {
           deployability
         });
       }
-      if (url.pathname === "/runs/run_demo/agent-spec") return json(agentSpec);
-      if (url.pathname === "/runs/run_demo/reviewers") return json(proofBundle.product_review);
-      if (url.pathname === "/candidates/cand_demo/progress") return json(proofBundle.candidate_progress);
-      if (url.pathname === "/candidates/cand_demo/lessons") return json([]);
+      if (url.pathname === "/runs/run_demo/surfaces") {
+        return json({
+          schema: "assay.run_surfaces.v1",
+          run_id: "run_demo",
+          agent_spec: agentSpec,
+          product_review: proofBundle.product_review,
+          candidate_progress: proofBundle.candidate_progress,
+          diagnostic_library: []
+        });
+      }
       if (url.pathname === "/runs/run_demo/agent-spec/diff") {
         return json({
           schema: "assay.agent_diff.v1",
@@ -245,8 +251,11 @@ describe("RunDetail query fanout", () => {
     expect(paths).not.toContain("/exam-packs");
 
     await screen.findByRole("button", { name: /exact diff/i }, { timeout: 3000 });
-    expect(paths).toContain("/runs/run_demo/agent-spec");
-    expect(paths).toContain("/runs/run_demo/reviewers");
+    expect(paths).toContain("/runs/run_demo/surfaces");
+    expect(paths).not.toContain("/runs/run_demo/agent-spec");
+    expect(paths).not.toContain("/runs/run_demo/reviewers");
+    expect(paths).not.toContain("/candidates/cand_demo/progress");
+    expect(paths).not.toContain("/candidates/cand_demo/lessons");
     expect(paths).not.toContain("/runs/run_demo/detail");
     expect(paths).not.toContain("/runs/run_demo/proof-bundle");
 

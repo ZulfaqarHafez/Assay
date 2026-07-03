@@ -58,6 +58,16 @@ describe("assayApi request headers", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1/verdict");
   });
 
+  it("uses the bundled run surfaces endpoint for secondary run-detail panels", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
+    const fetchMock = vi.fn(async () => json({ schema: "assay.run_surfaces.v1" }));
+    global.fetch = fetchMock;
+
+    await assayApi.runSurfaces("run_1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1/surfaces");
+  });
+
   it("adds JSON content type for mutation bodies", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
     const fetchMock = vi.fn(async () => json({ id: "run_1" }));

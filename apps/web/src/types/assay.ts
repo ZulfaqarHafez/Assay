@@ -252,6 +252,15 @@ export type RunVerdict = {
   deployability: DeployabilityDecision | null;
 };
 
+export type RunSurfaces = {
+  schema: "assay.run_surfaces.v1";
+  run_id: string;
+  agent_spec: AgentSpec | null;
+  product_review: ProductReview | null;
+  candidate_progress: CandidateProgress | null;
+  diagnostic_library: DiagnosticLesson[];
+};
+
 export type BriefCompetency = {
   key: string;
   label: string;

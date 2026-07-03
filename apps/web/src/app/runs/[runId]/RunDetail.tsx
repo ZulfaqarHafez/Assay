@@ -21,10 +21,8 @@ import {
   Rocket
 } from "lucide-react";
 import {
-  useAgentSpec,
-  useCandidateProgress,
-  useReviewers,
   useRunComparison,
+  useRunSurfaces,
   useRunVerdict,
   useTrace
 } from "@/lib/queries";
@@ -74,15 +72,10 @@ export default function RunDetail({ runId }: { runId: string }) {
   const traceQuery = useTrace(runId, {
     enabled: drawerOpen
   });
-  const agentSpecQuery = useAgentSpec(runId, {
+  const surfacesQuery = useRunSurfaces(runId, {
     enabled: richSurfacesReady,
     retry: false
   });
-  const reviewersQuery = useReviewers(runId, {
-    enabled: richSurfacesReady,
-    retry: false
-  });
-  const progressQuery = useCandidateProgress(richSurfacesReady ? candidateId : null);
   const [badgeCopied, setBadgeCopied] = React.useState(false);
   const [cardBusy, setCardBusy] = React.useState(false);
   const [exportingProof, setExportingProof] = React.useState(false);
@@ -91,9 +84,10 @@ export default function RunDetail({ runId }: { runId: string }) {
   const trace = traceQuery.data ?? null;
   const scorecard = verdict?.scorecard ?? null;
   const deployability = verdict?.deployability ?? null;
-  const reviewers = reviewersQuery.data ?? null;
+  const surfaces = surfacesQuery.data ?? null;
+  const reviewers = surfaces?.product_review ?? null;
   const events = trace?.events ?? [];
-  const agentSpec = agentSpecQuery.data ?? null;
+  const agentSpec = surfaces?.agent_spec ?? null;
   const candidateName = verdict?.candidate?.name ?? agentSpec?.candidate_name ?? "Candidate";
   // Rerun against the originally-requested pack (a tailored run repoints exam_pack_id at a gen-* id).
   const rerunPackId = runRecord?.source_pack_id ?? runRecord?.exam_pack_id ?? agentSpec?.exam_pack_id ?? "hr-v1";
@@ -101,7 +95,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   // later run pointing back here means this run's refinery output was validated.
   const baselineRunId = runRecord?.baseline_run_id ?? null;
   const validationRun =
-    progressQuery.data?.runs.find((item) => item.baseline_run_id === runId) ?? null;
+    surfaces?.candidate_progress?.runs.find((item) => item.baseline_run_id === runId) ?? null;
   const comparisonFallback = React.useMemo<RunComparisonData | undefined>(() => {
     if (!scorecard || scorecard.prior_run_id) return undefined;
     return {
@@ -255,7 +249,7 @@ export default function RunDetail({ runId }: { runId: string }) {
 
       {reviewers ? (
         <ReviewCouncil review={reviewers} decision={deployability} />
-      ) : richSurfacesReady && reviewersQuery.isLoading ? (
+      ) : richSurfacesReady && surfacesQuery.isLoading ? (
         <div className="ws-skeleton-card" />
       ) : null}
 
@@ -293,11 +287,12 @@ export default function RunDetail({ runId }: { runId: string }) {
             comparison={comparisonFallback}
           />
           <ProgressTrend
-            candidateId={richSurfacesReady ? candidateId : null}
-            progress={progressQuery.data ?? undefined}
+            candidateId={surfaces?.candidate_progress ? candidateId : null}
+            progress={surfaces?.candidate_progress ?? undefined}
           />
           <DiagnosticLibrary
-            candidateId={richSurfacesReady ? candidateId : null}
+            candidateId={surfaces ? candidateId : null}
+            lessons={surfaces?.diagnostic_library ?? undefined}
           />
         </div>
       )}
