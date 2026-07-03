@@ -110,7 +110,17 @@ def test_progress_tracks_competency_trend(monkeypatch: pytest.MonkeyPatch) -> No
         monkeypatch.setattr("assay_api.orchestrator.grade_response", _passing_grade)
         run_b = _start_run(client, candidate_id)
 
-        progress = client.get(f"/candidates/{candidate_id}/progress").json()
+        from assay_api import progress as progress_module
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(
+                progress_module,
+                "get_scorecard",
+                lambda run_id: (_ for _ in ()).throw(
+                    AssertionError(f"candidate_progress should batch scorecard reads; got {run_id}")
+                ),
+            )
+            progress = client.get(f"/candidates/{candidate_id}/progress").json()
         comparison = client.get(f"/runs/{run_b}/comparison?baseline={run_a}").json()
         lessons = client.get(f"/candidates/{candidate_id}/lessons").json()
 

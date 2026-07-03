@@ -16,6 +16,7 @@ from .database import (
     get_lesson,
     get_run,
     get_scorecard,
+    get_scorecards,
     list_lessons_for_candidate,
     list_runs_for_candidate,
 )
@@ -64,10 +65,11 @@ def candidate_progress(candidate_id: str) -> CandidateProgress | None:
         return None
 
     runs = [run for run in list_runs_for_candidate(candidate_id) if run.status == "completed"]
+    scorecards = get_scorecards([run.id for run in runs])
     points_by_comp: dict[str, list[CompetencyTrendPoint]] = defaultdict(list)
     certified_count = 0
     for run in runs:
-        scorecard = get_scorecard(run.id)
+        scorecard = scorecards.get(run.id)
         if scorecard is None:
             continue
         if scorecard.certified:
