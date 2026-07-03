@@ -446,6 +446,8 @@ export type ProofBundle = {
   agent_spec: AgentSpec | null;
   role_analysis?: RoleAnalysis | null;
   product_review?: ProductReview | null;
+  candidate_progress?: CandidateProgress | null;
+  diagnostic_library?: DiagnosticLesson[];
 };
 
 // --- Phase 0: closed learning loop (diagnostic library + progress) ---

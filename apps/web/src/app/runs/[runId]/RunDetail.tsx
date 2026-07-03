@@ -22,7 +22,6 @@ import {
 import {
   useDeployability,
   useProofBundle,
-  useReviewers,
   useRunComparison,
   useRuns,
   useScorecard,
@@ -40,7 +39,7 @@ import DiagnosticLibrary from "@/components/library/DiagnosticLibrary";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import ReviewCouncil from "@/components/assay/ReviewCouncil";
-import type { DeployabilityDecision, RunEvent, Scorecard } from "@/types/assay";
+import type { DeployabilityDecision, RunComparison as RunComparisonData, RunEvent, Scorecard, TracePayload } from "@/types/assay";
 
 /**
  * Shareable run-detail view. Reuses the same composition pieces as the console
@@ -48,15 +47,6 @@ import type { DeployabilityDecision, RunEvent, Scorecard } from "@/types/assay";
  * state is mirrored into `?drawer=trace` so the URL fully describes the view.
  */
 export default function RunDetail({ runId }: { runId: string }) {
-  const proofBundleQuery = useProofBundle(runId);
-  const traceQuery = useTrace(runId);
-  const scorecardQuery = useScorecard(runId);
-  const reviewersQuery = useReviewers(runId);
-  // Fast, policy-honest decision (no ~8s proof-bundle wait); bundle is fallback.
-  const deployabilityQuery = useDeployability(runId, { retry: false });
-  const runsQuery = useRuns();
-  const [badgeCopied, setBadgeCopied] = React.useState(false);
-
   // Drawer open/closed driven by the URL so the view is deep-linkable.
   // Only the trace inspector exists; the old spec/research values opened the
   // same view with mismatched intent, so the enum is narrowed to what renders.
@@ -66,11 +56,28 @@ export default function RunDetail({ runId }: { runId: string }) {
   );
   const drawerOpen = drawer !== null;
 
+  const proofBundleQuery = useProofBundle(runId);
   const proofBundle = proofBundleQuery.data ?? null;
-  const trace = traceQuery.data ?? null;
+  const traceFromBundle = React.useMemo<TracePayload | null>(() => {
+    if (!proofBundle) return null;
+    return {
+      run_id: runId,
+      events: proofBundle.events,
+      scorecard: proofBundle.scorecard
+    };
+  }, [proofBundle, runId]);
+  const traceQuery = useTrace(runId, {
+    enabled: drawerOpen && !traceFromBundle
+  });
+  const scorecardQuery = useScorecard(runId);
+  // Fast, policy-honest decision (no proof-bundle wait); bundle is fallback.
+  const deployabilityQuery = useDeployability(runId, { retry: false });
+  const [badgeCopied, setBadgeCopied] = React.useState(false);
+
+  const trace = traceQuery.data ?? traceFromBundle;
   const scorecard = scorecardQuery.data ?? proofBundle?.scorecard ?? null;
   const deployability = deployabilityQuery.data ?? proofBundle?.deployability ?? null;
-  const reviewers = reviewersQuery.data ?? proofBundle?.product_review ?? null;
+  const reviewers = proofBundle?.product_review ?? null;
   const events = trace?.events ?? proofBundle?.events ?? [];
   const agentSpec = proofBundle?.agent_spec ?? null;
   const candidateId = proofBundle?.candidate?.id ?? proofBundle?.run?.candidate_id ?? null;
@@ -80,7 +87,22 @@ export default function RunDetail({ runId }: { runId: string }) {
   // This run tested a refined agent when it carries a baseline; conversely a
   // later run pointing back here means this run's refinery output was validated.
   const baselineRunId = proofBundle?.run?.baseline_run_id ?? null;
+  const runsQuery = useRuns({ enabled: Boolean(agentSpec?.agent_markdown?.trim()) });
   const validationRun = (runsQuery.data ?? []).find((item) => item.baseline_run_id === runId) ?? null;
+  const comparisonFallback = React.useMemo<RunComparisonData | undefined>(() => {
+    if (!scorecard || scorecard.prior_run_id) return undefined;
+    return {
+      schema: "assay.run_comparison.v1",
+      run_id: runId,
+      baseline_run_id: null,
+      candidate_id: proofBundle?.run?.candidate_id ?? candidateId ?? "",
+      competencies: [],
+      improved: 0,
+      regressed: 0,
+      unchanged: 0,
+      certified_changed: false
+    };
+  }, [candidateId, proofBundle?.run?.candidate_id, runId, scorecard]);
 
   // Gate the analytics on the fast scorecard, not the ~8s proof-bundle assembly.
   const isLoading = scorecardQuery.isLoading && !scorecard;
@@ -189,7 +211,7 @@ export default function RunDetail({ runId }: { runId: string }) {
 
       {reviewers ? (
         <ReviewCouncil review={reviewers} decision={deployability} />
-      ) : reviewersQuery.isLoading ? (
+      ) : proofBundleQuery.isLoading ? (
         <div className="ws-skeleton-card" />
       ) : null}
 
@@ -222,9 +244,19 @@ export default function RunDetail({ runId }: { runId: string }) {
       ) : (
         <div className="learning-surfaces">
           <CompetencyRadar scorecard={scorecard} />
-          <RunComparison runId={runId} baseline={scorecard?.prior_run_id ?? undefined} />
-          <ProgressTrend candidateId={candidateId} />
-          <DiagnosticLibrary candidateId={candidateId} />
+          <RunComparison
+            runId={runId}
+            baseline={scorecard?.prior_run_id ?? undefined}
+            comparison={comparisonFallback}
+          />
+          <ProgressTrend
+            candidateId={candidateId}
+            progress={proofBundle?.candidate_progress ?? undefined}
+          />
+          <DiagnosticLibrary
+            candidateId={candidateId}
+            lessons={proofBundle?.diagnostic_library}
+          />
         </div>
       )}
 
