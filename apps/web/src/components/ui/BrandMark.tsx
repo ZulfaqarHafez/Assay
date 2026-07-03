@@ -3,10 +3,11 @@
 import * as React from "react";
 
 /**
- * The Assay mark — a flask of separated chromatography bands, generated in Canva
- * and exported as a rounded tile (bone or ink). Rendered as an <img> so the real
- * brand asset is used verbatim rather than re-drawn. The tile is self-contained,
- * so it reads on both the warm light and dark surfaces.
+ * The Assay mark — a tapered spiral that winds inward and settles on a single
+ * plum specimen at its eye: many trials drawn in to one reading. Generated as a
+ * rounded tile (bone or ink) by scripts/build-logo.mjs and rendered as an <img>
+ * so the real brand asset is used verbatim rather than re-drawn. The tile is
+ * self-contained, so it reads on both the warm light and dark surfaces.
  */
 
 export type BrandMarkProps = {
