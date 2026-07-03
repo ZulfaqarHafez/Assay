@@ -29,7 +29,7 @@ export function TopNav() {
   return (
     <header className="ws-nav">
       <div className="ws-nav-inner">
-        <Link href="/" className="ws-brand" aria-label="Assay home">
+        <Link prefetch={false} href="/" className="ws-brand" aria-label="Assay home">
           <BrandMark size={30} className="ws-brand-mark" title="Assay" />
           <span>Assay</span>
         </Link>
@@ -37,6 +37,7 @@ export function TopNav() {
           {LINKS.map((l) => (
             <Link
               key={l.href}
+              prefetch={false}
               href={l.href}
               className={`ws-link ${isActive(l.href, l.exact) ? "active" : ""}`}
               aria-current={isActive(l.href, l.exact) ? "page" : undefined}
