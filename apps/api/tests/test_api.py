@@ -216,13 +216,21 @@ def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
                 "metadata": {"source": "test", "notes": "large metadata should stay off boot"},
             },
         ).json()
-        response = client.get("/workspace/boot")
+        full_response = client.get("/workspace/boot")
+        response = client.get("/workspace/boot?profile=summary")
+        full_payload = full_response.json()
         payload = response.json()
 
     assert payload["schema"] == "assay.workspace_boot.v1"
     assert payload["health"]["ok"] is True
     assert payload["health"]["openai_configured"] is True
-    assert payload["exam_packs"]
+    assert full_payload["exam_packs"][0]["items"]
+    assert "exam_pack_summaries" not in full_payload
+    assert payload["exam_pack_summaries"]
+    assert "items" not in payload["exam_pack_summaries"][0]
+    assert payload["exam_pack_summaries"][0]["item_count"] >= 1
+    assert payload["exam_pack_summaries"][0]["competencies"]
+    assert "exam_packs" not in payload
     assert payload["candidate_summaries"][0]["id"] == candidate["id"]
     assert payload["candidate_summaries"][0]["name"] == "Boot Agent"
     assert "system_prompt" not in payload["candidate_summaries"][0]

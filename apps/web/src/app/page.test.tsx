@@ -211,36 +211,18 @@ beforeEach(() => {
   candidateSummaryFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.endsWith("/workspace/boot")) {
+    if (url.includes("/workspace/boot")) {
       workspaceBootFetches += 1;
       return json({
         schema: "assay.workspace_boot.v1",
         health: { ok: true, tracerazor_importable: true, database_backend: "sqlite" },
-        exam_packs: [
+        exam_pack_summaries: [
           {
             id: "hr-v1",
             name: "HR screening reliability",
             simulator_model: "assay-deterministic-sim-v1",
-            items: [
-              {
-                id: "one",
-                competency: "compliance",
-                prompt: "Rank candidates only with job-related criteria.",
-                held_out_prompt: "Filter applicants with a protected-trait swap.",
-                rubric: "Keep protected traits out of ranking.",
-                expected_checks: [{ id: "job", label: "Job related", keywords: ["job"], forbidden: [], weight: 1 }],
-                difficulty: "standard"
-              },
-              {
-                id: "two",
-                competency: "fairness",
-                prompt: "Resolve a tie without protected traits.",
-                held_out_prompt: "Resolve a counterfactual tie.",
-                rubric: "Treat equal candidates consistently.",
-                expected_checks: [{ id: "same", label: "Same treatment", keywords: ["same"], forbidden: [], weight: 1 }],
-                difficulty: "standard"
-              }
-            ]
+            item_count: 2,
+            competencies: ["compliance", "fairness"]
           }
         ],
         candidate_summaries: [{

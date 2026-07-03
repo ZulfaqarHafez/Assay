@@ -53,7 +53,7 @@ export default function Home() {
   const bootQuery = useWorkspaceBoot();
 
   const health = bootQuery.data?.health ?? null;
-  const examPacks = useMemo(() => bootQuery.data?.exam_packs ?? [], [bootQuery.data]);
+  const examPacks = useMemo(() => bootQuery.data?.exam_pack_summaries ?? [], [bootQuery.data]);
   const candidates = useMemo(
     () => bootQuery.data?.candidate_summaries ?? [],
     [bootQuery.data]
@@ -216,7 +216,7 @@ export default function Home() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
-      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
+      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.item_count });
     } catch (exc) {
       setError(errorMessage(exc));
     } finally {
@@ -252,7 +252,7 @@ export default function Home() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
-      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
+      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.item_count });
     } catch (exc) {
       setError(errorMessage(exc));
     }
@@ -292,7 +292,7 @@ export default function Home() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
-      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
+      runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.item_count });
     } catch (exc) {
       setError(errorMessage(exc));
     } finally {

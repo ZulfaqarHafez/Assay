@@ -22,10 +22,15 @@ export type Health = {
   openai_configured?: boolean;
 };
 
+export type ExamPackSummary = Pick<ExamPack, "id" | "name" | "simulator_model"> & {
+  item_count: number;
+  competencies: string[];
+};
+
 export type WorkspaceBoot = {
   schema: "assay.workspace_boot.v1";
   health: Health;
-  exam_packs: ExamPack[];
+  exam_pack_summaries: ExamPackSummary[];
   candidate_summaries: CandidateSummary[];
 };
 

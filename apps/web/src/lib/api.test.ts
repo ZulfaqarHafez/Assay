@@ -45,7 +45,7 @@ describe("assayApi request headers", () => {
 
     await assayApi.workspaceBoot();
 
-    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/workspace/boot");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/workspace/boot?profile=summary");
   });
 
   it("reads a single run without assembling a proof bundle", async () => {

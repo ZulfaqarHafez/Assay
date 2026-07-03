@@ -56,7 +56,7 @@ def test_shared_metadata_cache_disables_when_key_configured(monkeypatch: pytest.
         candidates = client.get("/candidates/summary", headers=headers)
         runs = client.get("/runs/summary", headers=headers)
         packs = client.get("/exam-packs", headers=headers)
-        boot = client.get("/workspace/boot", headers=headers)
+        boot = client.get("/workspace/boot?profile=summary", headers=headers)
 
     assert candidates.status_code == 200
     assert runs.status_code == 200
