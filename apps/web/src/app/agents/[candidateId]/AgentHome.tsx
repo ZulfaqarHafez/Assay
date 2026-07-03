@@ -5,10 +5,13 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, AlertTriangle, Circle, FlaskConical } from "lucide-react";
 import { useAgentHome } from "@/lib/queries";
-import AgentRunControls from "@/components/assay/AgentRunControls";
 import { AgentArt } from "@/components/ui/EmptyArt";
 import ViewportDeferred from "@/components/ui/ViewportDeferred";
 import type { RunSummary } from "@/types/assay";
+
+const AgentRunControls = dynamic(() => import("@/components/assay/AgentRunControls"), {
+  loading: () => <div className="agent-run-controls"><span className="ws-skeleton-row" aria-hidden="true" /></div>
+});
 
 const ProgressTrend = dynamic(() => import("@/components/progress/ProgressTrend"), {
   loading: () => <LearningSurfaceSkeleton />

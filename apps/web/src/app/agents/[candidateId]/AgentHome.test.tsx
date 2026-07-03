@@ -56,7 +56,7 @@ vi.mock("@/components/assay/AgentRunControls", () => ({
 }));
 
 describe("AgentHome", () => {
-  it("renders a candidate-scoped home payload without workspace-wide fanout", () => {
+  it("renders a candidate-scoped home payload without workspace-wide fanout", async () => {
     render(<AgentHome candidateId="cand_support" />);
 
     expect(queryMocks.useAgentHome).toHaveBeenCalledWith("cand_support");
@@ -64,7 +64,7 @@ describe("AgentHome", () => {
     expect(screen.getByText("run_latest")).toBeInTheDocument();
     expect(screen.getByText("5/5")).toBeInTheDocument();
     expect(screen.getByText("Ship")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-run-controls")).toHaveTextContent(
+    expect(await screen.findByTestId("agent-run-controls")).toHaveTextContent(
       JSON.stringify({ baselineRunId: "run_latest", refinedMarkdown: null, refinedRunId: "run_latest" })
     );
   });
