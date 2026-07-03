@@ -27,6 +27,7 @@ from .models import (
     CompetencyTrendPoint,
     DiagnosticLesson,
     RunComparison,
+    RunRecord,
     Scorecard,
 )
 
@@ -122,16 +123,22 @@ def candidate_progress(candidate_id: str) -> CandidateProgress | None:
     )
 
 
-def run_comparison(run_id: str, baseline_run_id: str | None = None) -> RunComparison | None:
+def run_comparison(
+    run_id: str,
+    baseline_run_id: str | None = None,
+    *,
+    run_record: RunRecord | None = None,
+    current_scorecard: Scorecard | None = None,
+) -> RunComparison | None:
     """Diff a run's held-out competency scores against a baseline run.
 
     The baseline defaults to the run's recorded ``prior_run_id`` (the candidate's
     previous completed run on the same pack), so the common case needs no args.
     """
-    run = get_run(run_id)
+    run = run_record or get_run(run_id)
     if run is None:
         return None
-    current = get_scorecard(run_id)
+    current = current_scorecard or get_scorecard(run_id)
     if current is None:
         return None
 

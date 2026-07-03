@@ -165,7 +165,19 @@ def test_explicit_baseline_compares_improved_candidate_to_source_run(
         ).json()
         scorecard = client.post(f"/runs/{improved_run['id']}/start").json()
         comparison = client.get(f"/runs/{improved_run['id']}/comparison").json()
-        verdict = client.get(f"/runs/{improved_run['id']}/verdict").json()
+
+        from assay_api import progress as progress_module
+
+        original_get_scorecard = progress_module.get_scorecard
+
+        def _no_current_reread(run_id: str):
+            if run_id == improved_run["id"]:
+                raise AssertionError("verdict-bundled comparison should reuse the loaded scorecard")
+            return original_get_scorecard(run_id)
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(progress_module, "get_scorecard", _no_current_reread)
+            verdict = client.get(f"/runs/{improved_run['id']}/verdict").json()
 
     assert improved_run["baseline_run_id"] == baseline_run["id"]
     assert scorecard["prior_run_id"] == baseline_run["id"]

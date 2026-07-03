@@ -212,7 +212,12 @@ def run_verdict(run_id: str) -> JSONResponse:
             by_alias=True,
         )
         if run.baseline_run_id or scorecard.prior_run_id:
-            comparison_payload = run_comparison(run_id, run.baseline_run_id)
+            comparison_payload = run_comparison(
+                run_id,
+                run.baseline_run_id,
+                run_record=run,
+                current_scorecard=scorecard,
+            )
             comparison = comparison_payload.model_dump(mode="json") if comparison_payload else None
     payload = {
         "schema": "assay.run_verdict.v1",
