@@ -23,6 +23,35 @@ const baseProps = (size: number, className?: string) => ({
   "aria-hidden": true as const
 });
 
+/** A dial gauge with the needle at rest — "no measurements yet". Echoes the
+ * hero verdict meter, so the empty Experiments table reads as an instrument
+ * waiting for its first reading. */
+export function GaugeArt({ size = 96, className }: ArtProps) {
+  const cx = 60;
+  const cy = 82;
+  const r = 40;
+  // Top semicircle: angle pi (left) -> 0 (right), y measured up from the centre.
+  const pt = (a: number, rr: number): [number, number] => [cx + rr * Math.cos(a), cy - rr * Math.sin(a)];
+  const arc = Array.from({ length: 33 }, (_, i) => pt(Math.PI - (i / 32) * Math.PI, r));
+  const arcD = "M " + arc.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(" L ");
+  const ticks = Array.from({ length: 9 }, (_, i) => Math.PI - (i / 8) * Math.PI);
+  const [nx, ny] = pt(Math.PI * (162 / 180), r - 9); // needle resting at the low end
+  return (
+    <svg {...baseProps(size, className)}>
+      <path d={arcD} />
+      {ticks.map((a, i) => {
+        const [ox, oy] = pt(a, r);
+        const [ix, iy] = pt(a, r - (i % 2 ? 5 : 9));
+        return <line key={i} x1={ox} y1={oy} x2={ix} y2={iy} opacity={i % 2 ? 0.5 : 0.8} />;
+      })}
+      <line x1={cx} y1={cy} x2={nx} y2={ny} strokeWidth={2.6} />
+      <circle cx={cx} cy={cy} r={4.2} fill={PLUM} stroke="none" />
+      <path d={`M26 ${cy + 16} H94`} opacity={0.4} />
+      <path d={`M30 ${cy + 16} V ${cy + 20} M90 ${cy + 16} V ${cy + 20}`} opacity={0.4} />
+    </svg>
+  );
+}
+
 /** Empty assay vial with a single plum droplet — "no experiments yet". */
 export function VialArt({ size = 96, className }: ArtProps) {
   return (

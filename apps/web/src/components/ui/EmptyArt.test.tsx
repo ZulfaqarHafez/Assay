@@ -1,9 +1,10 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { AgentArt, ProbeArrayArt, VialArt } from "./EmptyArt";
+import { AgentArt, GaugeArt, ProbeArrayArt, VialArt } from "./EmptyArt";
 
 describe("EmptyArt", () => {
   it.each([
+    ["gauge", GaugeArt],
     ["vial", VialArt],
     ["probe array", ProbeArrayArt],
     ["agent", AgentArt]

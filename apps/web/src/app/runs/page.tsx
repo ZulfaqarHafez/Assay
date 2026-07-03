@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, Circle, Loader2, FlaskConical } from "lucide-react";
 import { useRunSummaries, useCandidateSummaries } from "@/lib/queries";
-import { VialArt } from "@/components/ui/EmptyArt";
+import { GaugeArt } from "@/components/ui/EmptyArt";
 import { VERDICT_LABEL } from "@/lib/verdict";
 import type { RunSummary } from "@/types/assay";
 
@@ -42,7 +42,7 @@ export default function ExperimentsPage() {
         </div>
       ) : runs.length === 0 ? (
         <div className="ws-empty-rich">
-          <VialArt size={104} className="ws-empty-art" />
+          <GaugeArt size={104} className="ws-empty-art" />
           <h2>No experiments yet</h2>
           <p>Run an agent through an adversarial suite and every scored, certified run will land here — ready to compare and inspect.</p>
           <Link href="/" className="ws-empty-cta"><FlaskConical size={15} /> Run your first test</Link>
