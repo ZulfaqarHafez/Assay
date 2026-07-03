@@ -1,4 +1,4 @@
-import type { AgentSummary, ExamPackSummary, RunSummary } from "@/types/assay";
+import type { AgentSummary, ExamPackSummary, RunSummary, WorkspaceBoot } from "@/types/assay";
 
 function serverApiBaseUrl() {
   return (
@@ -36,4 +36,8 @@ export function getAgentSummaries() {
 
 export function getExamPackSummaries() {
   return serverRequest<ExamPackSummary[]>("/exam-packs/summary");
+}
+
+export function getWorkspaceBoot() {
+  return serverRequest<WorkspaceBoot>("/workspace/boot?profile=summary");
 }

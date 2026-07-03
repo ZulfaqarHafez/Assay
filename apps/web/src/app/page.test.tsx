@@ -4,21 +4,22 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AnnouncerProvider } from "@/components/announcer";
-import Home from "./page";
+import { HomeClient } from "./HomeClient";
+import type { WorkspaceBoot } from "@/types/assay";
 
 /**
  * The page composes TanStack Query hooks and the announcer context, so tests
  * render it inside the same hot-path provider stack the real app uses. Retries
  * are disabled so error-state queries settle immediately.
  */
-function renderHome() {
+function renderHome(initialBoot: WorkspaceBoot | null = workspaceBootPayload) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <AnnouncerProvider>
-        <Home />
+        <HomeClient initialBoot={initialBoot} />
       </AnnouncerProvider>
     </QueryClientProvider>
   );
@@ -229,6 +230,25 @@ let traceFetches = 0;
 let eventFetches = 0;
 let roleBriefFetches = 0;
 
+const workspaceBootPayload: WorkspaceBoot = {
+  schema: "assay.workspace_boot.v1",
+  health: { ok: true, tracerazor_importable: true, database_backend: "sqlite" },
+  exam_pack_summaries: [
+    {
+      id: "hr-v1",
+      name: "HR screening reliability",
+      simulator_model: "assay-deterministic-sim-v1",
+      item_count: 2,
+      competencies: ["compliance", "fairness"]
+    }
+  ],
+  candidate_summaries: [{
+    id: candidate.id,
+    name: candidate.name,
+    adapter_type: candidate.adapter_type
+  }]
+};
+
 beforeEach(() => {
   agentSpecOverride = null;
   runCreateBodies = [];
@@ -247,24 +267,7 @@ beforeEach(() => {
     const url = String(input);
     if (url.includes("/workspace/boot")) {
       workspaceBootFetches += 1;
-      return json({
-        schema: "assay.workspace_boot.v1",
-        health: { ok: true, tracerazor_importable: true, database_backend: "sqlite" },
-        exam_pack_summaries: [
-          {
-            id: "hr-v1",
-            name: "HR screening reliability",
-            simulator_model: "assay-deterministic-sim-v1",
-            item_count: 2,
-            competencies: ["compliance", "fairness"]
-          }
-        ],
-        candidate_summaries: [{
-          id: candidate.id,
-          name: candidate.name,
-          adapter_type: candidate.adapter_type
-        }]
-      });
+      return json(workspaceBootPayload);
     }
     if (url.endsWith("/health")) {
       healthFetches += 1;
@@ -541,7 +544,7 @@ describe("Assay page", () => {
     expect(screen.getByRole("button", { name: /run demo litmus test/i })).toBeInTheDocument();
     // Zero-input path: a one-click sample run is offered on the hero.
     expect(screen.getByRole("button", { name: /run the sample agent/i })).toBeInTheDocument();
-    expect(workspaceBootFetches).toBe(1);
+    expect(workspaceBootFetches).toBe(0);
     // The intake path should not fetch historical runs until a workspace route needs them.
     expect(runListFetches).toBe(0);
     // Home first paint is batched into /workspace/boot; these individual reads
@@ -564,7 +567,7 @@ describe("Assay page", () => {
     await screen.findByText("What to fix", undefined, { timeout: 10000 });
     expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0);
     expect(screen.getByText(/By capability/i)).toBeInTheDocument();
-    expect(workspaceBootFetches).toBe(1);
+    expect(workspaceBootFetches).toBe(0);
     expect(candidateSummaryFetches).toBe(0);
     expect(runListFetches).toBe(0);
     expect(payoffFetches).toBe(1);
@@ -601,7 +604,7 @@ describe("Assay page", () => {
     await user.click(screen.getByRole("button", { name: /test improved version/i }));
 
     await waitFor(() => expect(runCreateBodies).toHaveLength(2));
-    expect(workspaceBootFetches).toBe(1);
+    expect(workspaceBootFetches).toBe(0);
     expect(candidateSummaryFetches).toBe(0);
     expect(runListFetches).toBe(0);
     expect(runCreateBodies[1]).toMatchObject({
