@@ -82,6 +82,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert protected_verdict_response.headers["cache-control"] == "no-store"
     assert surfaces_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert protected_surfaces_response.headers["cache-control"] == "no-store"
+    assert "origin" in verdict_response.headers["vary"].lower()
+    assert "origin" in surfaces_response.headers["vary"].lower()
     assert verdict["schema"] == "assay.run_verdict.v1"
     assert verdict["run"]["id"] == run["id"]
     assert verdict["candidate"]["id"] == candidate_id

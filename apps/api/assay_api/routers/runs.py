@@ -182,6 +182,13 @@ def _completed_run_cache_control(run: RunRecord) -> str:
     return "no-store"
 
 
+def _run_json_cache_headers(run: RunRecord) -> dict[str, str]:
+    return {
+        "Cache-Control": _completed_run_cache_control(run),
+        "Vary": "Origin",
+    }
+
+
 @router.get("/runs/{run_id}/verdict")
 def run_verdict(run_id: str) -> JSONResponse:
     """Slim first-paint payload for the run detail page.
@@ -218,7 +225,7 @@ def run_verdict(run_id: str) -> JSONResponse:
     }
     return JSONResponse(
         content=payload,
-        headers={"Cache-Control": _completed_run_cache_control(run)},
+        headers=_run_json_cache_headers(run),
     )
 
 
@@ -262,7 +269,7 @@ def run_surfaces(run_id: str) -> JSONResponse:
     }
     return JSONResponse(
         content=payload,
-        headers={"Cache-Control": _completed_run_cache_control(run)},
+        headers=_run_json_cache_headers(run),
     )
 
 
