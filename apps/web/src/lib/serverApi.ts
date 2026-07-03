@@ -1,4 +1,4 @@
-import type { AgentSummary, ExamPackSummary, RunSummary, WorkspaceBoot } from "@/types/assay";
+import type { AgentHomeSummary, AgentSummary, ExamPackSummary, RunSummary, WorkspaceBoot } from "@/types/assay";
 
 function serverApiBaseUrl() {
   return (
@@ -32,6 +32,12 @@ export function getRunSummaries() {
 
 export function getAgentSummaries() {
   return serverRequest<AgentSummary[]>("/agents/summary");
+}
+
+export function getAgentHome(candidateId: string) {
+  return serverRequest<AgentHomeSummary>(
+    `/agents/${encodeURIComponent(candidateId)}/home?include_agent_markdown=false`
+  );
 }
 
 export function getExamPackSummaries() {

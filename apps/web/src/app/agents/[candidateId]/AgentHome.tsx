@@ -7,7 +7,7 @@ import { ArrowLeft, CheckCircle2, AlertTriangle, Circle, FlaskConical } from "lu
 import { useAgentHome } from "@/lib/queries";
 import { AgentArt } from "@/components/ui/EmptyArt";
 import ViewportDeferred from "@/components/ui/ViewportDeferred";
-import type { RunSummary } from "@/types/assay";
+import type { AgentHomeSummary, RunSummary } from "@/types/assay";
 
 const AgentRunControls = dynamic(() => import("@/components/assay/AgentRunControls"), {
   loading: () => <div className="agent-run-controls"><span className="ws-skeleton-row" aria-hidden="true" /></div>
@@ -25,8 +25,15 @@ const RunComparison = dynamic(() => import("@/components/scorecard/RunComparison
  * Per-agent home. The API returns the candidate, only this agent's run rows,
  * and the latest refined markdown in one scoped payload.
  */
-export default function AgentHome({ candidateId }: { candidateId: string }) {
-  const homeQuery = useAgentHome(candidateId);
+export default function AgentHome({
+  candidateId,
+  initialHome = null
+}: {
+  candidateId: string;
+  initialHome?: AgentHomeSummary | null;
+}) {
+  const initialData = initialHome?.candidate.id === candidateId ? initialHome : undefined;
+  const homeQuery = useAgentHome(candidateId, initialData ? { initialData, staleTime: 30_000 } : undefined);
   const candidate = homeQuery.data?.candidate ?? null;
   const runs = React.useMemo(() => homeQuery.data?.runs ?? [], [homeQuery.data]);
   const latest = runs[0] ?? null;

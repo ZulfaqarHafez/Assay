@@ -59,13 +59,37 @@ describe("AgentHome", () => {
   it("renders a candidate-scoped home payload without workspace-wide fanout", async () => {
     render(<AgentHome candidateId="cand_support" />);
 
-    expect(queryMocks.useAgentHome).toHaveBeenCalledWith("cand_support");
+    expect(queryMocks.useAgentHome).toHaveBeenCalledWith("cand_support", undefined);
     expect(screen.getByRole("heading", { name: "Support Triage Agent" })).toBeInTheDocument();
     expect(screen.getByText("run_latest")).toBeInTheDocument();
     expect(screen.getByText("5/5")).toBeInTheDocument();
     expect(screen.getByText("Ship")).toBeInTheDocument();
     expect(await screen.findByTestId("agent-run-controls")).toHaveTextContent(
       JSON.stringify({ baselineRunId: "run_latest", refinedMarkdown: null, refinedRunId: "run_latest" })
+    );
+  });
+
+  it("seeds the agent query from server-loaded initial data", () => {
+    const initialHome = {
+      schema: "assay.agent_home.v1" as const,
+      candidate: {
+        id: "cand_support",
+        name: "Support Triage Agent",
+        adapter_type: "mock" as const,
+        created_at: "2026-07-03T00:00:00Z"
+      },
+      runs: [],
+      latest_agent_markdown: null
+    };
+
+    render(<AgentHome candidateId="cand_support" initialHome={initialHome} />);
+
+    expect(queryMocks.useAgentHome).toHaveBeenLastCalledWith(
+      "cand_support",
+      expect.objectContaining({
+        initialData: initialHome,
+        staleTime: 30_000
+      })
     );
   });
 });
