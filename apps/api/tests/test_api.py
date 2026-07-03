@@ -583,6 +583,49 @@ def test_run_badge_svg(monkeypatch) -> None:
     assert "pending" in pending.text
 
 
+def test_run_verdict_card_svg(monkeypatch) -> None:
+    class FakeAudit:
+        def __init__(self, threshold: float):
+            self.threshold = threshold
+
+        def analyse(self, candidate, trace_steps, task_value_score):
+            from assay_api.models import TraceAuditSummary
+
+            return TraceAuditSummary(
+                status="ok", trace_id="t", tas_score=88, grade="Good", passes=True,
+                total_steps=len(trace_steps), total_tokens=1000,
+            )
+
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
+
+    with TestClient(app) as client:
+        candidate_id = client.get("/candidates").json()[0]["id"]
+        run = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        client.post(f"/runs/{run['id']}/start")
+        card = client.get(f"/runs/{run['id']}/card.svg")
+        pending = client.get("/runs/run_missing/card.svg")
+
+    assert card.status_code == 200
+    assert card.headers["content-type"].startswith("image/svg+xml")
+    assert card.text.startswith("<svg") and "ASSAY" in card.text
+    # Renders one of the three canonical bands and the pass^k readout.
+    assert any(word in card.text for word in ("SHIP", "RISKY", "HOLD"))
+    assert "PASS^K" in card.text
+    # Unknown run still returns a valid (pending) card, never a broken image.
+    assert pending.status_code == 200
+    assert "PENDING" in pending.text
+
+
+def test_verdict_card_is_public(monkeypatch) -> None:
+    """The card is embedded as an <img>, so it must be reachable without a key."""
+    monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
+    with TestClient(app) as client:
+        card = client.get("/runs/run_any/card.svg")
+        scorecard = client.get("/runs/run_any/scorecard")
+    assert card.status_code == 200
+    assert scorecard.status_code == 401
+
+
 def test_agent_spec_diff_endpoint(monkeypatch) -> None:
     class FakeAudit:
         def __init__(self, threshold: float):
