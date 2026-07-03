@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { FlaskConical, Upload, UploadCloud, FileText, Wrench, Hash, Sparkles, Zap } from "lucide-react";
-import { detectAgentFacts } from "@/lib/assay";
+import { detectAgentFacts } from "@/lib/agentDetect";
 import HeroScanCard from "@/components/assay/HeroScanCard";
 
 /**
