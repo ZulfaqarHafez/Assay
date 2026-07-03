@@ -2573,6 +2573,97 @@ pre {
 .assay-fix-body strong { font-size: 14px; font-weight: 600; line-height: 1.35; }
 .assay-fix-body small { font-size: 12.5px; color: var(--color-fg-muted); line-height: 1.5; }
 
+.assay-static-lint {
+  display: grid;
+  gap: 10px;
+  padding: 14px 15px;
+  border: 1px solid color-mix(in srgb, var(--color-warn) 32%, var(--color-border));
+  border-left: 3px solid var(--color-warn);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warn) 8%, var(--color-surface));
+}
+
+.assay-static-lint-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.assay-static-lint-head svg { color: var(--color-warn); }
+.assay-static-lint-head h3 { margin: 0; }
+
+.assay-static-lint-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
+.assay-static-lint-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.assay-static-lint-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+}
+
+.assay-static-lint-list li.is-high { border-color: color-mix(in srgb, var(--color-fail) 38%, var(--color-border)); }
+.assay-static-lint-list li.is-medium { border-color: color-mix(in srgb, var(--color-warn) 38%, var(--color-border)); }
+.assay-static-lint-list li.is-low { border-color: color-mix(in srgb, var(--color-info) 32%, var(--color-border)); }
+
+.assay-static-lint-list span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.assay-static-lint-list strong {
+  font-size: 13.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.assay-static-lint-list small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-fg-muted);
+}
+
+.assay-static-lint-sev {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  color: var(--color-warn);
+  background: var(--color-warn-bg);
+  white-space: nowrap;
+}
+
+.assay-static-lint-list li.is-high .assay-static-lint-sev {
+  color: var(--color-fail);
+  background: var(--color-fail-bg);
+}
+
+.assay-static-lint-more {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-fg-muted);
+}
+
 .rd-privilege {
   display: grid;
   gap: 10px;

@@ -390,6 +390,21 @@ beforeEach(() => {
       return json({
         candidate: { ...candidate, system_prompt: body.markdown, adapter_type: "mock" },
         mode: "demo",
+        static_lint: {
+          schema: "assay.static_lint.v1",
+          kind: "static_analysis",
+          label: "Static analysis - not a behavioral verdict. Add an OpenAI key to run the guardrail exam.",
+          findings: [
+            {
+              id: "dangerous-tool-delete_user",
+              severity: "high",
+              title: "Dangerous capability granted: `delete_user`",
+              detail: "This tool can take an irreversible action."
+            }
+          ],
+          dangerous_tools: ["delete_user"],
+          guardrail_coverage: { destructive: false, injection: false, secrets: false }
+        },
         detected: { role: "agent", title: "Demo Agent", tools: ["lookup"], tool_count: 1, token_estimate: 40 }
       });
     }
@@ -566,6 +581,8 @@ describe("Assay page", () => {
     // Lands on the verdict hero with the ranked "what to fix" list.
     await screen.findByText("What to fix", undefined, { timeout: 10000 });
     expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0);
+    expect(screen.getByText("Static artifact checks")).toBeInTheDocument();
+    expect(screen.getByText("Dangerous capability granted: `delete_user`")).toBeInTheDocument();
     expect(screen.getByText(/By capability/i)).toBeInTheDocument();
     expect(workspaceBootFetches).toBe(0);
     expect(candidateSummaryFetches).toBe(0);

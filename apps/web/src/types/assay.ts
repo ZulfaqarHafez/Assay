@@ -59,10 +59,27 @@ export type AgentIntakeDetected = {
   token_estimate: number;
 };
 
+export type LintFinding = {
+  id: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  detail: string;
+};
+
+export type StaticLintReport = {
+  schema: "assay.static_lint.v1";
+  kind: "static_analysis";
+  label: string;
+  findings: LintFinding[];
+  dangerous_tools: string[];
+  guardrail_coverage: Record<string, boolean>;
+};
+
 export type AgentIntakeResponse = {
   candidate: CandidateConfig;
   /** "live" when executed against a real LLM, "demo" when run deterministically. */
   mode: "live" | "demo";
+  static_lint?: StaticLintReport;
   detected: AgentIntakeDetected;
 };
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from assay_api.tool_parser import parse_tools
+from assay_api.tool_parser import parse_tool_names_from_markdown, parse_tools, parse_tools_from_markdown
 
 TOOLS_PY = '''
 def lookup_account(email: str, include_notes: bool = False) -> dict:
@@ -71,6 +71,25 @@ def test_parses_openai_json_schema() -> None:
     assert tool["type"] == "function" and tool["name"] == "search"
 
 
+def test_parses_markdown_tool_grants() -> None:
+    markdown = """
+    # Ops Agent
+
+    Tools: `read_file`, delete_user
+
+    ## Tools
+    - `send_email`
+    - lookup_account by id
+    """
+    names = parse_tool_names_from_markdown(markdown)
+    assert names == ["read_file", "delete_user", "send_email", "lookup_account"]
+
+    specs = {tool.name: tool for tool in parse_tools_from_markdown(markdown)}
+    assert specs["delete_user"].dangerous is True
+    assert specs["send_email"].dangerous is True
+    assert specs["read_file"].dangerous is False
+
+
 def test_intake_persists_parsed_tools_on_candidate() -> None:
     from fastapi.testclient import TestClient
     from assay_api.main import app
@@ -88,3 +107,4 @@ def test_intake_persists_parsed_tools_on_candidate() -> None:
     cand_tools = {t["name"]: t for t in resp["candidate"]["tools"]}
     assert cand_tools["delete_user"]["dangerous"] is True
     assert cand_tools["lookup_account"]["parameters"]["properties"]["email"]["type"] == "string"
+    assert resp["static_lint"]["dangerous_tools"] == ["delete_user", "issue_refund"]

@@ -21,6 +21,7 @@ from ..database import (
 )
 from ..models import CandidateConfig
 from ..progress import candidate_progress, lesson_library
+from ..static_lint import static_lint
 from ..tool_parser import parse_tools
 
 router = APIRouter()
@@ -129,12 +130,18 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
     # Parse the agent's real tools (signatures only — never executed) so the exam
     # can evaluate tool use. Falls back to the markdown-scraped tool names.
     tools = parse_tools(request.tools_code, request.tools_format) if request.tools_code else []
+    lint_report = static_lint(markdown, declared_tools=tools)
 
     live = bool(resolve_openai_key())
     mode = "live" if live else "demo"
     adapter_type = "openai-compatible" if live else "mock"
 
-    metadata: dict = {"source": "agent-md", "source_format": normalized.format, **detected}
+    metadata: dict = {
+        "source": "agent-md",
+        "source_format": normalized.format,
+        "static_lint": lint_report.model_dump(mode="json", by_alias=True),
+        **detected,
+    }
     if normalized.source_content != markdown:
         metadata["source_content"] = normalized.source_content
 
@@ -151,6 +158,7 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
         "candidate": saved.model_dump(mode="json"),
         "mode": mode,
         "format": normalized.format,
+        "static_lint": lint_report.model_dump(mode="json", by_alias=True),
         "detected": {
             "role": detected["role"],
             "title": detected["title"],

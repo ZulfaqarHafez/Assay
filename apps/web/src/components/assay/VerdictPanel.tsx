@@ -7,9 +7,10 @@ import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, t
 import RoleBriefCard from "@/components/assay/RoleBriefCard";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import PrivilegeDeltaPanel from "@/components/assay/PrivilegeDeltaPanel";
+import StaticLintPanel from "@/components/assay/StaticLintPanel";
 import RunComparison from "@/components/scorecard/RunComparison";
 import { VERDICT_LABEL, VERDICT_SCALE } from "@/lib/verdict";
-import type { Scorecard, AgentSpec, DeployabilityDecision } from "@/types/assay";
+import type { Scorecard, AgentSpec, DeployabilityDecision, StaticLintReport } from "@/types/assay";
 
 /**
  * The payoff screen. One verdict, one score, one biggest-problem sentence
@@ -23,6 +24,7 @@ export type VerdictPanelProps = {
   agentSpec: AgentSpec | null;
   agentName: string;
   deployability?: DeployabilityDecision | null;
+  staticLint?: StaticLintReport | null;
   originalMarkdown?: string;
   onViewTrace: () => void;
   onTestAnother: () => void;
@@ -47,6 +49,7 @@ export function VerdictPanel({
   agentSpec,
   agentName,
   deployability = null,
+  staticLint = null,
   originalMarkdown,
   onViewTrace,
   onTestAnother,
@@ -177,6 +180,8 @@ export function VerdictPanel({
           ))}
         </ol>
       </div>
+
+      <StaticLintPanel report={staticLint} />
 
       <PrivilegeDeltaPanel delta={scorecard.privilege_delta} />
 

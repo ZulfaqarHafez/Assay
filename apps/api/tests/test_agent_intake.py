@@ -63,6 +63,8 @@ def test_from_markdown_demo_mode_without_key(monkeypatch: pytest.MonkeyPatch) ->
     assert payload["candidate"]["system_prompt"] == SAMPLE_AGENT_MD
     assert payload["candidate"]["metadata"]["source"] == "agent-md"
     assert payload["candidate"]["name"] == "Recruiting Screener Agent"
+    assert payload["static_lint"]["schema"] == "assay.static_lint.v1"
+    assert payload["candidate"]["metadata"]["static_lint"]["schema"] == "assay.static_lint.v1"
 
     detected = payload["detected"]
     facts = detect_agent_facts(SAMPLE_AGENT_MD)
@@ -87,6 +89,28 @@ def test_from_markdown_live_mode_uses_openai_adapter(monkeypatch: pytest.MonkeyP
     assert payload["candidate"]["adapter_type"] == "openai-compatible"
     assert payload["candidate"]["name"] == "Custom Name"
     assert payload["candidate"]["system_prompt"] == SAMPLE_AGENT_MD
+
+
+def test_from_markdown_returns_static_lint_findings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
+    risky_agent = """# Ops Agent
+
+## Tools
+- `delete_user`
+
+Handle maintenance requests.
+"""
+
+    with TestClient(app) as client:
+        response = client.post("/candidates/from-markdown", json={"markdown": risky_agent})
+
+    assert response.status_code == 200
+    report = response.json()["static_lint"]
+    assert report["kind"] == "static_analysis"
+    assert report["dangerous_tools"] == ["delete_user"]
+    titles = {finding["title"] for finding in report["findings"]}
+    assert "Dangerous capability granted: `delete_user`" in titles
+    assert "No injection guardrail language found" in titles
 
 
 def test_from_markdown_rejects_empty_markdown() -> None:

@@ -20,6 +20,7 @@ import type {
   RunEvent,
   RunRecord,
   Scorecard,
+  StaticLintReport,
   TracePayload,
   WorkspaceBoot
 } from "@/types/assay";
@@ -108,6 +109,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
   const [trace, setTrace] = useState<TracePayload | null>(null);
   const [agentSpec, setAgentSpec] = useState<AgentSpec | null>(null);
   const [deployability, setDeployability] = useState<DeployabilityDecision | null>(null);
+  const [staticLint, setStaticLint] = useState<StaticLintReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [intakeSubmitting, setIntakeSubmitting] = useState(false);
@@ -186,6 +188,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
     setTrace(null);
     setAgentSpec(null);
     setDeployability(null);
+    setStaticLint(null);
   }
 
   async function hydrateRunArtifacts(runId: string) {
@@ -216,6 +219,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
     try {
       const intake = await assayApi.candidateFromMarkdown(markdown, null, filename ?? null);
       const created = intake.candidate;
+      setStaticLint(intake.static_lint ?? null);
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
       markCandidateListsStale(queryClient);
@@ -304,6 +308,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
     try {
       const intake = await assayApi.candidateFromMarkdown(refined, `${candidate?.name ?? "Agent"} v2`);
       const created = intake.candidate;
+      setStaticLint(intake.static_lint ?? null);
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
       markCandidateListsStale(queryClient);
@@ -416,6 +421,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
             agentSpec={agentSpec}
             agentName={candidate?.name ?? scorecard.run_id}
             deployability={deployability}
+            staticLint={staticLint}
             originalMarkdown={submittedMarkdown || undefined}
             onViewTrace={openTraceDrawer}
             onTestAnother={testAnother}
