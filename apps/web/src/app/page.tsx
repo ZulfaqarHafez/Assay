@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { assayApi } from "@/lib/api";
 import {
@@ -47,6 +47,21 @@ const VerdictPanel = dynamic(() => import("@/components/assay/VerdictPanel"), {
 const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
   loading: () => null
 });
+
+function markQueryStale(queryClient: QueryClient, queryKey: QueryKey) {
+  void queryClient.invalidateQueries({ queryKey, refetchType: "none" });
+}
+
+function markCandidateListsStale(queryClient: QueryClient) {
+  markQueryStale(queryClient, queryKeys.workspaceBoot());
+  markQueryStale(queryClient, queryKeys.candidateSummaries());
+}
+
+function markRunListsStale(queryClient: QueryClient) {
+  markQueryStale(queryClient, queryKeys.workspaceBoot());
+  markQueryStale(queryClient, queryKeys.runs());
+  markQueryStale(queryClient, queryKeys.runSummaries());
+}
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -166,8 +181,7 @@ export default function Home() {
       setProofBundle(null);
       setAgentSpec(payoff.agent_spec ?? null);
       setDeployability(payoff.deployability ?? null);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
+      markRunListsStale(queryClient);
     } catch (exc) {
       setError(errorMessage(exc));
     }
@@ -190,8 +204,7 @@ export default function Home() {
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
+      markCandidateListsStale(queryClient);
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const jobScope = roleScopeText?.trim()
         ? {
@@ -212,8 +225,7 @@ export default function Home() {
         policyName: policy?.name,
         competencyThreshold: policy?.competencyThreshold
       });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
+      markRunListsStale(queryClient);
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.item_count });
@@ -248,8 +260,7 @@ export default function Home() {
         policyName: runPolicy?.name,
         competencyThreshold: runPolicy?.competencyThreshold
       });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
+      markRunListsStale(queryClient);
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.item_count });
@@ -281,15 +292,13 @@ export default function Home() {
       const created = intake.candidate;
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
+      markCandidateListsStale(queryClient);
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const createdRun = await assayApi.createRun(created.id, packId, null, baselineRunId, {
         policyName: runPolicy?.name,
         competencyThreshold: runPolicy?.competencyThreshold
       });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.workspaceBoot() });
+      markRunListsStale(queryClient);
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.item_count });

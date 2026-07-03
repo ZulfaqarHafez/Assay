@@ -544,6 +544,9 @@ describe("Assay page", () => {
     await screen.findByText("What to fix", undefined, { timeout: 10000 });
     expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0);
     expect(screen.getByText(/By capability/i)).toBeInTheDocument();
+    expect(workspaceBootFetches).toBe(1);
+    expect(candidateSummaryFetches).toBe(0);
+    expect(runListFetches).toBe(0);
     expect(payoffFetches).toBe(1);
     expect(proofDetailFetches).toBe(0);
     expect(traceFetches).toBe(0);
@@ -572,6 +575,9 @@ describe("Assay page", () => {
     await user.click(screen.getByRole("button", { name: /test improved version/i }));
 
     await waitFor(() => expect(runCreateBodies).toHaveLength(2));
+    expect(workspaceBootFetches).toBe(1);
+    expect(candidateSummaryFetches).toBe(0);
+    expect(runListFetches).toBe(0);
     expect(runCreateBodies[1]).toMatchObject({
       candidate_id: "cand_demo",
       exam_pack_id: "hr-v1",
