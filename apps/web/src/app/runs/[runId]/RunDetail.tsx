@@ -101,6 +101,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   const trace = traceQuery.data ?? null;
   const scorecard = verdict?.scorecard ?? null;
   const deployability = verdict?.deployability ?? null;
+  const comparisonFromVerdict = verdict?.comparison ?? undefined;
   const surfaces = surfacesQuery.data ?? null;
   const reviewers = surfaces?.product_review ?? null;
   const events = trace?.events ?? [];
@@ -114,6 +115,7 @@ export default function RunDetail({ runId }: { runId: string }) {
   const validationRun =
     surfaces?.candidate_progress?.runs.find((item) => item.baseline_run_id === runId) ?? null;
   const comparisonFallback = React.useMemo<RunComparisonData | undefined>(() => {
+    if (comparisonFromVerdict) return comparisonFromVerdict;
     if (!scorecard || scorecard.prior_run_id) return undefined;
     return {
       schema: "assay.run_comparison.v1",
@@ -126,7 +128,7 @@ export default function RunDetail({ runId }: { runId: string }) {
       unchanged: 0,
       certified_changed: false
     };
-  }, [candidateId, runRecord?.candidate_id, runId, scorecard]);
+  }, [candidateId, comparisonFromVerdict, runRecord?.candidate_id, runId, scorecard]);
 
   // Gate the analytics on the slim verdict payload, not the slower proof surfaces.
   const isLoading = verdictQuery.isLoading && !scorecard;
@@ -245,7 +247,12 @@ export default function RunDetail({ runId }: { runId: string }) {
       ) : null}
 
       {scorecard && baselineRunId ? (
-        <ImprovementBanner runId={runId} baselineRunId={baselineRunId} deployable={deployable} />
+        <ImprovementBanner
+          runId={runId}
+          baselineRunId={baselineRunId}
+          deployable={deployable}
+          comparison={verdict?.comparison}
+        />
       ) : null}
 
       {scorecard ? (
@@ -410,14 +417,17 @@ function formatCheck(check: string): string {
 function ImprovementBanner({
   runId,
   baselineRunId,
-  deployable
+  deployable,
+  comparison: providedComparison
 }: {
   runId: string;
   baselineRunId: string;
   deployable: boolean;
+  comparison?: RunComparisonData | null;
 }) {
-  const comparisonQuery = useRunComparison(runId, baselineRunId);
-  const comparison = comparisonQuery.data ?? null;
+  const hasProvidedComparison = providedComparison !== undefined;
+  const comparisonQuery = useRunComparison(hasProvidedComparison ? null : runId, baselineRunId);
+  const comparison = hasProvidedComparison ? providedComparison : comparisonQuery.data ?? null;
   if (!comparison) return null;
 
   const deltas = comparison.competencies

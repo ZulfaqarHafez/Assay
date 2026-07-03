@@ -125,6 +125,7 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert verdict["candidate"]["name"]
     assert verdict["scorecard"]["trace_audit"]["raw"] == {}
     assert verdict["deployability"]["schema"] == "assay.deployability_decision.v1"
+    assert verdict["comparison"] is None
     assert "events" not in verdict
     assert "product_review" not in verdict
     assert payoff["schema"] == "assay.run_payoff.v1"

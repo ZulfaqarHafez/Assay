@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import RunDetail from "./RunDetail";
+import type { RunComparison as RunComparisonData } from "@/types/assay";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() })
@@ -108,6 +109,29 @@ const deployability = {
   warnings: []
 };
 
+const comparison: RunComparisonData = {
+  schema: "assay.run_comparison.v1",
+  run_id: "run_demo",
+  baseline_run_id: "run_base",
+  candidate_id: "cand_demo",
+  competencies: [
+    {
+      competency: "compliance",
+      label: "Compliance",
+      baseline_score: 0.4,
+      current_score: 0.9,
+      delta: 0.5,
+      outcome: "improved",
+      baseline_passed: false,
+      current_passed: true
+    }
+  ],
+  improved: 1,
+  regressed: 0,
+  unchanged: 0,
+  certified_changed: true
+};
+
 const agentSpec = {
   schema: "assay.agent_spec.v1",
   run_id: "run_demo",
@@ -197,7 +221,8 @@ describe("RunDetail query fanout", () => {
           run: runRecord,
           candidate,
           scorecard,
-          deployability
+          deployability,
+          comparison: null
         });
       }
       if (url.pathname === "/runs/run_demo/surfaces") {
@@ -261,5 +286,41 @@ describe("RunDetail query fanout", () => {
 
     await user.click(screen.getByRole("button", { name: /exact diff/i }));
     await waitFor(() => expect(paths).toContain("/runs/run_demo/agent-spec/diff"));
+  }, 15000);
+
+  it("reuses verdict-bundled comparisons for refined runs", async () => {
+    const paths: string[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      paths.push(url.pathname);
+      if (url.pathname === "/runs/run_demo/verdict") {
+        return json({
+          schema: "assay.run_verdict.v1",
+          run: { ...runRecord, baseline_run_id: "run_base" },
+          candidate,
+          scorecard: { ...scorecard, prior_run_id: "run_base" },
+          deployability,
+          comparison
+        });
+      }
+      if (url.pathname === "/runs/run_demo/surfaces") {
+        return json({
+          schema: "assay.run_surfaces.v1",
+          run_id: "run_demo",
+          agent_spec: agentSpec,
+          product_review: proofBundle.product_review,
+          candidate_progress: proofBundle.candidate_progress,
+          diagnostic_library: []
+        });
+      }
+      return Promise.resolve(new Response("not mocked", { status: 404 }));
+    });
+
+    renderRunDetail();
+
+    await screen.findByText(/refined agent vs baseline/i);
+    expect(screen.getByRole("status")).toHaveTextContent(/1 competency improved/i);
+    expect(paths).toContain("/runs/run_demo/verdict");
+    expect(paths).not.toContain("/runs/run_demo/comparison");
   }, 15000);
 });

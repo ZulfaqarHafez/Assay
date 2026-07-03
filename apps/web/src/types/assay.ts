@@ -282,6 +282,7 @@ export type RunVerdict = {
   candidate: CandidateSummary | null;
   scorecard: Scorecard | null;
   deployability: DeployabilityDecision | null;
+  comparison: RunComparison | null;
 };
 
 export type RunSurfaces = {

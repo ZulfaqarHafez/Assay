@@ -155,12 +155,16 @@ def test_explicit_baseline_compares_improved_candidate_to_source_run(
         ).json()
         scorecard = client.post(f"/runs/{improved_run['id']}/start").json()
         comparison = client.get(f"/runs/{improved_run['id']}/comparison").json()
+        verdict = client.get(f"/runs/{improved_run['id']}/verdict").json()
 
     assert improved_run["baseline_run_id"] == baseline_run["id"]
     assert scorecard["prior_run_id"] == baseline_run["id"]
     assert comparison["baseline_run_id"] == baseline_run["id"]
     assert comparison["candidate_id"] == improved_candidate["id"]
     assert comparison["competencies"]
+    assert verdict["comparison"]["baseline_run_id"] == baseline_run["id"]
+    assert verdict["comparison"]["candidate_id"] == improved_candidate["id"]
+    assert verdict["comparison"]["competencies"]
 
 
 def test_progress_404_for_unknown_candidate() -> None:

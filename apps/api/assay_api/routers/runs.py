@@ -205,11 +205,15 @@ def run_verdict(run_id: str) -> JSONResponse:
     candidate = get_candidate(run.candidate_id)
     scorecard = get_scorecard(run_id)
     deployability = None
+    comparison = None
     if scorecard is not None:
         deployability = evaluate_scorecard(scorecard, policy_for_run(run)).model_dump(
             mode="json",
             by_alias=True,
         )
+        if run.baseline_run_id or scorecard.prior_run_id:
+            comparison_payload = run_comparison(run_id, run.baseline_run_id)
+            comparison = comparison_payload.model_dump(mode="json") if comparison_payload else None
     payload = {
         "schema": "assay.run_verdict.v1",
         "run": run.model_dump(mode="json"),
@@ -225,6 +229,7 @@ def run_verdict(run_id: str) -> JSONResponse:
         ),
         "scorecard": _scorecard_payload(scorecard, include_trace_raw=False) if scorecard else None,
         "deployability": deployability,
+        "comparison": comparison,
     }
     return JSONResponse(
         content=payload,
