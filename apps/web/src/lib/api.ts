@@ -95,7 +95,10 @@ export const assayApi = {
     request<Scorecard>(`/runs/${runId}/start`, {
       method: "POST"
     }),
-  events: (runId: string) => request<RunEvent[]>(`/runs/${runId}/events`),
+  events: (runId: string, afterSequence?: number) =>
+    request<RunEvent[]>(
+      `/runs/${runId}/events${afterSequence != null ? `?after=${encodeURIComponent(String(afterSequence))}` : ""}`
+    ),
   scorecard: (runId: string) => request<Scorecard>(`/runs/${runId}/scorecard`),
   reviewers: (runId: string) => request<ProductReview>(`/runs/${runId}/reviewers`),
   trace: (runId: string) => request<TracePayload>(`/runs/${runId}/trace`),

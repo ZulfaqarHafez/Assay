@@ -164,12 +164,15 @@ def run_role_brief(run_id: str) -> dict:
 
 
 @router.get("/runs/{run_id}/events")
-def run_events(run_id: str) -> JSONResponse:
+def run_events(run_id: str, after: int | None = None) -> JSONResponse:
     run = get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
+    events = list_events(run_id)
+    if after is not None:
+        events = [event for event in events if event.sequence > after]
     return JSONResponse(
-        content=[event.model_dump(mode="json") for event in list_events(run_id)],
+        content=[event.model_dump(mode="json") for event in events],
         headers=_run_json_cache_headers(run),
     )
 

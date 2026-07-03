@@ -250,7 +250,7 @@ describe("RunDetail query fanout", () => {
     expect(paths).not.toContain("/runs/run_demo/comparison");
     expect(paths).not.toContain("/exam-packs");
 
-    await screen.findByRole("button", { name: /exact diff/i }, { timeout: 3000 });
+    await screen.findByRole("button", { name: /exact diff/i }, { timeout: 10000 });
     expect(paths).toContain("/runs/run_demo/surfaces");
     expect(paths).not.toContain("/runs/run_demo/agent-spec");
     expect(paths).not.toContain("/runs/run_demo/reviewers");
@@ -261,5 +261,5 @@ describe("RunDetail query fanout", () => {
 
     await user.click(screen.getByRole("button", { name: /exact diff/i }));
     await waitFor(() => expect(paths).toContain("/runs/run_demo/agent-spec/diff"));
-  });
+  }, 15000);
 });

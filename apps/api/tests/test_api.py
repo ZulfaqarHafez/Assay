@@ -52,6 +52,11 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         reviewers = client.get(f"/runs/{run['id']}/reviewers").json()
         events_response = client.get(f"/runs/{run['id']}/events")
         events = events_response.json()
+        incremental_events_response = client.get(
+            f"/runs/{run['id']}/events",
+            params={"after": events[0]["sequence"]},
+        )
+        incremental_events = incremental_events_response.json()
         public_scorecard_response = client.get(f"/runs/{run['id']}/scorecard")
         public_scorecard = public_scorecard_response.json()
         verdict_response = client.get(f"/runs/{run['id']}/verdict")
@@ -88,9 +93,13 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert scorecard["trials_stochastic"] is False
     assert scorecard["trace_audit"]["tas_score"] == 88
     assert events
+    assert incremental_events
+    assert len(incremental_events) < len(events)
+    assert all(event["sequence"] > events[0]["sequence"] for event in incremental_events)
     assert public_scorecard["trace_audit"]["raw"] == {}
     assert pending_verdict_response.headers["cache-control"] == "no-store"
     assert events_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert incremental_events_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert public_scorecard_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert verdict_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert protected_verdict_response.headers["cache-control"] == "no-store"

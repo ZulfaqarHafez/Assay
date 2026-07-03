@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRunStream, type RunEventSource } from "./useRunStream";
+import { createPollSource, useRunStream, type RunEventSource } from "./useRunStream";
 import type { RunEvent, Scorecard } from "@/types/assay";
 
 const baseScorecard: Scorecard = {
@@ -169,6 +169,36 @@ describe("useRunStream", () => {
 
     await waitFor(() => expect(result.current.status).toBe("completed"));
     expect(result.current.scorecard?.run_id).toBe("run_1");
+  });
+
+  it("polls event deltas and exposes an accumulated event snapshot", async () => {
+    const eventUrls: string[] = [];
+    const eventPayloads = [[gradedEvent(1, "compliance")], [gradedEvent(2, "fairness")], []];
+    global.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/start")) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+          rejectStart = reject;
+        });
+      }
+      if (url.includes("/runs/run_1/events")) {
+        eventUrls.push(url);
+        return Promise.resolve(jsonResponse(eventPayloads.shift() ?? []));
+      }
+      return Promise.resolve(jsonResponse({}, 404));
+    }) as typeof fetch;
+
+    const { result } = renderHook(() => useRunStream(createPollSource(1)));
+    act(() => result.current.start("run_1", { k: 1, itemCount: 2 }));
+
+    await waitFor(() => expect(result.current.gradedCount).toBe(2));
+
+    expect(result.current.events.map((event) => event.sequence)).toEqual([1, 2]);
+    expect(eventUrls[0]).toMatch(/\/runs\/run_1\/events$/);
+    expect(eventUrls[1]).toContain("/runs/run_1/events?after=1");
+
+    act(() => result.current.cancel());
   });
 
   it("cancel() aborts the in-flight start request and goes to canceled", async () => {

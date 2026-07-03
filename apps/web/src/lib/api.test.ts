@@ -110,4 +110,14 @@ describe("assayApi request headers", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1/proof-bundle");
   });
+
+  it("can request only events after the latest received sequence", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
+    const fetchMock = vi.fn(async () => json([]));
+    global.fetch = fetchMock;
+
+    await assayApi.events("run_1", 7);
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1/events?after=7");
+  });
 });

@@ -139,19 +139,39 @@ async function recoverRunResult(runId: string, signal: AbortSignal): Promise<Sco
   return null;
 }
 
+function eventSequence(event: RunEvent): number {
+  return Number.isFinite(event.sequence) ? event.sequence : 0;
+}
+
+function mergeEventSnapshot(current: RunEvent[], incoming: RunEvent[]): RunEvent[] {
+  if (incoming.length === 0) return current;
+  const byKey = new Map<string, RunEvent>();
+  for (const event of current) {
+    byKey.set(`${event.sequence}:${event.span_id}`, event);
+  }
+  for (const event of incoming) {
+    byKey.set(`${event.sequence}:${event.span_id}`, event);
+  }
+  return [...byKey.values()].sort((a, b) => eventSequence(a) - eventSequence(b));
+}
+
 /** Default poll-based event source. Swap for an SSE source without touching callers. */
-function createPollSource(intervalMs = DEFAULT_POLL_MS): RunEventSource {
+export function createPollSource(intervalMs = DEFAULT_POLL_MS): RunEventSource {
   return {
     subscribe(runId, onEvents, signal) {
       let stopped = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
+      let snapshot: RunEvent[] = [];
+      let afterSequence: number | undefined;
 
       const tick = async () => {
         if (stopped || signal.aborted) return;
         try {
-          const events = await assayApi.events(runId);
-          if (!stopped && !signal.aborted) {
-            onEvents(events);
+          const events = await assayApi.events(runId, afterSequence);
+          if (!stopped && !signal.aborted && events.length > 0) {
+            snapshot = mergeEventSnapshot(snapshot, events);
+            afterSequence = Math.max(...snapshot.map(eventSequence));
+            onEvents(snapshot);
           }
         } catch {
           // Transient poll error: keep the loop alive, the run may still finish.
