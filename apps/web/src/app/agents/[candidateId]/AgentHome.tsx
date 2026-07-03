@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, AlertTriangle, Circle, FlaskConical } from "lu
 import { useCandidateSummaries, useRunSummaries, useAgentSpec } from "@/lib/queries";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import { AgentArt } from "@/components/ui/EmptyArt";
+import ViewportDeferred from "@/components/ui/ViewportDeferred";
 import type { RunSummary } from "@/types/assay";
 
 const ProgressTrend = dynamic(() => import("@/components/progress/ProgressTrend"), {
@@ -81,10 +82,19 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
         </div>
       ) : (
         <>
-          <div className="learning-surfaces">
+          <ViewportDeferred
+            className="learning-surfaces"
+            resetKey={candidateId}
+            fallback={
+              <>
+                <LearningSurfaceSkeleton />
+                <LearningSurfaceSkeleton />
+              </>
+            }
+          >
             <ProgressTrend candidateId={candidateId} />
             {latest ? <RunComparison runId={latest.id} /> : null}
-          </div>
+          </ViewportDeferred>
 
           <div className="ws-table-wrap">
             <table className="ws-table">

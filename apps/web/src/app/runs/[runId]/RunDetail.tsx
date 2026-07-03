@@ -35,6 +35,7 @@ import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel }
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import ReviewCouncil from "@/components/assay/ReviewCouncil";
+import ViewportDeferred from "@/components/ui/ViewportDeferred";
 import type { DeployabilityDecision, RunComparison as RunComparisonData, RunEvent, Scorecard } from "@/types/assay";
 
 const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
@@ -295,7 +296,16 @@ export default function RunDetail({ runId }: { runId: string }) {
           Could not load run {runId}: {errorMessage(loadError)}
         </p>
       ) : (
-        <div className="learning-surfaces">
+        <ViewportDeferred
+          className="learning-surfaces"
+          resetKey={runId}
+          fallback={
+            <>
+              <LearningSurfaceSkeleton />
+              <LearningSurfaceSkeleton />
+            </>
+          }
+        >
           <CompetencyRadar scorecard={scorecard} />
           <RunComparison
             runId={runId}
@@ -310,7 +320,7 @@ export default function RunDetail({ runId }: { runId: string }) {
             candidateId={surfaces ? candidateId : null}
             lessons={surfaces?.diagnostic_library ?? undefined}
           />
-        </div>
+        </ViewportDeferred>
       )}
 
       {drawerOpen ? (
