@@ -1,4 +1,4 @@
-import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, ExamPackSummary, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunPayoff, RunRecord, RunSummary, RunSurfaces, RunVerdict, Scorecard, TracePayload, WorkspaceBoot } from "@/types/assay";
+import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, AgentSummary, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, ExamPackSummary, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunPayoff, RunRecord, RunSummary, RunSurfaces, RunVerdict, Scorecard, TracePayload, WorkspaceBoot } from "@/types/assay";
 
 function apiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
@@ -55,6 +55,7 @@ export const assayApi = {
   connectorProbes: () => request<ConnectorProbe[]>("/connectors/probe"),
   candidates: () => request<CandidateConfig[]>("/candidates"),
   candidateSummaries: () => request<CandidateSummary[]>("/candidates/summary"),
+  agentSummaries: () => request<AgentSummary[]>("/agents/summary"),
   runs: () => request<RunRecord[]>("/runs"),
   runSummaries: () => request<RunSummary[]>("/runs/summary"),
   run: (runId: string) => request<RunRecord>(`/runs/${runId}`),

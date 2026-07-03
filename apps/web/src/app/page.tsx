@@ -54,12 +54,14 @@ function markQueryStale(queryClient: QueryClient, queryKey: QueryKey) {
 function markCandidateListsStale(queryClient: QueryClient) {
   markQueryStale(queryClient, queryKeys.workspaceBoot());
   markQueryStale(queryClient, queryKeys.candidateSummaries());
+  markQueryStale(queryClient, queryKeys.agentSummaries());
 }
 
 function markRunListsStale(queryClient: QueryClient) {
   markQueryStale(queryClient, queryKeys.workspaceBoot());
   markQueryStale(queryClient, queryKeys.runs());
   markQueryStale(queryClient, queryKeys.runSummaries());
+  markQueryStale(queryClient, queryKeys.agentSummaries());
 }
 
 export default function Home() {

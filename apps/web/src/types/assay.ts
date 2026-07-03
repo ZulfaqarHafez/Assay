@@ -14,6 +14,16 @@ export type CandidateConfig = {
 
 export type CandidateSummary = Pick<CandidateConfig, "id" | "name" | "adapter_type" | "created_at">;
 
+export type AgentSummary = {
+  name: string;
+  candidate_id: string | null;
+  adapter_type: CandidateConfig["adapter_type"] | "unknown";
+  run_count: number;
+  latest_run_id: string | null;
+  verdict: "ship" | "hold" | null;
+  score: string | null;
+};
+
 export type Health = {
   ok: boolean;
   tracerazor_importable: boolean;

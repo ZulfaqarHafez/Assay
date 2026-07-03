@@ -206,6 +206,7 @@ export function useCreateRun(options?: MutationOpts<RunRecord, CreateRunVars>) {
     onSettled: (...args) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentSummaries() });
       options?.onSettled?.(...args);
     }
   });
@@ -229,6 +230,7 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
     onSettled: (data, error, runId, ...rest) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentSummaries() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.run(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runVerdict(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSurfaces(runId) });

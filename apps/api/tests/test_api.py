@@ -219,10 +219,12 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
         client.post(f"/runs/{run['id']}/start")
         candidate_summary_response = client.get("/candidates/summary")
         run_summary_response = client.get("/runs/summary")
+        agent_summary_response = client.get("/agents/summary")
         exam_packs_response = client.get("/exam-packs")
         exam_pack_summary_response = client.get("/exam-packs/summary")
         candidate_summary = candidate_summary_response.json()[0]
         run_summary = run_summary_response.json()[0]
+        agent_summary = agent_summary_response.json()[0]
         exam_pack_summary = exam_pack_summary_response.json()[0]
 
     assert candidate_summary["id"] == candidate["id"]
@@ -241,6 +243,19 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert "tailored_exam_pack" not in run_summary
     assert run_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert "origin" in run_summary_response.headers["vary"].lower()
+
+    assert agent_summary_response.status_code == 200
+    assert agent_summary["name"] == "Verbose Agent"
+    assert agent_summary["candidate_id"] == candidate["id"]
+    assert agent_summary["adapter_type"] == "mock"
+    assert agent_summary["run_count"] == 1
+    assert agent_summary["latest_run_id"] == run["id"]
+    assert agent_summary["verdict"] in {"ship", "hold"}
+    assert "system_prompt" not in agent_summary
+    assert "metadata" not in agent_summary
+    assert "job_scope" not in agent_summary
+    assert agent_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert "origin" in agent_summary_response.headers["vary"].lower()
 
     assert exam_packs_response.status_code == 200
     assert exam_packs_response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=1800"

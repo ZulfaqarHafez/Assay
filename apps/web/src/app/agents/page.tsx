@@ -3,22 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, FlaskConical } from "lucide-react";
-import { useCandidateSummaries, useRunSummaries } from "@/lib/queries";
+import { useAgentSummaries } from "@/lib/queries";
 import { AgentArt } from "@/components/ui/EmptyArt";
-import type { CandidateSummary, RunSummary } from "@/types/assay";
 
 /**
- * Agents — the candidate definitions under test, deduplicated by name and rolled
- * up: how many experiments each has been through, its latest verdict, and a jump
- * to the most recent run. One agent definition = one row.
+ * Agents - the candidate definitions under test, deduplicated and rolled up by
+ * the API so first paint is one slim read instead of candidate + run fanout.
  */
 export default function AgentsPage() {
-  const candidatesQuery = useCandidateSummaries();
-  const runsQuery = useRunSummaries();
-  const candidates = React.useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
-  const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
-
-  const rows = React.useMemo(() => groupAgents(candidates, runs), [candidates, runs]);
+  const agentsQuery = useAgentSummaries();
+  const rows = React.useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
 
   return (
     <main className="ws-page">
@@ -30,7 +24,7 @@ export default function AgentsPage() {
         <span className="ws-count">{rows.length} agent{rows.length === 1 ? "" : "s"}</span>
       </header>
 
-      {candidatesQuery.isLoading ? (
+      {agentsQuery.isLoading ? (
         <div className="ws-table-wrap" aria-hidden="true">
           {Array.from({ length: 6 }).map((_, i) => (
             <div className="ws-skeleton-row" key={i} />
@@ -57,30 +51,30 @@ export default function AgentsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.name}>
+              {rows.map((row) => (
+                <tr key={row.name}>
                   <td data-label="Agent">
-                    {r.candidateId ? (
-                      <Link prefetch={false} href={`/agents/${r.candidateId}`} className="ws-cell-strong">{r.name}</Link>
+                    {row.candidate_id ? (
+                      <Link prefetch={false} href={`/agents/${row.candidate_id}`} className="ws-cell-strong">{row.name}</Link>
                     ) : (
-                      <span className="ws-cell-strong">{r.name}</span>
+                      <span className="ws-cell-strong">{row.name}</span>
                     )}
-                    <div className="ws-cell-sub">{r.adapter}</div>
+                    <div className="ws-cell-sub">{row.adapter_type}</div>
                   </td>
-                  <td data-label="Adapter"><span className="ws-chip accent">{r.adapter}</span></td>
-                  <td className="num" data-label="Runs">{r.runCount}</td>
+                  <td data-label="Adapter"><span className="ws-chip accent">{row.adapter_type}</span></td>
+                  <td className="num" data-label="Runs">{row.run_count}</td>
                   <td data-label="Latest verdict">
-                    {r.verdict === "ship" ? (
+                    {row.verdict === "ship" ? (
                       <span className="ws-verdict ship"><CheckCircle2 size={13} /> Ship</span>
-                    ) : r.verdict === "hold" ? (
+                    ) : row.verdict === "hold" ? (
                       <span className="ws-verdict hold"><AlertTriangle size={13} /> Needs review</span>
                     ) : (
-                      <span className="ws-verdict idle">—</span>
+                      <span className="ws-verdict idle">-</span>
                     )}
                   </td>
-                  <td className="num" data-label="Latest score">{r.score ?? "—"}</td>
+                  <td className="num" data-label="Latest score">{row.score ?? "-"}</td>
                   <td className="num ws-row-action">
-                    {r.candidateId ? <Link prefetch={false} href={`/agents/${r.candidateId}`} className="ws-row-link">Open →</Link> : null}
+                    {row.candidate_id ? <Link prefetch={false} href={`/agents/${row.candidate_id}`} className="ws-row-link">Open -&gt;</Link> : null}
                   </td>
                 </tr>
               ))}
@@ -90,51 +84,4 @@ export default function AgentsPage() {
       )}
     </main>
   );
-}
-
-type AgentRow = {
-  name: string;
-  candidateId: string | null;
-  adapter: string;
-  runCount: number;
-  latestRunId: string | null;
-  verdict: "ship" | "hold" | null;
-  score: string | null;
-};
-
-function groupAgents(
-  candidates: CandidateSummary[],
-  runs: RunSummary[]
-): AgentRow[] {
-  const idToName: Record<string, string> = {};
-  const idToAdapter: Record<string, string> = {};
-  for (const c of candidates) {
-    idToName[c.id] = c.name;
-    idToAdapter[c.id] = c.adapter_type;
-  }
-  const map = new Map<string, AgentRow>();
-  // Seed from candidates so agents with zero runs still appear.
-  for (const c of candidates) {
-    if (!map.has(c.name)) {
-      map.set(c.name, { name: c.name, candidateId: c.id, adapter: c.adapter_type, runCount: 0, latestRunId: null, verdict: null, score: null });
-    }
-  }
-  // Runs come newest-first; the first run we see per name is the latest.
-  for (const run of runs) {
-    const name = idToName[run.candidate_id];
-    if (!name) continue;
-    const row = map.get(name) ?? { name, candidateId: run.candidate_id, adapter: idToAdapter[run.candidate_id] ?? "—", runCount: 0, latestRunId: null, verdict: null, score: null };
-    row.runCount += 1;
-    if (!row.latestRunId) {
-      row.latestRunId = run.id;
-      if (run.status === "completed" && typeof run.certified === "boolean") {
-        row.verdict = run.certified ? "ship" : "hold";
-        if (typeof run.pass_count === "number" && typeof run.total_count === "number") {
-          row.score = `${run.pass_count}/${run.total_count}`;
-        }
-      }
-    }
-    map.set(name, row);
-  }
-  return Array.from(map.values()).sort((a, b) => b.runCount - a.runCount);
 }

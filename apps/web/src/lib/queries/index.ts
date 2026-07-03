@@ -11,7 +11,7 @@ export { queryKeys, type HealthPayload, type QueryOpts, type MutationOpts } from
 export { useWorkspaceBoot } from "./workspace";
 export { useHealth, useDatabaseHealth } from "./health";
 export { useExamPackSummaries, useExamPacks, useImportExamPackFile } from "./suites";
-export { useCandidates, useCandidateSummaries, useCandidateProgress, useCandidateLessons, useCreateCandidate } from "./agents";
+export { useAgentSummaries, useCandidates, useCandidateSummaries, useCandidateProgress, useCandidateLessons, useCreateCandidate } from "./agents";
 export {
   useRuns,
   useRunSummaries,

@@ -21,6 +21,7 @@ export const queryKeys = {
   examPackSummaries: () => ["exam-packs", "summary"] as const,
   connectors: () => ["connectors"] as const,
   connectorProbes: () => ["connectors", "probe"] as const,
+  agentSummaries: () => ["agents", "summary"] as const,
   candidates: () => ["candidates"] as const,
   candidateSummaries: () => ["candidates", "summary"] as const,
   runs: () => ["runs"] as const,

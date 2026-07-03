@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assayApi } from "@/lib/api";
-import type { CandidateConfig, CandidateProgress, CandidateSummary, DiagnosticLesson } from "@/types/assay";
+import type { AgentSummary, CandidateConfig, CandidateProgress, CandidateSummary, DiagnosticLesson } from "@/types/assay";
 import { queryKeys, type MutationOpts, type QueryOpts } from "./keys";
 
 export function useCandidates(options?: QueryOpts<CandidateConfig[]>) {
@@ -17,6 +17,14 @@ export function useCandidateSummaries(options?: QueryOpts<CandidateSummary[]>) {
   return useQuery({
     queryKey: queryKeys.candidateSummaries(),
     queryFn: () => assayApi.candidateSummaries(),
+    ...options
+  });
+}
+
+export function useAgentSummaries(options?: QueryOpts<AgentSummary[]>) {
+  return useQuery({
+    queryKey: queryKeys.agentSummaries(),
+    queryFn: () => assayApi.agentSummaries(),
     ...options
   });
 }
@@ -56,6 +64,7 @@ export function useCreateCandidate(
     onSettled: (...args) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidates() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentSummaries() });
       options?.onSettled?.(...args);
     }
   });
