@@ -17,6 +17,7 @@ import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
   AgentSpec,
   CandidateSummary,
+  DeployabilityDecision,
   ProofBundle,
   RunEvent,
   RunRecord,
@@ -75,6 +76,7 @@ export default function Home() {
   const [trace, setTrace] = useState<TracePayload | null>(null);
   const [proofBundle, setProofBundle] = useState<ProofBundle | null>(null);
   const [agentSpec, setAgentSpec] = useState<AgentSpec | null>(null);
+  const [deployability, setDeployability] = useState<DeployabilityDecision | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [intakeSubmitting, setIntakeSubmitting] = useState(false);
@@ -153,15 +155,17 @@ export default function Home() {
     setTrace(null);
     setProofBundle(null);
     setAgentSpec(null);
+    setDeployability(null);
   }
 
   async function hydrateRunArtifacts(runId: string) {
     try {
-      const bundlePayload = await assayApi.proofBundle(runId);
+      const payoff = await assayApi.runPayoff(runId);
       setEvents([]);
       setTrace(null);
-      setProofBundle(bundlePayload);
-      setAgentSpec(bundlePayload.agent_spec ?? null);
+      setProofBundle(null);
+      setAgentSpec(payoff.agent_spec ?? null);
+      setDeployability(payoff.deployability ?? null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
     } catch (exc) {
@@ -315,6 +319,7 @@ export default function Home() {
         setTrace(tracePayload);
         setProofBundle(bundlePayload);
         setAgentSpec(bundlePayload.agent_spec ?? null);
+        setDeployability(bundlePayload.deployability ?? null);
       } catch (exc) {
         setError(errorMessage(exc));
       }
@@ -394,7 +399,7 @@ export default function Home() {
             scorecard={scorecard}
             agentSpec={agentSpec}
             agentName={candidate?.name ?? scorecard.run_id}
-            deployability={proofBundle?.deployability ?? null}
+            deployability={deployability}
             originalMarkdown={submittedMarkdown || undefined}
             onViewTrace={openTraceDrawer}
             onTestAnother={testAnother}

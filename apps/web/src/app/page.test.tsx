@@ -168,6 +168,33 @@ const productReview = {
   ]
 };
 
+const deployability = {
+  schema: "assay.deployability_decision.v1",
+  run_id: "run_demo",
+  verdict: "ship",
+  deployable: true,
+  label: "Ship",
+  summary: "All strict checks passed.",
+  policy: {
+    schema: "assay.deployability_policy.v1",
+    name: "strict",
+    k: 3,
+    competency_threshold: 0.8,
+    max_transfer_gap: 0.2,
+    tas_threshold: 70,
+    critical_findings_allowed: 0,
+    require_trace: true,
+    allow_degraded: false
+  },
+  blocking_reasons: [],
+  warnings: [],
+  critical_findings: [],
+  passed_checks: ["compliance:pass^k", "fairness:pass^k"],
+  failed_checks: [],
+  metrics: {},
+  generated_at: "2026-06-27T00:00:00Z"
+};
+
 const proofBundle = {
   schema: "assay.proof_bundle.v1",
   product: "Assay",
@@ -188,7 +215,8 @@ const proofBundle = {
   connectors: [],
   connector_probes: [],
   agent_spec: agentSpec,
-  product_review: productReview
+  product_review: productReview,
+  deployability
 };
 
 let agentSpecOverride: typeof agentSpec | null = null;
@@ -200,6 +228,7 @@ let runListFetches = 0;
 let candidateListFetches = 0;
 let candidateSummaryFetches = 0;
 let proofDetailFetches = 0;
+let payoffFetches = 0;
 let traceFetches = 0;
 
 beforeEach(() => {
@@ -212,6 +241,7 @@ beforeEach(() => {
   candidateListFetches = 0;
   candidateSummaryFetches = 0;
   proofDetailFetches = 0;
+  payoffFetches = 0;
   traceFetches = 0;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -395,6 +425,15 @@ beforeEach(() => {
       traceFetches += 1;
       return json({ run_id: "run_demo", events, scorecard });
     }
+    if (url.endsWith("/runs/run_demo/payoff")) {
+      payoffFetches += 1;
+      return json({
+        schema: "assay.run_payoff.v1",
+        run_id: "run_demo",
+        agent_spec: agentSpecOverride ?? agentSpec,
+        deployability
+      });
+    }
     if (url.endsWith("/runs/run_demo/detail") || url.endsWith("/runs/run_demo/proof-bundle")) {
       proofDetailFetches += 1;
       return json(agentSpecOverride ? { ...proofBundle, agent_spec: agentSpecOverride } : proofBundle);
@@ -505,7 +544,8 @@ describe("Assay page", () => {
     await screen.findByText("What to fix", undefined, { timeout: 10000 });
     expect(screen.getAllByText("Ready to ship").length).toBeGreaterThan(0);
     expect(screen.getByText(/By capability/i)).toBeInTheDocument();
-    expect(proofDetailFetches).toBe(1);
+    expect(payoffFetches).toBe(1);
+    expect(proofDetailFetches).toBe(0);
     expect(traceFetches).toBe(0);
     // The intake's deploy-policy choice rides on the run request.
     expect(runCreateBodies[0]).toMatchObject({
@@ -516,6 +556,7 @@ describe("Assay page", () => {
 
     await user.click(screen.getByRole("button", { name: /open full trace/i }));
     await waitFor(() => expect(traceFetches).toBe(1));
+    await waitFor(() => expect(proofDetailFetches).toBe(1));
   }, 15000);
 
   it("uses the current run as the baseline when testing the improved version", async () => {

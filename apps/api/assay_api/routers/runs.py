@@ -275,6 +275,39 @@ def run_surfaces(run_id: str) -> JSONResponse:
     )
 
 
+@router.get("/runs/{run_id}/payoff")
+def run_payoff(run_id: str) -> JSONResponse:
+    """Slim payoff payload for the home page after a run completes.
+
+    The live run already has the scorecard in hand. This endpoint returns only
+    the policy decision and refined agent spec needed for the verdict screen,
+    avoiding the broader proof/detail assembly until the user asks for evidence.
+    """
+    run = get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    scorecard = get_scorecard(run_id)
+    if scorecard is None:
+        raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
+    try:
+        agent_spec = agent_spec_payload(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
+    payload = {
+        "schema": "assay.run_payoff.v1",
+        "run_id": run_id,
+        "agent_spec": agent_spec,
+        "deployability": evaluate_scorecard(scorecard, policy_for_run(run)).model_dump(
+            mode="json",
+            by_alias=True,
+        ),
+    }
+    return JSONResponse(
+        content=payload,
+        headers=_run_json_cache_headers(run),
+    )
+
+
 @router.get("/runs/{run_id}/deployability")
 def run_deployability(run_id: str, policy: str | None = None) -> dict:
     """The deployability decision for a run under its own policy.

@@ -273,6 +273,13 @@ export type RunSurfaces = {
   diagnostic_library: DiagnosticLesson[];
 };
 
+export type RunPayoff = {
+  schema: "assay.run_payoff.v1";
+  run_id: string;
+  agent_spec: AgentSpec | null;
+  deployability: DeployabilityDecision | null;
+};
+
 export type BriefCompetency = {
   key: string;
   label: string;

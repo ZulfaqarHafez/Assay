@@ -61,6 +61,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         public_scorecard = public_scorecard_response.json()
         verdict_response = client.get(f"/runs/{run['id']}/verdict")
         verdict = verdict_response.json()
+        payoff_response = client.get(f"/runs/{run['id']}/payoff")
+        payoff = payoff_response.json()
         surfaces_response = client.get(f"/runs/{run['id']}/surfaces")
         surfaces = surfaces_response.json()
         trace_response = client.get(f"/runs/{run['id']}/trace")
@@ -71,6 +73,10 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
         protected_verdict_response = client.get(
             f"/runs/{run['id']}/verdict",
+            headers={"X-API-Key": "secret-key-1"},
+        )
+        protected_payoff_response = client.get(
+            f"/runs/{run['id']}/payoff",
             headers={"X-API-Key": "secret-key-1"},
         )
         protected_surfaces_response = client.get(
@@ -103,6 +109,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert public_scorecard_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert verdict_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert protected_verdict_response.headers["cache-control"] == "no-store"
+    assert payoff_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert protected_payoff_response.headers["cache-control"] == "no-store"
     assert surfaces_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert protected_surfaces_response.headers["cache-control"] == "no-store"
     assert trace_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
@@ -119,6 +127,13 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert verdict["deployability"]["schema"] == "assay.deployability_decision.v1"
     assert "events" not in verdict
     assert "product_review" not in verdict
+    assert payoff["schema"] == "assay.run_payoff.v1"
+    assert payoff["run_id"] == run["id"]
+    assert payoff["agent_spec"]["schema"] == "assay.agent_spec.v1"
+    assert payoff["deployability"]["schema"] == "assay.deployability_decision.v1"
+    assert "events" not in payoff
+    assert "scorecard" not in payoff
+    assert "product_review" not in payoff
     assert surfaces["schema"] == "assay.run_surfaces.v1"
     assert surfaces["run_id"] == run["id"]
     assert surfaces["agent_spec"]["schema"] == "assay.agent_spec.v1"

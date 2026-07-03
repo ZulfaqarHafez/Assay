@@ -78,6 +78,16 @@ describe("assayApi request headers", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1/surfaces");
   });
 
+  it("uses the slim payoff endpoint after a live run completes", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
+    const fetchMock = vi.fn(async () => json({ schema: "assay.run_payoff.v1" }));
+    global.fetch = fetchMock;
+
+    await assayApi.runPayoff("run_1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1/payoff");
+  });
+
   it("adds JSON content type for mutation bodies", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
     const fetchMock = vi.fn(async () => json({ id: "run_1" }));
