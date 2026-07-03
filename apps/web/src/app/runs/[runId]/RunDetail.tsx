@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useQueryState, parseAsStringEnum } from "nuqs";
 import {
@@ -31,15 +32,30 @@ import { downloadVerdictCardPng } from "@/lib/cardExport";
 import { policyRuleSentence } from "@/lib/assay";
 import { VERDICT_LABEL, bandFromDecision, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
-import TraceDrawer from "@/components/trace/TraceDrawer";
-import CompetencyRadar from "@/components/scorecard/CompetencyRadar";
-import RunComparison from "@/components/scorecard/RunComparison";
-import ProgressTrend from "@/components/progress/ProgressTrend";
-import DiagnosticLibrary from "@/components/library/DiagnosticLibrary";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import ReviewCouncil from "@/components/assay/ReviewCouncil";
 import type { DeployabilityDecision, RunComparison as RunComparisonData, RunEvent, Scorecard } from "@/types/assay";
+
+const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
+  loading: () => null
+});
+
+const CompetencyRadar = dynamic(() => import("@/components/scorecard/CompetencyRadar"), {
+  loading: () => <LearningSurfaceSkeleton />
+});
+
+const RunComparison = dynamic(() => import("@/components/scorecard/RunComparison"), {
+  loading: () => <LearningSurfaceSkeleton />
+});
+
+const ProgressTrend = dynamic(() => import("@/components/progress/ProgressTrend"), {
+  loading: () => <LearningSurfaceSkeleton />
+});
+
+const DiagnosticLibrary = dynamic(() => import("@/components/library/DiagnosticLibrary"), {
+  loading: () => <LearningSurfaceSkeleton />
+});
 
 /**
  * Shareable run-detail view. Reuses the same composition pieces as the console
@@ -269,10 +285,10 @@ export default function RunDetail({ runId }: { runId: string }) {
         />
       ) : null}
 
-      {isLoading ? (
+      {isLoading || !richSurfacesReady ? (
         <div className="learning-surfaces">
-          <div className="ws-skeleton-card" />
-          <div className="ws-skeleton-card" />
+          <LearningSurfaceSkeleton />
+          <LearningSurfaceSkeleton />
         </div>
       ) : loadError ? (
         <p role="alert" className="rd-error">
@@ -297,18 +313,24 @@ export default function RunDetail({ runId }: { runId: string }) {
         </div>
       )}
 
-      <TraceDrawer
-        events={events}
-        trace={trace}
-        scorecard={scorecard}
-        proofBundle={null}
-        agentSpec={agentSpec}
-        agentResearch={null}
-        open={drawerOpen}
-        onOpenChange={(open) => void setDrawer(open ? "trace" : null)}
-      />
+      {drawerOpen ? (
+        <TraceDrawer
+          events={events}
+          trace={trace}
+          scorecard={scorecard}
+          proofBundle={null}
+          agentSpec={agentSpec}
+          agentResearch={null}
+          open={drawerOpen}
+          onOpenChange={(open) => void setDrawer(open ? "trace" : null)}
+        />
+      ) : null}
     </main>
   );
+}
+
+function LearningSurfaceSkeleton() {
+  return <div className="ws-skeleton-card" aria-hidden="true" />;
 }
 
 function DeployabilityMeter({

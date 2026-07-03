@@ -1,14 +1,21 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, AlertTriangle, Circle, FlaskConical } from "lucide-react";
 import { useCandidateSummaries, useRunSummaries, useAgentSpec } from "@/lib/queries";
-import ProgressTrend from "@/components/progress/ProgressTrend";
-import RunComparison from "@/components/scorecard/RunComparison";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import { AgentArt } from "@/components/ui/EmptyArt";
 import type { RunSummary } from "@/types/assay";
+
+const ProgressTrend = dynamic(() => import("@/components/progress/ProgressTrend"), {
+  loading: () => <LearningSurfaceSkeleton />
+});
+
+const RunComparison = dynamic(() => import("@/components/scorecard/RunComparison"), {
+  loading: () => <LearningSurfaceSkeleton />
+});
 
 /**
  * The agent's home: lead with the score trajectory (does it get better across
@@ -124,6 +131,10 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
       )}
     </main>
   );
+}
+
+function LearningSurfaceSkeleton() {
+  return <div className="ws-skeleton-card" aria-hidden="true" />;
 }
 
 /** Latest pass-rate as a 0-100 number, or null when not scored. */
