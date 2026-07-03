@@ -1,4 +1,4 @@
-import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunRecord, Scorecard, TracePayload } from "@/types/assay";
+import type { AgentDiff, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunRecord, RunSummary, Scorecard, TracePayload } from "@/types/assay";
 
 function apiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
@@ -52,7 +52,9 @@ export const assayApi = {
   connectors: () => request<Connector[]>("/connectors"),
   connectorProbes: () => request<ConnectorProbe[]>("/connectors/probe"),
   candidates: () => request<CandidateConfig[]>("/candidates"),
+  candidateSummaries: () => request<CandidateSummary[]>("/candidates/summary"),
   runs: () => request<RunRecord[]>("/runs"),
+  runSummaries: () => request<RunSummary[]>("/runs/summary"),
   createCandidate: (candidate: Partial<CandidateConfig>) =>
     request<CandidateConfig>("/candidates", {
       method: "POST",

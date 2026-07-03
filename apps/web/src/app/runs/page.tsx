@@ -3,18 +3,19 @@
 import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, Circle, Loader2, FlaskConical } from "lucide-react";
-import { useRuns, useCandidates } from "@/lib/queries";
+import { useRunSummaries, useCandidateSummaries } from "@/lib/queries";
 import { VialArt } from "@/components/ui/EmptyArt";
 import { VERDICT_LABEL } from "@/lib/verdict";
-import type { RunRecord } from "@/types/assay";
+import type { RunSummary } from "@/types/assay";
 
 /**
  * Experiments — the run history of the workspace. Every run an agent has been
- * put through, scored and certified, newest first. Reuses useRuns/useScorecard.
+ * put through, scored and certified, newest first. Uses slim summary reads for
+ * the table so detail-only proof payloads stay off the hot path.
  */
 export default function ExperimentsPage() {
-  const runsQuery = useRuns();
-  const candidatesQuery = useCandidates();
+  const runsQuery = useRunSummaries();
+  const candidatesQuery = useCandidateSummaries();
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
   const candidates = React.useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
   const nameById = React.useMemo(() => {
@@ -72,8 +73,8 @@ export default function ExperimentsPage() {
   );
 }
 
-function RunRow({ run, agentName }: { run: RunRecord; agentName: string }) {
-  // Scorecard summary is attached to the run by GET /runs (no per-row fetch).
+function RunRow({ run, agentName }: { run: RunSummary; agentName: string }) {
+  // Scorecard summary is attached to GET /runs/summary (no per-row fetch).
   const scored = run.status === "completed" && typeof run.certified === "boolean";
   const verdict = scored ? (run.certified ? "ship" : "hold") : null;
   const passCount = run.pass_count ?? 0;
@@ -109,7 +110,7 @@ function RunRow({ run, agentName }: { run: RunRecord; agentName: string }) {
   );
 }
 
-function RunStatus({ status }: { status: RunRecord["status"] }) {
+function RunStatus({ status }: { status: RunSummary["status"] }) {
   if (status === "running" || status === "created")
     return <span className="ws-status running"><Loader2 size={12} className="assay-spin" /> {status}</span>;
   if (status === "failed") return <span className="ws-status failed"><AlertTriangle size={12} /> failed</span>;

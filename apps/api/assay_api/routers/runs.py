@@ -59,6 +59,13 @@ def runs() -> list[dict]:
     return items
 
 
+@router.get("/runs/summary")
+def run_summaries() -> list[dict]:
+    run_records = list_runs()
+    scorecards = get_scorecards([run.id for run in run_records if run.status == "completed"])
+    return [_run_summary(run, scorecards.get(run.id)) for run in run_records]
+
+
 @router.post("/runs", dependencies=[Depends(rate_limit("create_run"))])
 def create_run(payload: RunCreate) -> dict:
     if get_candidate(payload.candidate_id) is None:
@@ -393,6 +400,29 @@ def _scorecard_payload(scorecard, *, include_trace_raw: bool = True) -> dict:
     if include_trace_raw:
         return payload
     return _strip_scorecard_trace_raw(payload)
+
+
+def _run_summary(run: RunRecord, scorecard=None) -> dict:
+    item = {
+        "id": run.id,
+        "candidate_id": run.candidate_id,
+        "exam_pack_id": run.exam_pack_id,
+        "source_pack_id": run.source_pack_id,
+        "status": run.status,
+        "k": run.k,
+        "created_at": run.created_at.isoformat(),
+        "updated_at": run.updated_at.isoformat(),
+        "baseline_run_id": run.baseline_run_id,
+    }
+    if run.status == "completed" and scorecard is not None:
+        passes = scorecard.pass_at_k or {}
+        item["certified"] = scorecard.certified
+        item["pass_count"] = sum(1 for v in passes.values() if v)
+        item["total_count"] = len(passes)
+        item["degraded"] = scorecard.degraded
+        item["qualification_status"] = scorecard.qualification_status
+        item["role_brief_summary"] = scorecard.role_brief_summary
+    return item
 
 
 def _strip_scorecard_trace_raw(payload: dict) -> dict:

@@ -172,6 +172,7 @@ export default function Home() {
       setProofBundle(bundlePayload);
       setAgentSpec(bundlePayload.agent_spec ?? null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
     } catch (exc) {
       setError(errorMessage(exc));
     }
@@ -195,6 +196,7 @@ export default function Home() {
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
       void candidatesQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const jobScope = roleScopeText?.trim()
         ? {
@@ -215,6 +217,7 @@ export default function Home() {
         policyName: policy?.name,
         competencyThreshold: policy?.competencyThreshold
       });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
@@ -249,6 +252,7 @@ export default function Home() {
         policyName: runPolicy?.name,
         competencyThreshold: runPolicy?.competencyThreshold
       });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });
@@ -281,11 +285,13 @@ export default function Home() {
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
       void candidatesQuery.refetch();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.candidateSummaries() });
       const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
       const createdRun = await assayApi.createRun(created.id, packId, null, baselineRunId, {
         policyName: runPolicy?.name,
         competencyThreshold: runPolicy?.competencyThreshold
       });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       const runPack = examPacks.find((pack) => pack.id === createdRun.exam_pack_id) ?? selectedExamPack;
       setRun(createdRun);
       runStream.start(createdRun.id, { k: createdRun.k, itemCount: runPack?.items.length });

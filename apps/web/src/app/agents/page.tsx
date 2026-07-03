@@ -3,9 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, FlaskConical } from "lucide-react";
-import { useCandidates, useRuns } from "@/lib/queries";
+import { useCandidateSummaries, useRunSummaries } from "@/lib/queries";
 import { AgentArt } from "@/components/ui/EmptyArt";
-import type { RunRecord } from "@/types/assay";
+import type { CandidateSummary, RunSummary } from "@/types/assay";
 
 /**
  * Agents — the candidate definitions under test, deduplicated by name and rolled
@@ -13,8 +13,8 @@ import type { RunRecord } from "@/types/assay";
  * to the most recent run. One agent definition = one row.
  */
 export default function AgentsPage() {
-  const candidatesQuery = useCandidates();
-  const runsQuery = useRuns();
+  const candidatesQuery = useCandidateSummaries();
+  const runsQuery = useRunSummaries();
   const candidates = React.useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
 
@@ -103,8 +103,8 @@ type AgentRow = {
 };
 
 function groupAgents(
-  candidates: { id: string; name: string; adapter_type: string }[],
-  runs: RunRecord[]
+  candidates: CandidateSummary[],
+  runs: RunSummary[]
 ): AgentRow[] {
   const idToName: Record<string, string> = {};
   const idToAdapter: Record<string, string> = {};

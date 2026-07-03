@@ -3,20 +3,20 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, AlertTriangle, Circle, FlaskConical } from "lucide-react";
-import { useCandidates, useRuns, useAgentSpec } from "@/lib/queries";
+import { useCandidateSummaries, useRunSummaries, useAgentSpec } from "@/lib/queries";
 import ProgressTrend from "@/components/progress/ProgressTrend";
 import RunComparison from "@/components/scorecard/RunComparison";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import { AgentArt } from "@/components/ui/EmptyArt";
-import type { RunRecord } from "@/types/assay";
+import type { RunSummary } from "@/types/assay";
 
 /**
  * The agent's home: lead with the score trajectory (does it get better across
  * runs?), keep the iterate controls one click away, and list the run history.
  */
 export default function AgentHome({ candidateId }: { candidateId: string }) {
-  const candidatesQuery = useCandidates();
-  const runsQuery = useRuns();
+  const candidatesQuery = useCandidateSummaries();
+  const runsQuery = useRunSummaries();
 
   const candidate = (candidatesQuery.data ?? []).find((item) => item.id === candidateId) ?? null;
   const runs = React.useMemo(
@@ -127,14 +127,14 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
 }
 
 /** Latest pass-rate as a 0-100 number, or null when not scored. */
-function scoreOf(run: RunRecord | undefined): number | null {
+function scoreOf(run: RunSummary | undefined): number | null {
   if (!run || typeof run.pass_count !== "number" || typeof run.total_count !== "number" || !run.total_count) {
     return null;
   }
   return Math.round((run.pass_count / run.total_count) * 100);
 }
 
-function scoreLabel(run: RunRecord): string {
+function scoreLabel(run: RunSummary): string {
   if (typeof run.pass_count === "number" && typeof run.total_count === "number") {
     return `${run.pass_count}/${run.total_count}`;
   }

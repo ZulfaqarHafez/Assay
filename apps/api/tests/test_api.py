@@ -96,6 +96,65 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert "role_analysis" not in detail
 
 
+def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
+    class FakeAudit:
+        def __init__(self, threshold: float):
+            self.threshold = threshold
+
+        def analyse(self, candidate, trace_steps, task_value_score):
+            from assay_api.models import TraceAuditSummary
+
+            return TraceAuditSummary(
+                status="ok",
+                trace_id="trace_test",
+                tas_score=88,
+                grade="Good",
+                passes=True,
+                total_steps=len(trace_steps),
+                total_tokens=1000,
+                raw={"debug": "large raw audit payload"},
+            )
+
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
+
+    with TestClient(app) as client:
+        candidate = client.post(
+            "/candidates",
+            json={
+                "name": "Verbose Agent",
+                "adapter_type": "mock",
+                "system_prompt": "# Verbose\n\n" + ("instructions " * 200),
+                "metadata": {"source": "test", "notes": "large metadata should stay off summary"},
+            },
+        ).json()
+        run = client.post(
+            "/runs",
+            json={
+                "candidate_id": candidate["id"],
+                "job_scope": {
+                    "raw_text": "Screen candidates fairly",
+                    "title": "Recruiting Screener",
+                },
+            },
+        ).json()
+        client.post(f"/runs/{run['id']}/start")
+        candidate_summary = client.get("/candidates/summary").json()[0]
+        run_summary = client.get("/runs/summary").json()[0]
+
+    assert candidate_summary["id"] == candidate["id"]
+    assert candidate_summary["name"] == "Verbose Agent"
+    assert candidate_summary["adapter_type"] == "mock"
+    assert "system_prompt" not in candidate_summary
+    assert "metadata" not in candidate_summary
+
+    assert run_summary["id"] == run["id"]
+    assert run_summary["candidate_id"] == candidate["id"]
+    assert run_summary["certified"] in {True, False}
+    assert run_summary["pass_count"] >= 0
+    assert "job_scope" not in run_summary
+    assert "tailored_exam_pack" not in run_summary
+
+
 def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
     class FakeAudit:
         def __init__(self, threshold: float):

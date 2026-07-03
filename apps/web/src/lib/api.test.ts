@@ -26,6 +26,18 @@ describe("assayApi request headers", () => {
     expect(headers.has("Content-Type")).toBe(false);
   });
 
+  it("uses slim summary endpoints for workspace list views", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
+    const fetchMock = vi.fn(async () => json([]));
+    global.fetch = fetchMock;
+
+    await assayApi.runSummaries();
+    await assayApi.candidateSummaries();
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/summary");
+    expect(fetchMock.mock.calls[1][0]).toBe("https://api.assay.test/candidates/summary");
+  });
+
   it("adds JSON content type for mutation bodies", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
     const fetchMock = vi.fn(async () => json({ id: "run_1" }));

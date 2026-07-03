@@ -12,6 +12,8 @@ export type CandidateConfig = {
   created_at?: string;
 };
 
+export type CandidateSummary = Pick<CandidateConfig, "id" | "name" | "adapter_type" | "created_at">;
+
 export type Health = {
   ok: boolean;
   tracerazor_importable: boolean;
@@ -122,6 +124,24 @@ export type RunRecord = {
   qualification_status?: "tailored" | "deterministic" | "partial";
   role_brief_summary?: string | null;
 };
+
+export type RunSummary = Pick<RunRecord,
+  | "id"
+  | "candidate_id"
+  | "exam_pack_id"
+  | "source_pack_id"
+  | "status"
+  | "k"
+  | "created_at"
+  | "updated_at"
+  | "baseline_run_id"
+  | "certified"
+  | "pass_count"
+  | "total_count"
+  | "degraded"
+  | "qualification_status"
+  | "role_brief_summary"
+>;
 
 export type RunEvent = {
   span_id: string;

@@ -14,6 +14,7 @@ import type {
   RunComparison,
   RunEvent,
   RunRecord,
+  RunSummary,
   Scorecard,
   TracePayload
 } from "@/types/assay";
@@ -25,6 +26,14 @@ export function useRuns(options?: QueryOpts<RunRecord[]>) {
   return useQuery({
     queryKey: queryKeys.runs(),
     queryFn: () => assayApi.runs(),
+    ...options
+  });
+}
+
+export function useRunSummaries(options?: QueryOpts<RunSummary[]>) {
+  return useQuery({
+    queryKey: queryKeys.runSummaries(),
+    queryFn: () => assayApi.runSummaries(),
     ...options
   });
 }
@@ -176,6 +185,7 @@ export function useCreateRun(options?: MutationOpts<RunRecord, CreateRunVars>) {
     ...options,
     onSettled: (...args) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       options?.onSettled?.(...args);
     }
   });
@@ -198,6 +208,7 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
     ...options,
     onSettled: (data, error, runId, ...rest) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.run(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.scorecard(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.events(runId) });

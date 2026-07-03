@@ -6,9 +6,9 @@ import { CommandPalette } from "./CommandPalette";
 
 const pushMock = vi.hoisted(() => vi.fn());
 const queryMocks = vi.hoisted(() => ({
-  useRuns: vi.fn(() => ({ data: [] })),
+  useRunSummaries: vi.fn(() => ({ data: [] })),
   useExamPacks: vi.fn(() => ({ data: [] })),
-  useCandidates: vi.fn(() => ({ data: [] }))
+  useCandidateSummaries: vi.fn(() => ({ data: [] }))
 }));
 
 vi.mock("next/navigation", () => ({
@@ -16,9 +16,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/queries", () => ({
-  useRuns: queryMocks.useRuns,
+  useRunSummaries: queryMocks.useRunSummaries,
   useExamPacks: queryMocks.useExamPacks,
-  useCandidates: queryMocks.useCandidates
+  useCandidateSummaries: queryMocks.useCandidateSummaries
 }));
 
 function renderWithClient(ui: React.ReactElement) {
@@ -31,9 +31,9 @@ function renderWithClient(ui: React.ReactElement) {
 describe("CommandPalette", () => {
   afterEach(() => {
     pushMock.mockReset();
-    queryMocks.useRuns.mockClear();
+    queryMocks.useRunSummaries.mockClear();
     queryMocks.useExamPacks.mockClear();
-    queryMocks.useCandidates.mockClear();
+    queryMocks.useCandidateSummaries.mockClear();
   });
 
   it("opens with Ctrl-K, filters commands, and navigates on Enter", async () => {
@@ -51,15 +51,15 @@ describe("CommandPalette", () => {
   it("defers dynamic index queries until the palette opens", async () => {
     renderWithClient(<CommandPalette />);
 
-    expect(queryMocks.useRuns).toHaveBeenLastCalledWith({ enabled: false });
+    expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: false });
     expect(queryMocks.useExamPacks).toHaveBeenLastCalledWith({ enabled: false });
-    expect(queryMocks.useCandidates).toHaveBeenLastCalledWith({ enabled: false });
+    expect(queryMocks.useCandidateSummaries).toHaveBeenLastCalledWith({ enabled: false });
 
     fireEvent(window, new Event("assay:open-cmdk"));
 
-    await waitFor(() => expect(queryMocks.useRuns).toHaveBeenLastCalledWith({ enabled: true }));
+    await waitFor(() => expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: true }));
     expect(queryMocks.useExamPacks).toHaveBeenLastCalledWith({ enabled: true });
-    expect(queryMocks.useCandidates).toHaveBeenLastCalledWith({ enabled: true });
+    expect(queryMocks.useCandidateSummaries).toHaveBeenLastCalledWith({ enabled: true });
   });
 
   it("shows an empty state for unmatched filters", async () => {

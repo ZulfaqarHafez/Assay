@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   FlaskConical, Layers, Bot, Beaker, Clock, MoonStar, CheckCircle2, AlertTriangle, CornerDownLeft
 } from "lucide-react";
-import { useRuns, useExamPacks, useCandidates } from "@/lib/queries";
+import { useRunSummaries, useExamPacks, useCandidateSummaries } from "@/lib/queries";
 
 type Item = {
   id: string;
@@ -29,9 +29,9 @@ export function CommandPalette() {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
 
-  const runsQuery = useRuns({ enabled: open });
+  const runsQuery = useRunSummaries({ enabled: open });
   const packsQuery = useExamPacks({ enabled: open });
-  const candidatesQuery = useCandidates({ enabled: open });
+  const candidatesQuery = useCandidateSummaries({ enabled: open });
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
   const packs = React.useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
   const candidates = React.useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);

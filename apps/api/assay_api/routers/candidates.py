@@ -53,6 +53,19 @@ def candidates() -> list[dict]:
     return [candidate.model_dump(mode="json") for candidate in list_candidates()]
 
 
+@router.get("/candidates/summary")
+def candidate_summaries() -> list[dict]:
+    return [
+        {
+            "id": candidate.id,
+            "name": candidate.name,
+            "adapter_type": candidate.adapter_type,
+            "created_at": candidate.created_at.isoformat(),
+        }
+        for candidate in list_candidates()
+    ]
+
+
 @router.post("/candidates")
 def create_candidate(candidate: CandidateConfig) -> dict:
     return save_candidate(candidate).model_dump(mode="json")

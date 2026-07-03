@@ -10,9 +10,10 @@
 export { queryKeys, type HealthPayload, type QueryOpts, type MutationOpts } from "./keys";
 export { useHealth, useDatabaseHealth } from "./health";
 export { useExamPacks, useImportExamPackFile } from "./suites";
-export { useCandidates, useCandidateProgress, useCandidateLessons, useCreateCandidate } from "./agents";
+export { useCandidates, useCandidateSummaries, useCandidateProgress, useCandidateLessons, useCreateCandidate } from "./agents";
 export {
   useRuns,
+  useRunSummaries,
   useRun,
   useScorecard,
   useTrace,
