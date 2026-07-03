@@ -57,6 +57,22 @@ describe("CommandPalette", () => {
     expect(queryMocks.useExamPackSummaries).toHaveBeenLastCalledWith({ enabled: true });
   });
 
+  it("can lazy-mount already open while delegating the shortcut listener", async () => {
+    renderWithClient(<CommandPalette initialOpen listenForShortcut={false} />);
+
+    expect(await screen.findByRole("textbox", { name: /command palette search/i })).toBeInTheDocument();
+    expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: true });
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /command palette/i })).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(screen.queryByRole("dialog", { name: /command palette/i })).not.toBeInTheDocument();
+
+    fireEvent(window, new Event("assay:open-cmdk"));
+    expect(await screen.findByRole("textbox", { name: /command palette search/i })).toBeInTheDocument();
+  });
+
   it("uses run summary candidate names without a candidate fanout query", async () => {
     queryMocks.useRunSummaries.mockReturnValue({
       data: [

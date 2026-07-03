@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 import BrandMark from "@/components/ui/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { CommandPalette } from "@/components/workspace/CommandPalette";
 
 /**
  * Persistent platform nav across the whole workspace: the front door ("Test an
@@ -21,10 +21,32 @@ const LINKS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/agents", label: "Agents" }
 ];
 
+const CommandPalette = dynamic(
+  () => import("@/components/workspace/CommandPalette").then((mod) => mod.CommandPalette),
+  { ssr: false, loading: () => null }
+);
+
 export function TopNav() {
   const pathname = usePathname() || "/";
+  const [paletteRequested, setPaletteRequested] = React.useState(false);
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+
+  const openCommandPalette = React.useCallback(() => {
+    setPaletteRequested(true);
+    window.dispatchEvent(new Event("assay:open-cmdk"));
+  }, []);
+
+  React.useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        openCommandPalette();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openCommandPalette]);
 
   return (
     <header className="ws-nav">
@@ -50,7 +72,7 @@ export function TopNav() {
           <button
             type="button"
             className="ws-cmdk-hint"
-            onClick={() => window.dispatchEvent(new Event("assay:open-cmdk"))}
+            onClick={openCommandPalette}
             aria-label="Open command palette"
           >
             <Search size={13} />
@@ -60,7 +82,7 @@ export function TopNav() {
           <ThemeToggle />
         </div>
       </div>
-      <CommandPalette />
+      {paletteRequested ? <CommandPalette initialOpen listenForShortcut={false} /> : null}
     </header>
   );
 }

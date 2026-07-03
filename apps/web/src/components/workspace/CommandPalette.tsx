@@ -16,14 +16,22 @@ type Item = {
   run: () => void;
 };
 
+export type CommandPaletteProps = {
+  initialOpen?: boolean;
+  listenForShortcut?: boolean;
+};
+
 /**
  * Keyboard-first command palette (Cmd-K / Ctrl-K). Jumps to any route, recent
  * run, suite, or agent, plus quick actions. Mounted once under the providers so
  * its data hooks share the workspace query cache.
  */
-export function CommandPalette() {
+export function CommandPalette({
+  initialOpen = false,
+  listenForShortcut = true
+}: CommandPaletteProps = {}) {
   const router = useRouter();
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(initialOpen);
   const [query, setQuery] = React.useState("");
   const [active, setActive] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -109,6 +117,7 @@ export function CommandPalette() {
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (!listenForShortcut) return;
         e.preventDefault();
         setOpen((o) => !o);
       } else if (e.key === "Escape") {
@@ -124,7 +133,7 @@ export function CommandPalette() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("assay:open-cmdk", onOpen);
     };
-  }, []);
+  }, [listenForShortcut]);
 
   // Reset + focus when opening.
   React.useEffect(() => {
