@@ -33,13 +33,19 @@ import { policyRuleSentence } from "@/lib/assay";
 import { VERDICT_LABEL, bandFromDecision, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import AgentRunControls from "@/components/assay/AgentRunControls";
-import ImprovePanel from "@/components/assay/ImprovePanel";
-import ReviewCouncil from "@/components/assay/ReviewCouncil";
 import ViewportDeferred from "@/components/ui/ViewportDeferred";
 import type { DeployabilityDecision, RunComparison as RunComparisonData, RunEvent, Scorecard } from "@/types/assay";
 
 const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
   loading: () => null
+});
+
+const ImprovePanel = dynamic(() => import("@/components/assay/ImprovePanel"), {
+  loading: () => <LearningSurfaceSkeleton />
+});
+
+const ReviewCouncil = dynamic(() => import("@/components/assay/ReviewCouncil"), {
+  loading: () => <LearningSurfaceSkeleton />
 });
 
 const CompetencyRadar = dynamic(() => import("@/components/scorecard/CompetencyRadar"), {
