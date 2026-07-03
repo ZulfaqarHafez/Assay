@@ -80,7 +80,7 @@ def agent_summaries() -> JSONResponse:
 
 
 @router.get("/agents/{candidate_id}/home")
-def agent_home(candidate_id: str) -> JSONResponse:
+def agent_home(candidate_id: str, include_agent_markdown: bool = True) -> JSONResponse:
     candidate = get_candidate(candidate_id)
     if candidate is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
@@ -94,7 +94,10 @@ def agent_home(candidate_id: str) -> JSONResponse:
             "created_at": candidate.created_at.isoformat(),
         },
         "runs": _run_rows_for_candidate(runs, candidate),
-        "latest_agent_markdown": _latest_agent_markdown(runs),
+        # Older clients expect this field; the current web app asks for the fast
+        # summary form and fetches /runs/{id}/agent-spec only when the user tests
+        # the improved agent.
+        "latest_agent_markdown": _latest_agent_markdown(runs) if include_agent_markdown else None,
     }
     return JSONResponse(
         content=payload,

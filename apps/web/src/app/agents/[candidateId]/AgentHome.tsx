@@ -27,9 +27,14 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
   const candidate = homeQuery.data?.candidate ?? null;
   const runs = React.useMemo(() => homeQuery.data?.runs ?? [], [homeQuery.data]);
   const latest = runs[0] ?? null;
+  const latestCompletedRun = React.useMemo(
+    () => runs.find((run) => run.status === "completed") ?? null,
+    [runs]
+  );
 
   const name = candidate?.name ?? "Agent";
   const packId = latest?.source_pack_id ?? latest?.exam_pack_id ?? "hr-v1";
+  const actionPackId = latestCompletedRun?.source_pack_id ?? latestCompletedRun?.exam_pack_id ?? packId;
   const refinedMarkdown = homeQuery.data?.latest_agent_markdown ?? null;
 
   const scored = runs.filter((run) => run.status === "completed" && typeof run.certified === "boolean");
@@ -61,9 +66,10 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
         <AgentRunControls
           candidateId={candidateId}
           agentName={name}
-          examPackId={packId}
-          baselineRunId={latest?.id ?? null}
+          examPackId={actionPackId}
+          baselineRunId={latestCompletedRun?.id ?? null}
           refinedMarkdown={refinedMarkdown}
+          refinedRunId={refinedMarkdown ? null : latestCompletedRun?.id ?? null}
         />
       </header>
 

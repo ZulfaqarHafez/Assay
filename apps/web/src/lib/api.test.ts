@@ -39,7 +39,7 @@ describe("assayApi request headers", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/summary");
     expect(fetchMock.mock.calls[1][0]).toBe("https://api.assay.test/candidates/summary");
     expect(fetchMock.mock.calls[2][0]).toBe("https://api.assay.test/agents/summary");
-    expect(fetchMock.mock.calls[3][0]).toBe("https://api.assay.test/agents/cand_1/home");
+    expect(fetchMock.mock.calls[3][0]).toBe("https://api.assay.test/agents/cand_1/home?include_agent_markdown=false");
   });
 
   it("uses the workspace boot endpoint for home first paint", async () => {

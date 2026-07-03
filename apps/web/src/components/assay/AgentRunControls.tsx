@@ -3,6 +3,8 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw, Sparkles, Loader2 } from "lucide-react";
+import { assayApi } from "@/lib/api";
+import { errorMessage } from "@/lib/derive";
 import { useAgentRun } from "@/lib/useAgentRun";
 
 /**
@@ -18,6 +20,8 @@ export type AgentRunControlsProps = {
   baselineRunId?: string | null;
   /** The refined agent.md from the run's agent-spec, if any. */
   refinedMarkdown?: string | null;
+  /** Run whose agent-spec should be fetched only if the user tests the refined agent. */
+  refinedRunId?: string | null;
   className?: string;
 };
 
@@ -27,16 +31,42 @@ export function AgentRunControls({
   examPackId,
   baselineRunId,
   refinedMarkdown,
+  refinedRunId,
   className
 }: AgentRunControlsProps) {
   const router = useRouter();
   const { runStream, isRunning, error, rerun, testImproved } = useAgentRun({
     onComplete: (newRunId) => router.push(`/runs/${newRunId}`)
   });
+  const [loadingSpec, setLoadingSpec] = React.useState(false);
+  const [specError, setSpecError] = React.useState<string | null>(null);
 
-  const canImprove = Boolean(refinedMarkdown?.trim());
+  const canImprove = Boolean(refinedMarkdown?.trim() || refinedRunId);
   const total = runStream.totalExpected;
   const done = runStream.gradedCount;
+  const shownError = error ?? specError;
+
+  const testRefinedAgent = React.useCallback(async () => {
+    setSpecError(null);
+    let markdown = refinedMarkdown?.trim() ?? "";
+    if (!markdown && refinedRunId) {
+      setLoadingSpec(true);
+      try {
+        const spec = await assayApi.agentSpec(refinedRunId);
+        markdown = spec.agent_markdown?.trim() ?? "";
+      } catch (exc) {
+        setSpecError(errorMessage(exc));
+        return;
+      } finally {
+        setLoadingSpec(false);
+      }
+    }
+    if (!markdown) {
+      setSpecError("No refined agent.md is available for this run yet.");
+      return;
+    }
+    await testImproved(markdown, `${agentName} v2`, examPackId, baselineRunId);
+  }, [agentName, baselineRunId, examPackId, refinedMarkdown, refinedRunId, testImproved]);
 
   if (isRunning) {
     return (
@@ -64,12 +94,14 @@ export function AgentRunControls({
         <button
           type="button"
           className="command-button accent"
-          onClick={() => void testImproved(refinedMarkdown as string, `${agentName} v2`, examPackId, baselineRunId)}
+          disabled={loadingSpec}
+          onClick={() => void testRefinedAgent()}
         >
-          <Sparkles size={16} /> Test improved version
+          {loadingSpec ? <Loader2 size={16} className="assay-spin" /> : <Sparkles size={16} />}
+          {loadingSpec ? "Preparing improved version" : "Test improved version"}
         </button>
       )}
-      {error && <span className="agent-run-error" role="alert">{error}</span>}
+      {shownError && <span className="agent-run-error" role="alert">{shownError}</span>}
     </div>
   );
 }

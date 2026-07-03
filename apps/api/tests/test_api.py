@@ -221,7 +221,10 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
         candidate_summary_response = client.get("/candidates/summary")
         run_summary_response = client.get("/runs/summary")
         agent_summary_response = client.get("/agents/summary")
-        agent_home_response = client.get(f"/agents/{candidate['id']}/home")
+        agent_home_response = client.get(
+            f"/agents/{candidate['id']}/home",
+            params={"include_agent_markdown": "false"},
+        )
         exam_packs_response = client.get("/exam-packs")
         exam_pack_summary_response = client.get("/exam-packs/summary")
         candidate_summary = candidate_summary_response.json()[0]
@@ -272,7 +275,9 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert len(agent_home["runs"]) == 1
     assert agent_home["runs"][0]["id"] == run["id"]
     assert agent_home["runs"][0]["candidate_name"] == "Verbose Agent"
-    assert agent_home["latest_agent_markdown"].startswith("# Verbose Agent")
+    # Agent home stays a fast summary payload; refined markdown is fetched from
+    # /runs/{id}/agent-spec only if the user asks to test the improved version.
+    assert agent_home["latest_agent_markdown"] is None
     assert "system_prompt" not in agent_home["candidate"]
     assert "metadata" not in agent_home["candidate"]
     assert "job_scope" not in agent_home["runs"][0]

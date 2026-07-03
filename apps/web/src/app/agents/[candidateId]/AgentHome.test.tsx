@@ -30,7 +30,7 @@ const queryMocks = vi.hoisted(() => ({
           created_at: "2026-07-03T00:00:00Z"
         }
       ],
-      latest_agent_markdown: "# Improved Support Triage Agent"
+      latest_agent_markdown: null
     }
   }))
 }));
@@ -40,8 +40,18 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 vi.mock("@/components/assay/AgentRunControls", () => ({
-  default: ({ refinedMarkdown }: { refinedMarkdown?: string | null }) => (
-    <div data-testid="agent-run-controls">{refinedMarkdown}</div>
+  default: ({
+    baselineRunId,
+    refinedMarkdown,
+    refinedRunId
+  }: {
+    baselineRunId?: string | null;
+    refinedMarkdown?: string | null;
+    refinedRunId?: string | null;
+  }) => (
+    <div data-testid="agent-run-controls">
+      {JSON.stringify({ baselineRunId, refinedMarkdown, refinedRunId })}
+    </div>
   )
 }));
 
@@ -54,6 +64,8 @@ describe("AgentHome", () => {
     expect(screen.getByText("run_latest")).toBeInTheDocument();
     expect(screen.getByText("5/5")).toBeInTheDocument();
     expect(screen.getByText("Ship")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-run-controls")).toHaveTextContent("# Improved Support Triage Agent");
+    expect(screen.getByTestId("agent-run-controls")).toHaveTextContent(
+      JSON.stringify({ baselineRunId: "run_latest", refinedMarkdown: null, refinedRunId: "run_latest" })
+    );
   });
 });
