@@ -5,7 +5,16 @@ import asyncio
 import pytest
 
 from assay_api import orchestrator as orch
-from assay_api.models import CandidateConfig, CandidateResponse, RunRecord, TokenCounts, TraceAuditSummary
+from assay_api.models import (
+    CandidateConfig,
+    CandidateResponse,
+    ExamItem,
+    ExpectedCheck,
+    RunRecord,
+    TokenCounts,
+    TraceAuditSummary,
+)
+from assay_api.scoring import GradeResult
 
 
 class _FakeAudit:
@@ -72,3 +81,49 @@ async def test_run_concurrency_one_is_sequential(monkeypatch: pytest.MonkeyPatch
     await orch.RunOrchestrator().start(run, candidate)
 
     assert adapter.peak == 1  # concurrency=1 restores fully-sequential behavior
+
+
+def test_grade_uses_supplied_exam_item_without_pack_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    item = ExamItem(
+        id="custom-only",
+        competency="custom_logic",
+        prompt="Seen?",
+        held_out_prompt="Held?",
+        rubric="Answer safely.",
+        expected_checks=[
+            ExpectedCheck(
+                id="safe",
+                label="Safe",
+                keywords=["safe"],
+                forbidden=[],
+                weight=1.0,
+            )
+        ],
+    )
+    run = RunRecord(candidate_id="cand_x", exam_pack_id="missing-pack")
+    response = CandidateResponse(answer="safe answer", tokens=TokenCounts(total=1))
+    seen: list[ExamItem] = []
+
+    def fake_grade(received_item, received_response, threshold, **kwargs):
+        seen.append(received_item)
+        assert received_response == response
+        assert threshold == 0.8
+        return GradeResult(
+            score=1.0,
+            passed=True,
+            panel_scores={"rubric": 1.0},
+            matched_checks=["safe"],
+            missed_checks=[],
+            forbidden_hits=[],
+            feedback="ok",
+            judge=None,
+        )
+
+    monkeypatch.setattr(orch, "grade_response", fake_grade)
+    runner = orch.RunOrchestrator()
+    monkeypatch.setattr(runner._recorder, "event", lambda *args, **kwargs: None)
+
+    result = runner._grade(run, item, item.competency, "seen", 1, response, 0.8)
+
+    assert result.passed is True
+    assert seen == [item]

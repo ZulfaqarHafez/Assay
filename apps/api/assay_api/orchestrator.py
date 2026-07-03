@@ -9,11 +9,11 @@ from typing import Any, NamedTuple
 from .adapters import CandidateAdapterError, adapter_for
 from .database import save_run, save_scorecard
 from .diagnostics import load_prior_diagnostics, persist_new_lessons, record_lesson_outcomes
-from .exam_packs import get_exam_pack
 from .exam_prep import qualify, resolve_pack
 from .models import (
     CandidateConfig,
     CandidateResponse,
+    ExamItem,
     RunRecord,
     Scorecard,
 )
@@ -252,7 +252,7 @@ class RunOrchestrator:
                     run, adapter, candidate, item.competency, question, trial, variant, seed_lessons
                 )
                 grade = self._grade(
-                    run, item.id, item.competency, variant, trial, response, run.competency_threshold
+                    run, item, item.competency, variant, trial, response, run.competency_threshold
                 )
                 return item, trial, variant, grade
 
@@ -301,22 +301,20 @@ class RunOrchestrator:
     def _grade(
         self,
         run: RunRecord,
-        item_id: str,
+        item: ExamItem,
         competency: str,
         variant: str,
         trial: int,
         response: CandidateResponse,
         threshold: float,
     ) -> GradeResult:
-        pack = get_exam_pack(run.exam_pack_id)
-        item = next(exam_item for exam_item in pack.items if exam_item.id == item_id)
         result = grade_response(item, response, threshold, judge_cache=self._judge_cache)
         self._recorder.event(
             run.id,
             "grader_panel",
             "response_graded",
             {
-                "item_id": item_id,
+                "item_id": item.id,
                 "competency": competency,
                 "variant": variant,
                 "trial": trial,
