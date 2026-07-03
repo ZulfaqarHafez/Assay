@@ -17,6 +17,7 @@ from ..database import (
     get_lesson,
     get_run,
     get_scorecard,
+    get_scorecards,
     list_events,
     list_runs,
     proof_bundle,
@@ -40,11 +41,13 @@ router = APIRouter()
 def runs() -> list[dict]:
     # Enrich each run with a lightweight scorecard summary so the Experiments
     # table renders verdict/score without an N+1 per-row scorecard fetch.
+    run_records = list_runs()
+    scorecards = get_scorecards([run.id for run in run_records if run.status == "completed"])
     items: list[dict] = []
-    for run in list_runs():
+    for run in run_records:
         item = run.model_dump(mode="json")
         if run.status == "completed":
-            scorecard = get_scorecard(run.id)
+            scorecard = scorecards.get(run.id)
             if scorecard is not None:
                 passes = scorecard.pass_at_k or {}
                 item["certified"] = scorecard.certified

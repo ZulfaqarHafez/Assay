@@ -111,6 +111,10 @@ class DataStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_scorecards(self, run_ids: list[str]) -> dict[str, Scorecard]:
+        raise NotImplementedError
+
+    @abstractmethod
     def list_runs_for_candidate(self, candidate_id: str) -> list[RunRecord]:
         raise NotImplementedError
 
@@ -348,6 +352,18 @@ class SQLiteStore(DataStore):
             ).fetchone()
         return Scorecard.model_validate_json(row["payload"]) if row else None
 
+    def get_scorecards(self, run_ids: list[str]) -> dict[str, Scorecard]:
+        if not run_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in run_ids)
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"SELECT payload FROM scorecards WHERE tenant_id = ? AND run_id IN ({placeholders})",
+                (current_tenant_id(), *run_ids),
+            ).fetchall()
+        scorecards = [Scorecard.model_validate_json(row["payload"]) for row in rows]
+        return {scorecard.run_id: scorecard for scorecard in scorecards}
+
     def list_runs_for_candidate(self, candidate_id: str) -> list[RunRecord]:
         with self.connect() as conn:
             rows = conn.execute(
@@ -568,6 +584,15 @@ class SupabaseStore(DataStore):
         row = self._single("scorecards", "run_id", run_id)
         return Scorecard.model_validate(row["payload"]) if row else None
 
+    def get_scorecards(self, run_ids: list[str]) -> dict[str, Scorecard]:
+        self._ensure_schema()
+        if not run_ids or "scorecards" not in self._available_tables:
+            return {}
+        query = self.client.table(self.tables["scorecards"]).select("payload").in_("run_id", run_ids)
+        response = self._with_tenant_filter("scorecards", query).execute()
+        scorecards = [Scorecard.model_validate(row["payload"]) for row in response.data or []]
+        return {scorecard.run_id: scorecard for scorecard in scorecards}
+
     def list_runs_for_candidate(self, candidate_id: str) -> list[RunRecord]:
         self._ensure_schema()
         query = self.client.table(self.tables["runs"]).select("payload").eq("candidate_id", candidate_id)
@@ -758,6 +783,10 @@ def save_scorecard(scorecard: Scorecard) -> Scorecard:
 
 def get_scorecard(run_id: str) -> Scorecard | None:
     return store().get_scorecard(run_id)
+
+
+def get_scorecards(run_ids: list[str]) -> dict[str, Scorecard]:
+    return store().get_scorecards(run_ids)
 
 
 def list_runs_for_candidate(candidate_id: str) -> list[RunRecord]:
