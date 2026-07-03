@@ -22,7 +22,6 @@ from ..database import (
     list_runs,
     proof_bundle,
     save_run,
-    trace_payload,
 )
 from ..deployability import evaluate_scorecard, policy_for_run
 from ..exam_packs import get_exam_pack
@@ -165,7 +164,7 @@ def run_scorecard(run_id: str) -> dict:
     scorecard = get_scorecard(run_id)
     if scorecard is None:
         raise HTTPException(status_code=404, detail="Scorecard not found")
-    return scorecard.model_dump(mode="json")
+    return _scorecard_payload(scorecard, include_trace_raw=False)
 
 
 @router.get("/runs/{run_id}/reviewers")
@@ -225,7 +224,12 @@ def run_badge(run_id: str) -> Response:
 def run_trace(run_id: str) -> dict:
     if get_run(run_id) is None:
         raise HTTPException(status_code=404, detail="Run not found")
-    return trace_payload(run_id)
+    scorecard = get_scorecard(run_id)
+    return {
+        "run_id": run_id,
+        "events": [event.model_dump(mode="json") for event in list_events(run_id)],
+        "scorecard": _scorecard_payload(scorecard, include_trace_raw=False) if scorecard else None,
+    }
 
 
 @router.get("/runs/{run_id}/comparison")
@@ -361,6 +365,8 @@ def run_detail(run_id: str) -> dict:
     )
     if bundle is None:
         raise HTTPException(status_code=404, detail="Run not found")
+    if bundle.get("scorecard"):
+        bundle["scorecard"] = _strip_scorecard_trace_raw(bundle["scorecard"])
     try:
         agent_spec = agent_spec_payload(run_id)
     except KeyError:
@@ -380,3 +386,17 @@ def run_detail(run_id: str) -> dict:
         "candidate_progress": progress_bundle,
         "diagnostic_library": diagnostic_library,
     }
+
+
+def _scorecard_payload(scorecard, *, include_trace_raw: bool = True) -> dict:
+    payload = scorecard.model_dump(mode="json")
+    if include_trace_raw:
+        return payload
+    return _strip_scorecard_trace_raw(payload)
+
+
+def _strip_scorecard_trace_raw(payload: dict) -> dict:
+    trace_audit = payload.get("trace_audit")
+    if isinstance(trace_audit, dict):
+        trace_audit["raw"] = {}
+    return payload

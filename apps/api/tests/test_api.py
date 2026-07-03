@@ -37,6 +37,7 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
                 passes=True,
                 total_steps=len(trace_steps),
                 total_tokens=1000,
+                raw={"debug": "large raw audit payload"},
             )
 
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
@@ -49,6 +50,7 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         scorecard = client.post(f"/runs/{run['id']}/start").json()
         reviewers = client.get(f"/runs/{run['id']}/reviewers").json()
         events = client.get(f"/runs/{run['id']}/events").json()
+        public_scorecard = client.get(f"/runs/{run['id']}/scorecard").json()
         trace = client.get(f"/runs/{run['id']}/trace").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
         detail = client.get(f"/runs/{run['id']}/detail").json()
@@ -60,7 +62,9 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert scorecard["trials_stochastic"] is False
     assert scorecard["trace_audit"]["tas_score"] == 88
     assert events
+    assert public_scorecard["trace_audit"]["raw"] == {}
     assert trace["scorecard"]["run_id"] == run["id"]
+    assert trace["scorecard"]["trace_audit"]["raw"] == {}
     assert bundle["schema"] == "assay.proof_bundle.v1"
     assert bundle["summary"]["event_count"] == len(events)
     assert bundle["database"]["backend"] == "sqlite"
@@ -80,6 +84,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert detail["detail_profile"] == "fast"
     assert detail["events"] == []
     assert detail["summary"]["event_count"] == 0
+    assert detail["scorecard"]["trace_audit"]["raw"] == {}
+    assert bundle["scorecard"]["trace_audit"]["raw"] == {"debug": "large raw audit payload"}
     assert detail["product_review"]["schema"] == "assay.product_review.v1"
     assert detail["agent_spec"]["schema"] == "assay.agent_spec.v1"
     assert detail["candidate_progress"]["schema"] == "assay.candidate_progress.v1"
