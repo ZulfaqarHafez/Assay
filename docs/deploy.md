@@ -26,6 +26,40 @@ npx vercel            # first deploy / link
 npx vercel --prod     # production
 ```
 
+Current production web deployments are promoted to the stable Vercel alias
+`https://assay-three.vercel.app`. The API is deployed separately and the current
+stable API alias is `https://assay-api-psi.vercel.app`.
+
+## Production deploy helper
+
+This repo includes a deploy wrapper that stages only the files each Vercel
+project needs, stamps the deployment with the git commit SHA, and can reuse an
+existing READY deployment for the same commit.
+
+```bash
+npm run deploy:prod      # deploy API and web
+npm run deploy:web       # deploy web only
+npm run deploy:api       # deploy API only
+npm run deploy:dry       # dry run both targets
+```
+
+For local use, run `npx vercel link` once in `apps/web` and `apps/api`. The
+generated `.vercel/` directories are intentionally not committed.
+
+GitHub Actions deploys production from pushes to `main` with
+`.github/workflows/deploy.yml`. Configure these repository secrets before
+expecting the workflow to upload deployments:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID_WEB`
+- `VERCEL_PROJECT_ID_API`
+
+The workflow skips cleanly if those secrets are missing. When they are present,
+it deploys only affected projects: API changes under `apps/api/`, web changes
+under `apps/web/`, and shared package lock/package manifest changes for the web
+build.
+
 ## 2. Host the API
 
 The API holds server-only secrets (`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,

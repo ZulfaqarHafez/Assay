@@ -1,0 +1,78 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vercel-production:
+    name: Vercel production
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID_API: ${{ secrets.VERCEL_PROJECT_ID_API }}
+      VERCEL_PROJECT_ID_WEB: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+    steps:
+      - name: Check Vercel secrets
+        id: vercel-secrets
+        shell: pwsh
+        run: |
+          $missing = @()
+          foreach ($name in @("VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID_API", "VERCEL_PROJECT_ID_WEB")) {
+            $value = (Get-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue).Value
+            if ([string]::IsNullOrWhiteSpace($value)) {
+              $missing += $name
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            "enabled=false" >> $env:GITHUB_OUTPUT
+            "missing=$($missing -join ', ')" >> $env:GITHUB_OUTPUT
+            Write-Warning "Skipping Vercel deploy; missing secrets: $($missing -join ', ')"
+          } else {
+            "enabled=true" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Checkout
+        if: steps.vercel-secrets.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node 22
+        if: steps.vercel-secrets.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install Vercel CLI
+        if: steps.vercel-secrets.outputs.enabled == 'true'
+        run: npm install -g vercel@54.20.1
+
+      - name: Deploy affected projects
+        if: steps.vercel-secrets.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $base = "${{ github.event.before }}"
+          if ([string]::IsNullOrWhiteSpace($base) -or $base -match '^0+$') {
+            $base = ""
+          }
+
+          ./scripts/deploy-vercel.ps1 `
+            -Target all `
+            -Prod `
+            -AffectedOnly `
+            -Base $base `
+            -Head "${{ github.sha }}"
+
+      - name: Report skipped deploy
+        if: steps.vercel-secrets.outputs.enabled != 'true'
+        run: |
+          echo "Vercel deploy skipped because required secrets are not configured: ${{ steps.vercel-secrets.outputs.missing }}" >> "$GITHUB_STEP_SUMMARY"

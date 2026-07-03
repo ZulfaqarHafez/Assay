@@ -5,16 +5,34 @@ param(
   [switch]$Prod,
   [switch]$DryRun,
   [switch]$KeepStage,
-  [switch]$Force
+  [switch]$Force,
+  [switch]$AffectedOnly,
+  [string]$Base = "",
+  [string]$Head = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $branch = (& git -C $repoRoot branch --show-current).Trim()
-$commitSha = (& git -C $repoRoot rev-parse HEAD).Trim()
-$commitShort = (& git -C $repoRoot rev-parse --short HEAD).Trim()
+$headRef = if ([string]::IsNullOrWhiteSpace($Head)) { "HEAD" } else { $Head }
+$commitSha = (& git -C $repoRoot rev-parse $headRef).Trim()
+$commitShort = (& git -C $repoRoot rev-parse --short $commitSha).Trim()
 $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+
+$targetPaths = @{
+  api = @("apps/api/")
+  web = @("apps/web/", "package.json", "package-lock.json")
+}
+
+function Add-VercelTokenArg {
+  param([string[]]$Args)
+
+  if (![string]::IsNullOrWhiteSpace($env:VERCEL_TOKEN)) {
+    return $Args + @("--token", $env:VERCEL_TOKEN)
+  }
+  return $Args
+}
 
 function Copy-StageItem {
   param(
@@ -74,11 +92,144 @@ function Remove-StageMatches {
   $matches | Sort-Object FullName -Descending | Remove-Item -Recurse -Force
 }
 
+function Get-EnvValue {
+  param([Parameter(Mandatory = $true)][string]$Name)
+
+  $item = Get-Item -LiteralPath "Env:$Name" -ErrorAction SilentlyContinue
+  if ($item -and ![string]::IsNullOrWhiteSpace($item.Value)) {
+    return $item.Value
+  }
+  return ""
+}
+
+function Get-ProjectLink {
+  param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("api", "web")]
+    [string]$Name
+  )
+
+  $projectPath = Get-TargetProjectPath -Name $Name
+  $localProject = Join-Path $projectPath ".vercel/project.json"
+  if (Test-Path -LiteralPath $localProject) {
+    return Get-Content -Raw -LiteralPath $localProject | ConvertFrom-Json
+  }
+
+  $suffix = $Name.ToUpperInvariant()
+  $projectId = Get-EnvValue "VERCEL_PROJECT_ID_$suffix"
+  if ([string]::IsNullOrWhiteSpace($projectId)) {
+    $projectId = Get-EnvValue "VERCEL_${suffix}_PROJECT_ID"
+  }
+  if ([string]::IsNullOrWhiteSpace($projectId) -and $Name -eq $Target) {
+    $projectId = Get-EnvValue "VERCEL_PROJECT_ID"
+  }
+  $orgId = Get-EnvValue "VERCEL_ORG_ID"
+
+  if ([string]::IsNullOrWhiteSpace($projectId) -or [string]::IsNullOrWhiteSpace($orgId)) {
+    throw "Missing Vercel project link for $Name. Run 'npx vercel link' in apps/$Name or set VERCEL_ORG_ID and VERCEL_PROJECT_ID_$suffix."
+  }
+
+  [pscustomobject]@{
+    projectId = $projectId
+    orgId = $orgId
+    projectName = if ($Name -eq "api") { "assay-api" } else { "assay" }
+  }
+}
+
+function Write-ProjectLinkToStage {
+  param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("api", "web")]
+    [string]$Name
+  )
+
+  $link = Get-ProjectLink -Name $Name
+  $vercelDir = Join-Path $script:stageRoot ".vercel"
+  New-Item -ItemType Directory -Force -Path $vercelDir | Out-Null
+  $link |
+    ConvertTo-Json -Compress |
+    Set-Content -LiteralPath (Join-Path $vercelDir "project.json") -Encoding UTF8
+}
+
+function Get-ChangedPaths {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$BaseRef,
+    [Parameter(Mandatory = $true)]
+    [string]$HeadRef
+  )
+
+  $output = (& git -C $repoRoot diff --name-only $BaseRef $HeadRef --) -join "`n"
+  if ($LASTEXITCODE -ne 0) {
+    throw "git diff failed while detecting affected deploy targets"
+  }
+  return $output -split "`r?`n" | Where-Object { $_ } | ForEach-Object { $_.Replace("\", "/") }
+}
+
+function Test-PathAffectsTarget {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("api", "web")]
+    [string]$Name
+  )
+
+  foreach ($affectedPath in $targetPaths[$Name]) {
+    if ($affectedPath.EndsWith("/") -and $Path.StartsWith($affectedPath)) {
+      return $true
+    }
+    if ($Path -eq $affectedPath) {
+      return $true
+    }
+  }
+  return $false
+}
+
+function Get-AffectedTargets {
+  param([string[]]$Targets)
+
+  if (!$AffectedOnly) {
+    return $Targets
+  }
+
+  $baseRef = $Base
+  if ([string]::IsNullOrWhiteSpace($baseRef)) {
+    $baseRef = Get-EnvValue "VERCEL_GIT_PREVIOUS_SHA"
+  }
+  if ([string]::IsNullOrWhiteSpace($baseRef)) {
+    $baseRef = "$commitSha^"
+  }
+  $head = $commitSha
+
+  try {
+    $changed = @(Get-ChangedPaths -BaseRef $baseRef -HeadRef $head)
+  } catch {
+    Write-Warning "$($_.Exception.Message); deploying requested targets."
+    return $Targets
+  }
+
+  $affected = @()
+  foreach ($item in $Targets) {
+    $targetChanges = @($changed | Where-Object { Test-PathAffectsTarget -Path $_ -Name $item })
+    if ($targetChanges.Count -gt 0) {
+      $affected += $item
+    }
+  }
+
+  if ($affected.Count -eq 0) {
+    Write-Host "No deployable target changed between $baseRef and $head."
+  } else {
+    Write-Host "Affected deploy targets: $($affected -join ', ')"
+  }
+  return $affected
+}
+
 function New-ApiStage {
   $script:stageRoot = Join-Path ([System.IO.Path]::GetTempPath()) "assay-api-vercel-$timestamp"
   New-Item -ItemType Directory -Force -Path $script:stageRoot | Out-Null
 
-  Copy-StageItem "apps/api/.vercel" ".vercel"
+  Write-ProjectLinkToStage -Name "api"
   Copy-StageItem "apps/api/.vercelignore"
   Copy-StageItem "apps/api/api"
   Copy-StageItem "apps/api/assay_api"
@@ -95,7 +246,7 @@ function New-WebStage {
   $script:stageRoot = Join-Path ([System.IO.Path]::GetTempPath()) "assay-web-vercel-$timestamp"
   New-Item -ItemType Directory -Force -Path $script:stageRoot | Out-Null
 
-  Copy-StageItem "apps/web/.vercel" ".vercel"
+  Write-ProjectLinkToStage -Name "web"
   Copy-StageItem "package.json"
   Copy-StageItem "package-lock.json"
   Copy-StageItem "apps/web/public"
@@ -157,6 +308,7 @@ function Get-ExistingDeploymentForCommit {
   if ($Prod) {
     $args += @("--environment", "production")
   }
+  $args = Add-VercelTokenArg -Args $args
 
   $previousErrorActionPreference = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
@@ -176,14 +328,38 @@ function Get-ExistingDeploymentForCommit {
     return $null
   }
 
+  $jsonLineIndex = -1
+  $lines = @($raw -split "`r?`n")
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    $line = $lines[$i].TrimStart()
+    if ($line.StartsWith("{") -or $line.StartsWith("[")) {
+      $jsonLineIndex = $i
+      break
+    }
+  }
+
+  if ($jsonLineIndex -lt 0) {
+    return $null
+  }
+
+  $json = ($lines[$jsonLineIndex..($lines.Count - 1)] -join "`n")
+
   try {
-    $result = $raw | ConvertFrom-Json
+    $result = $json | ConvertFrom-Json
   } catch {
     Write-Warning "Could not parse Vercel deployment list for ${Name}; continuing with deploy."
     return $null
   }
 
-  foreach ($deployment in @($result.deployments)) {
+  $deployments = if ($result -is [array]) {
+    @($result)
+  } elseif ($result.PSObject.Properties.Name -contains "deployments") {
+    @($result.deployments)
+  } else {
+    @()
+  }
+
+  foreach ($deployment in $deployments) {
     $sha = [string]$deployment.meta.githubCommitSha
     if ($sha -eq $commitSha -or $sha -eq $commitShort) {
       return $deployment
@@ -221,6 +397,7 @@ function Use-ExistingDeployment {
     $projectPath = Get-TargetProjectPath -Name $Name
     Write-Host "Promoting existing deployment to production aliases."
     $args = @("vercel", "promote", $url, "--cwd", $projectPath, "--yes")
+    $args = Add-VercelTokenArg -Args $args
     & npx @args
     if ($LASTEXITCODE -ne 0) {
       throw "Vercel promote failed for $Name with exit code $LASTEXITCODE"
@@ -253,13 +430,16 @@ function Invoke-VercelDeploy {
   if ($Prod) {
     $args += "--prod"
   }
-  if ($DryRun) {
-    $args += "--dry"
-  }
+  $args = Add-VercelTokenArg -Args $args
 
   Write-Host "Deploy target: $Name"
   Write-Host "Commit: $commitShort ($branch)"
   Write-Host "Stage: $StagePath"
+
+  if ($DryRun) {
+    Write-Host "Dry run: would run Vercel deploy for $Name."
+    return
+  }
 
   Push-Location $StagePath
   try {
@@ -272,7 +452,8 @@ function Invoke-VercelDeploy {
   }
 }
 
-$targets = if ($Target -eq "all") { @("api", "web") } else { @($Target) }
+$requestedTargets = if ($Target -eq "all") { @("api", "web") } else { @($Target) }
+$targets = @(Get-AffectedTargets -Targets $requestedTargets)
 
 foreach ($item in $targets) {
   $stage = $null
