@@ -22,10 +22,10 @@ import {
   Rocket
 } from "lucide-react";
 import {
+  useEvents,
   useRunComparison,
   useRunSurfaces,
-  useRunVerdict,
-  useTrace
+  useRunVerdict
 } from "@/lib/queries";
 import { assayApi } from "@/lib/api";
 import { downloadVerdictCardPng } from "@/lib/cardExport";
@@ -95,7 +95,7 @@ export default function RunDetail({ runId }: { runId: string }) {
     return () => window.clearTimeout(handle);
   }, [runId, criticalSettled]);
 
-  const traceQuery = useTrace(runId, {
+  const eventsQuery = useEvents(runId, {
     enabled: drawerOpen
   });
   const surfacesQuery = useRunSurfaces(runId, {
@@ -107,13 +107,16 @@ export default function RunDetail({ runId }: { runId: string }) {
   const [exportingProof, setExportingProof] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
 
-  const trace = traceQuery.data ?? null;
   const scorecard = verdict?.scorecard ?? null;
   const deployability = verdict?.deployability ?? null;
   const comparisonFromVerdict = verdict?.comparison ?? undefined;
   const surfaces = surfacesQuery.data ?? null;
   const reviewers = surfaces?.product_review ?? null;
-  const events = trace?.events ?? [];
+  const events = React.useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+  const trace = React.useMemo(
+    () => (drawerOpen ? { run_id: runId, events, scorecard } : null),
+    [drawerOpen, events, runId, scorecard]
+  );
   const agentSpec = surfaces?.agent_spec ?? null;
   const candidateName = verdict?.candidate?.name ?? agentSpec?.candidate_name ?? "Candidate";
   // Rerun against the originally-requested pack (a tailored run repoints exam_pack_id at a gen-* id).

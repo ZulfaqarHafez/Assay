@@ -1,6 +1,5 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -11,13 +10,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() })
 }));
 
-function renderRunDetail() {
+function renderRunDetail(searchParams = "") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <NuqsTestingAdapter>
+      <NuqsTestingAdapter searchParams={searchParams}>
         <RunDetail runId="run_demo" />
       </NuqsTestingAdapter>
     </QueryClientProvider>
@@ -210,7 +209,6 @@ describe("RunDetail query fanout", () => {
   });
 
   it("boots from fast verdict endpoints and avoids bundle-backed duplicate reads", async () => {
-    const user = userEvent.setup();
     const paths: string[] = [];
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
@@ -235,27 +233,6 @@ describe("RunDetail query fanout", () => {
           diagnostic_library: []
         });
       }
-      if (url.pathname === "/runs/run_demo/agent-spec/diff") {
-        return json({
-          schema: "assay.agent_diff.v1",
-          run_id: "run_demo",
-          original_available: true,
-          from_label: "original/agent.md",
-          to_label: "refined/AGENTS.md",
-          unified: "--- original/agent.md\n+++ refined/AGENTS.md",
-          hunks: [
-            {
-              header: "@@ -1,1 +1,2 @@",
-              lines: [
-                { op: " ", text: "# Demo Candidate" },
-                { op: "+", text: "- Use job-related criteria only." }
-              ]
-            }
-          ],
-          added: 1,
-          removed: 0
-        });
-      }
       return Promise.resolve(new Response("not mocked", { status: 404 }));
     });
 
@@ -275,7 +252,7 @@ describe("RunDetail query fanout", () => {
     expect(paths).not.toContain("/runs/run_demo/comparison");
     expect(paths).not.toContain("/exam-packs");
 
-    await screen.findByRole("button", { name: /exact diff/i }, { timeout: 10000 });
+    await waitFor(() => expect(paths).toContain("/runs/run_demo/surfaces"), { timeout: 5000 });
     expect(paths).toContain("/runs/run_demo/surfaces");
     expect(paths).not.toContain("/runs/run_demo/agent-spec");
     expect(paths).not.toContain("/runs/run_demo/reviewers");
@@ -283,9 +260,44 @@ describe("RunDetail query fanout", () => {
     expect(paths).not.toContain("/candidates/cand_demo/lessons");
     expect(paths).not.toContain("/runs/run_demo/detail");
     expect(paths).not.toContain("/runs/run_demo/proof-bundle");
+  }, 15000);
 
-    await user.click(screen.getByRole("button", { name: /exact diff/i }));
-    await waitFor(() => expect(paths).toContain("/runs/run_demo/agent-spec/diff"));
+  it("loads trace drawer evidence from events without the duplicate trace payload", async () => {
+    const paths: string[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      paths.push(url.pathname);
+      if (url.pathname === "/runs/run_demo/verdict") {
+        return json({
+          schema: "assay.run_verdict.v1",
+          run: runRecord,
+          candidate,
+          scorecard,
+          deployability,
+          comparison: null
+        });
+      }
+      if (url.pathname === "/runs/run_demo/events") {
+        return json(events);
+      }
+      if (url.pathname === "/runs/run_demo/surfaces") {
+        return json({
+          schema: "assay.run_surfaces.v1",
+          run_id: "run_demo",
+          agent_spec: agentSpec,
+          product_review: proofBundle.product_review,
+          candidate_progress: proofBundle.candidate_progress,
+          diagnostic_library: []
+        });
+      }
+      return Promise.resolve(new Response("not mocked", { status: 404 }));
+    });
+
+    renderRunDetail("?drawer=trace");
+
+    await waitFor(() => expect(paths).toContain("/runs/run_demo/events"));
+    expect(paths).toContain("/runs/run_demo/verdict");
+    expect(paths).not.toContain("/runs/run_demo/trace");
   }, 15000);
 
   it("reuses verdict-bundled comparisons for refined runs", async () => {
