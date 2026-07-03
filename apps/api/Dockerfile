@@ -9,7 +9,8 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    ASSAY_ENV=production
+    ASSAY_ENV=production \
+    PORT=8000
 
 WORKDIR /app
 
@@ -41,4 +42,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT:-8000}/health" || exit 1
 
-CMD ["sh", "-c", "uvicorn assay_api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python -m uvicorn assay_api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
