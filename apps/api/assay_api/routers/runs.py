@@ -447,30 +447,39 @@ def run_trace(run_id: str) -> JSONResponse:
 
 
 @router.get("/runs/{run_id}/comparison")
-def run_comparison_endpoint(run_id: str, baseline: str | None = None) -> dict:
-    if get_run(run_id) is None:
+def run_comparison_endpoint(run_id: str, baseline: str | None = None) -> JSONResponse:
+    run = get_run(run_id)
+    if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     payload = run_comparison(run_id, baseline)
     if payload is None:
         raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
-    return payload.model_dump(mode="json")
+    return JSONResponse(
+        content=payload.model_dump(mode="json"),
+        headers=_run_json_cache_headers(run),
+    )
 
 
 @router.get("/runs/{run_id}/lessons-applied")
-def run_lessons_applied(run_id: str) -> list[dict]:
-    if get_run(run_id) is None:
+def run_lessons_applied(run_id: str) -> JSONResponse:
+    run = get_run(run_id)
+    if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     scorecard = get_scorecard(run_id)
     if scorecard is None:
-        return []
+        return JSONResponse(content=[], headers=_run_json_cache_headers(run))
     lessons_by_id = get_lessons(scorecard.lessons_applied)
     resolved = [lessons_by_id.get(lesson_id) for lesson_id in scorecard.lessons_applied]
-    return [lesson.model_dump(mode="json") for lesson in resolved if lesson is not None]
+    return JSONResponse(
+        content=[lesson.model_dump(mode="json") for lesson in resolved if lesson is not None],
+        headers=_run_json_cache_headers(run),
+    )
 
 
 @router.get("/runs/{run_id}/agent-spec")
-def run_agent_spec(run_id: str) -> dict:
-    if get_run(run_id) is None:
+def run_agent_spec(run_id: str) -> JSONResponse:
+    run = get_run(run_id)
+    if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     try:
         payload = agent_spec_payload(run_id)
@@ -478,13 +487,17 @@ def run_agent_spec(run_id: str) -> dict:
         raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
     if payload is None:
         raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
-    return payload
+    return JSONResponse(
+        content=payload,
+        headers=_run_json_cache_headers(run),
+    )
 
 
 @router.get("/runs/{run_id}/agent-spec/diff")
-def run_agent_spec_diff(run_id: str) -> dict:
+def run_agent_spec_diff(run_id: str) -> JSONResponse:
     """Structured before/after diff between the uploaded and refined agent md."""
-    if get_run(run_id) is None:
+    run = get_run(run_id)
+    if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     try:
         payload = diff_payload(run_id)
@@ -492,7 +505,10 @@ def run_agent_spec_diff(run_id: str) -> dict:
         raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
     if payload is None:
         raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
-    return payload
+    return JSONResponse(
+        content=payload,
+        headers=_run_json_cache_headers(run),
+    )
 
 
 @router.post("/runs/{run_id}/agent-spec/export-files")

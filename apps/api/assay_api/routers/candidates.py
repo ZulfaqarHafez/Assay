@@ -166,18 +166,24 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
 
 
 @router.get("/candidates/{candidate_id}/progress")
-def candidate_progress_endpoint(candidate_id: str) -> dict:
+def candidate_progress_endpoint(candidate_id: str) -> JSONResponse:
     payload = candidate_progress(candidate_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    return payload.model_dump(mode="json")
+    return JSONResponse(
+        content=payload.model_dump(mode="json"),
+        headers=public_read_json_headers(),
+    )
 
 
 @router.get("/candidates/{candidate_id}/lessons")
-def candidate_lessons(candidate_id: str, exam_pack_id: str | None = None) -> list[dict]:
+def candidate_lessons(candidate_id: str, exam_pack_id: str | None = None) -> JSONResponse:
     if get_candidate(candidate_id) is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    return [lesson.model_dump(mode="json") for lesson in lesson_library(candidate_id, exam_pack_id)]
+    return JSONResponse(
+        content=[lesson.model_dump(mode="json") for lesson in lesson_library(candidate_id, exam_pack_id)],
+        headers=public_read_json_headers(),
+    )
 
 
 def _agent_rollups(candidates: list[dict], runs: list[dict]) -> list[dict[str, object]]:

@@ -401,12 +401,14 @@ def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
         candidate_id = client.get("/candidates").json()[0]["id"]
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         client.post(f"/runs/{run['id']}/start")
-        spec = client.get(f"/runs/{run['id']}/agent-spec").json()
+        spec_response = client.get(f"/runs/{run['id']}/agent-spec")
+        spec = spec_response.json()
         export = client.post(f"/runs/{run['id']}/agent-spec/export-files").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
 
     assert spec["schema"] == "assay.agent_spec.v1"
     assert spec["run_id"] == run["id"]
+    assert spec_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert spec["readiness"] in {"ready", "refine", "needs_subagents"}
     assert spec["agent_markdown"].startswith("# Demo Candidate")
     assert isinstance(spec["sub_agents"], list)
@@ -881,7 +883,8 @@ def test_agent_spec_diff_endpoint(monkeypatch) -> None:
 
         pending = client.get(f"/runs/{run['id']}/agent-spec/diff")
         client.post(f"/runs/{run['id']}/start")
-        diff = client.get(f"/runs/{run['id']}/agent-spec/diff").json()
+        diff_response = client.get(f"/runs/{run['id']}/agent-spec/diff")
+        diff = diff_response.json()
         spec = client.get(f"/runs/{run['id']}/agent-spec").json()
 
         # The seeded demo candidate has no stored original definition.
@@ -895,6 +898,7 @@ def test_agent_spec_diff_endpoint(monkeypatch) -> None:
 
     assert pending.status_code == 409
     assert diff["schema"] == "assay.agent_diff.v1"
+    assert diff_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert diff["original_available"] is True
     assert diff["hunks"]
     assert diff["added"] > 0

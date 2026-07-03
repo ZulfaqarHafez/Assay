@@ -69,7 +69,8 @@ def test_lessons_persist_and_apply_across_runs(monkeypatch: pytest.MonkeyPatch) 
 
         # Run A: every competency fails, so the diagnostic library is seeded.
         run_a = _start_run(client, candidate_id)
-        lessons_after_a = client.get(f"/candidates/{candidate_id}/lessons").json()
+        lessons_after_a_response = client.get(f"/candidates/{candidate_id}/lessons")
+        lessons_after_a = lessons_after_a_response.json()
         assert lessons_after_a, "run A should persist at least one diagnostic lesson"
         a_origin_run_ids = {lesson["origin_run_id"] for lesson in lessons_after_a}
         assert a_origin_run_ids == {run_a}
@@ -78,11 +79,14 @@ def test_lessons_persist_and_apply_across_runs(monkeypatch: pytest.MonkeyPatch) 
         run_b = _start_run(client, candidate_id)
         scorecard_b = client.get(f"/runs/{run_b}/scorecard").json()
         events_b = client.get(f"/runs/{run_b}/events").json()
-        applied = client.get(f"/runs/{run_b}/lessons-applied").json()
+        applied_response = client.get(f"/runs/{run_b}/lessons-applied")
+        applied = applied_response.json()
 
     # The scorecard records which library lessons it consumed and its baseline.
     assert scorecard_b["lessons_applied"], "run B should apply prior-run lessons"
     assert scorecard_b["prior_run_id"] == run_a
+    assert lessons_after_a_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert applied_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     # The timeline shows the application event.
     assert any(event["event_type"] == "lesson_applied" for event in events_b)
     # Applied lessons resolve and now record run B in their provenance.
@@ -129,12 +133,18 @@ def test_progress_tracks_competency_trend(monkeypatch: pytest.MonkeyPatch) -> No
                 return original_get_lessons(lesson_ids)
 
             patch.setattr(progress_module, "get_lessons", _tracked_get_lessons)
-            progress = client.get(f"/candidates/{candidate_id}/progress").json()
-        comparison = client.get(f"/runs/{run_b}/comparison?baseline={run_a}").json()
-        lessons = client.get(f"/candidates/{candidate_id}/lessons").json()
+            progress_response = client.get(f"/candidates/{candidate_id}/progress")
+            progress = progress_response.json()
+        comparison_response = client.get(f"/runs/{run_b}/comparison?baseline={run_a}")
+        comparison = comparison_response.json()
+        lessons_response = client.get(f"/candidates/{candidate_id}/lessons")
+        lessons = lessons_response.json()
 
     assert progress["schema"] == "assay.candidate_progress.v1"
     assert progress["run_count"] == 2
+    assert progress_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert comparison_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert lessons_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert len(lesson_batch_calls) == 1
     assert lesson_batch_calls[0], "candidate_progress should batch applied lesson ids"
     assert progress["competencies"], "progress should report per-competency trends"
