@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..tenancy import current_tenant_id
 from ._common import _TENANT_ID_PATTERN, RunStatus, utc_now
+from .privilege import PrivilegeDelta
 from .role import JobScope
 from .trace import TraceAuditSummary
 
@@ -103,6 +104,9 @@ class Scorecard(BaseModel):
     # grading (offline/no-key); ``partial`` = some stage fell back mid-run.
     qualification_status: Literal["tailored", "deterministic", "partial"] = "deterministic"
     role_brief_summary: str | None = None
+    # Least-privilege analysis: tools the agent declared but never needed across
+    # the exam. None when the run exercised no tools (e.g. a plain HR pack).
+    privilege_delta: PrivilegeDelta | None = None
     semantic_judge_used: bool = False
     semantic_judge_summary: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=utc_now)

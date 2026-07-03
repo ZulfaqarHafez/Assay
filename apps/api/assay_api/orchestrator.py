@@ -17,6 +17,7 @@ from .models import (
     RunRecord,
     Scorecard,
 )
+from .privilege import analyze_privilege
 from .run_recorder import RunRecorder
 from .scoring import GradeResult, grade_response, grade_scenario, panel_disagreement
 from .trace_audit import TraceAuditService
@@ -403,9 +404,19 @@ class RunOrchestrator:
 
         certified = not failures
         judge_summary = self._judge_summary(judge_results or [])
+        # Least-privilege delta: which declared tools were never exercised.
+        privilege_delta = analyze_privilege(candidate.tools, self._recorder.trace_steps)
+        if privilege_delta and privilege_delta.removable:
+            self._recorder.event(
+                run.id,
+                "system",
+                "privilege_analyzed",
+                privilege_delta.model_dump(mode="json"),
+            )
         return Scorecard(
             run_id=run.id,
             certified=certified,
+            privilege_delta=privilege_delta,
             k=run.k,
             thresholds={
                 "competency": run.competency_threshold,

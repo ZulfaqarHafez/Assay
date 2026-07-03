@@ -25,6 +25,7 @@ from .candidate import (
     ToolSpec,
 )
 from .exam import ExamItem, ExamPack, ExamPackFileExport, ExpectedCheck
+from .privilege import PrivilegeDelta
 from .progress import (
     CandidateProgress,
     CompetencyComparison,
@@ -81,6 +82,8 @@ __all__ = [
     "CompetencyTrendPoint",
     "DiagnosticLesson",
     "RunComparison",
+    # privilege
+    "PrivilegeDelta",
     # refinery
     "AgentResearch",
     "AgentResearchSource",
