@@ -112,12 +112,15 @@ jobs:
         run: |
           docker run -d --name assay-api -p 8000:8000 \
             -e ASSAY_DB_BACKEND=sqlite \
+            -e ASSAY_DB_PATH=/tmp/assay-ci.db \
+            -e ASSAY_DISABLE_OPENAI=1 \
+            -e ASSAY_RATE_LIMIT_ENABLED=0 \
             assay-api:ci
 
       - name: Wait for /health
         run: |
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then echo "healthy"; exit 0; fi
+          for i in $(seq 1 60); do
+            if curl --max-time 5 -fsS http://127.0.0.1:8000/health >/dev/null; then echo "healthy"; exit 0; fi
             sleep 2
           done
           echo "container never became healthy"; docker logs assay-api; exit 1

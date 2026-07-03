@@ -38,14 +38,10 @@ test("command palette opens and navigates", async ({ page }) => {
   // are covered at the component level where the event is not intercepted.
   const trigger = page.getByRole("button", { name: /open command palette/i });
   await expect(trigger).toBeVisible();
-  await expect
-    .poll(async () => {
-      await trigger.click();
-      return page.locator(".cmdk-panel").isVisible();
-    })
-    .toBe(true);
-  await expect(page.locator(".cmdk-panel")).toBeVisible();
-  await page.locator(".cmdk-input").fill("suites");
+  await trigger.click();
+  const palette = page.getByRole("dialog", { name: /command palette/i });
+  await expect(palette).toBeVisible({ timeout: 15_000 });
+  await palette.getByRole("textbox", { name: /command palette search/i }).fill("suites");
   await expect(page.locator(".cmdk-item", { hasText: "Suites" })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/suites$/);
