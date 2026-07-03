@@ -1,9 +1,11 @@
-"""Sprint-1 acceptance: a bad AGENTS.md whose agent actually calls `rm -rf`
-trips a guardrail end-to-end → CRITICAL finding → HOLD verdict, with the
-offending tool call captured in the transcript. Runs offline via a fake
-sandboxed adapter (no OpenAI key)."""
+"""Guardrail acceptance: tool-call breach -> CRITICAL finding -> HOLD verdict.
+
+Runs offline via fake sandboxed adapters, so no OpenAI key is required.
+"""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +20,12 @@ from assay_api.models import (
     TraceAuditSummary,
 )
 
+_FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _agent_fixture(name: str) -> str:
+    return (_FIXTURES / name).read_text(encoding="utf-8")
+
 
 class _FakeAudit:
     def __init__(self, threshold: float):
@@ -25,13 +33,18 @@ class _FakeAudit:
 
     def analyse(self, candidate, trace_steps, task_value_score):
         return TraceAuditSummary(
-            status="ok", trace_id="t", tas_score=88, grade="Good",
-            passes=True, total_steps=len(trace_steps), total_tokens=100,
+            status="ok",
+            trace_id="t",
+            tas_score=88,
+            grade="Good",
+            passes=True,
+            total_steps=len(trace_steps),
+            total_tokens=100,
         )
 
 
 class _BadAgentAdapter:
-    """Simulates an over-eager agent that runs `rm -rf` on the prod path."""
+    """Simulates an over-eager agent that runs rm -rf on the prod path."""
 
     stochastic = True
     degraded = False
@@ -83,15 +96,18 @@ async def test_bad_agent_trips_guardrail_and_holds(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(orch, "adapter_for", lambda candidate: _BadAgentAdapter())
 
     run = RunRecord(candidate_id="bad", exam_pack_id="guardrail-v1", k=1)
-    candidate = CandidateConfig(id="bad", name="Ops Helper", adapter_type="openai-compatible")
+    candidate = CandidateConfig(
+        id="bad",
+        name="Ops Helper",
+        adapter_type="openai-compatible",
+        system_prompt=_agent_fixture("agent_bad.md"),
+    )
     scorecard = await orch.RunOrchestrator().start(run, candidate)
 
-    # A real guardrail breach was recorded as a structured CRITICAL finding...
-    criticals = [r for r in scorecard.failure_reasons if r.startswith("CRITICAL guardrail_breach")]
+    criticals = [reason for reason in scorecard.failure_reasons if reason.startswith("CRITICAL guardrail_breach")]
     assert criticals, scorecard.failure_reasons
     assert "rm -rf" in " ".join(criticals)
 
-    # ...and the deployability gate blocks it.
     decision = evaluate_scorecard(scorecard, strict_policy())
     assert decision.verdict == "do_not_ship"
 
@@ -105,7 +121,12 @@ async def test_hardened_agent_passes_the_guardrail(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(orch, "adapter_for", lambda candidate: _HardenedAgentAdapter())
 
     run = RunRecord(candidate_id="good", exam_pack_id="guardrail-v1", k=1)
-    candidate = CandidateConfig(id="good", name="Ops Helper (hardened)", adapter_type="openai-compatible")
+    candidate = CandidateConfig(
+        id="good",
+        name="Ops Helper (hardened)",
+        adapter_type="openai-compatible",
+        system_prompt=_agent_fixture("agent_hardened.md"),
+    )
     scorecard = await orch.RunOrchestrator().start(run, candidate)
 
-    assert not [r for r in scorecard.failure_reasons if r.startswith("CRITICAL")]
+    assert not [reason for reason in scorecard.failure_reasons if reason.startswith("CRITICAL")]
