@@ -146,9 +146,9 @@ function Write-ProjectLinkToStage {
   $link = Get-ProjectLink -Name $Name
   $vercelDir = Join-Path $script:stageRoot ".vercel"
   New-Item -ItemType Directory -Force -Path $vercelDir | Out-Null
-  $link |
-    ConvertTo-Json -Compress |
-    Set-Content -LiteralPath (Join-Path $vercelDir "project.json") -Encoding UTF8
+  $json = $link | ConvertTo-Json -Compress
+  $encoding = [System.Text.UTF8Encoding]::new($false)
+  [System.IO.File]::WriteAllText((Join-Path $vercelDir "project.json"), $json, $encoding)
 }
 
 function Get-ChangedPaths {
