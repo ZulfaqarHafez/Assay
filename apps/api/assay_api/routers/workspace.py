@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from ..cache_headers import public_read_json_headers
@@ -14,11 +14,14 @@ router = APIRouter()
 
 
 @router.get("/workspace/boot")
-def workspace_boot(profile: Literal["full", "summary"] = "full") -> JSONResponse:
+def workspace_boot(
+    profile: Literal["full", "summary"] = "full",
+    candidate_limit: int = Query(50, ge=1, le=100),
+) -> JSONResponse:
     content: dict[str, object] = {
         "schema": "assay.workspace_boot.v1",
         "health": health_payload(),
-        "candidate_summaries": list_candidate_summaries(),
+        "candidate_summaries": list_candidate_summaries(limit=candidate_limit),
     }
     if profile == "summary":
         content["exam_pack_summaries"] = list_exam_pack_summaries()

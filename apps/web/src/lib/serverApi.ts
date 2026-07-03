@@ -39,5 +39,5 @@ export function getExamPackSummaries() {
 }
 
 export function getWorkspaceBoot() {
-  return serverRequest<WorkspaceBoot>("/workspace/boot?profile=summary");
+  return serverRequest<WorkspaceBoot>("/workspace/boot?profile=summary&candidate_limit=24");
 }

@@ -36,7 +36,7 @@ function requestHeaders(init?: RequestInit): Headers {
 }
 
 export const assayApi = {
-  workspaceBoot: () => request<WorkspaceBoot>("/workspace/boot?profile=summary"),
+  workspaceBoot: () => request<WorkspaceBoot>("/workspace/boot?profile=summary&candidate_limit=24"),
   health: () => request<Health>("/health"),
   databaseHealth: () => request<DatabaseHealth>("/health/database"),
   examPacks: () => request<ExamPack[]>("/exam-packs"),

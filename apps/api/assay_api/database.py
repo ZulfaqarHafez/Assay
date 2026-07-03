@@ -78,11 +78,12 @@ class DataStore(ABC):
     def list_candidates(self) -> list[CandidateConfig]:
         raise NotImplementedError
 
-    def list_candidate_summaries(self) -> list[dict[str, Any]]:
-        return [
+    def list_candidate_summaries(self, limit: int | None = None) -> list[dict[str, Any]]:
+        summaries = [
             _candidate_summary_from_payload(candidate.model_dump(mode="json"))
             for candidate in self.list_candidates()
         ]
+        return summaries[:limit] if limit is not None else summaries
 
     @abstractmethod
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
@@ -282,11 +283,17 @@ class SQLiteStore(DataStore):
             ).fetchall()
         return [_load_candidate(row["payload"]) for row in rows]
 
-    def list_candidate_summaries(self) -> list[dict[str, Any]]:
+    def list_candidate_summaries(self, limit: int | None = None) -> list[dict[str, Any]]:
         with self.connect() as conn:
+            limit_clause = " LIMIT ?" if limit is not None else ""
+            params: tuple[object, ...] = (
+                (current_tenant_id(), limit) if limit is not None else (current_tenant_id(),)
+            )
             rows = conn.execute(
-                "SELECT id, payload, created_at FROM candidates WHERE tenant_id = ? ORDER BY created_at DESC",
-                (current_tenant_id(),),
+                "SELECT id, payload, created_at "
+                "FROM candidates "
+                f"WHERE tenant_id = ? ORDER BY created_at DESC{limit_clause}",
+                params,
             ).fetchall()
         return [_candidate_summary_from_row(row) for row in rows]
 
@@ -591,9 +598,15 @@ class SupabaseStore(DataStore):
         rows = self._select("candidates", order="created_at", desc=True)
         return [_load_candidate(row["payload"]) for row in rows]
 
-    def list_candidate_summaries(self) -> list[dict[str, Any]]:
+    def list_candidate_summaries(self, limit: int | None = None) -> list[dict[str, Any]]:
         self._ensure_schema()
-        rows = self._select("candidates", columns="id, payload, created_at", order="created_at", desc=True)
+        rows = self._select(
+            "candidates",
+            columns="id, payload, created_at",
+            order="created_at",
+            desc=True,
+            limit=limit,
+        )
         return [_candidate_summary_from_row(row) for row in rows]
 
     def get_candidate(self, candidate_id: str) -> CandidateConfig | None:
@@ -826,11 +839,15 @@ class SupabaseStore(DataStore):
         order: str,
         desc: bool = False,
         columns: str = "payload",
+        limit: int | None = None,
     ) -> list[dict[str, Any]]:
         if not self._table_available(logical_table):
             return []
         query = self.client.table(self.tables[logical_table]).select(columns)
-        response = self._with_tenant_filter(logical_table, query).order(order, desc=desc).execute()
+        query = self._with_tenant_filter(logical_table, query).order(order, desc=desc)
+        if limit is not None:
+            query = query.limit(limit)
+        response = query.execute()
         return response.data or []
 
     def _single(self, logical_table: str, column: str, value: str) -> dict[str, Any] | None:
@@ -949,8 +966,8 @@ def list_candidates() -> list[CandidateConfig]:
     return store().list_candidates()
 
 
-def list_candidate_summaries() -> list[dict[str, Any]]:
-    return store().list_candidate_summaries()
+def list_candidate_summaries(limit: int | None = None) -> list[dict[str, Any]]:
+    return store().list_candidate_summaries(limit=limit)
 
 
 def get_candidate(candidate_id: str) -> CandidateConfig | None:

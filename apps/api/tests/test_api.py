@@ -334,6 +334,27 @@ def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
     assert "origin" in response.headers["vary"].lower()
 
 
+def test_workspace_boot_bounds_recent_candidate_summaries() -> None:
+    with TestClient(app) as client:
+        for index in range(5):
+            client.post(
+                "/candidates",
+                json={
+                    "name": f"Boot Agent {index}",
+                    "adapter_type": "mock",
+                    "system_prompt": f"# Boot Agent {index}",
+                },
+            )
+        boot = client.get("/workspace/boot?profile=summary&candidate_limit=2").json()
+        all_summaries = client.get("/candidates/summary").json()
+
+    assert [item["name"] for item in boot["candidate_summaries"]] == [
+        "Boot Agent 4",
+        "Boot Agent 3",
+    ]
+    assert sum(1 for item in all_summaries if item["name"].startswith("Boot Agent ")) == 5
+
+
 def test_health_payload_caches_readiness_probes(monkeypatch) -> None:
     from assay_api.routers import health as health_router
 
