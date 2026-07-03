@@ -3,6 +3,11 @@ name: Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - "apps/api/**"
+      - "apps/web/**"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 concurrency:

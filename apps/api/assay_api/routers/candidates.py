@@ -193,12 +193,15 @@ def _agent_rollups(candidates: list[dict], runs: list[dict]) -> list[dict[str, o
 
     # Seed from candidates so agents with zero runs still appear.
     for candidate in candidates:
+        candidate_id = str(candidate.get("id") or "")
+        if not candidate_id:
+            continue
         name = str(candidate["name"])
         rows.setdefault(
-            name,
+            candidate_id,
             {
                 "name": name,
-                "candidate_id": candidate.get("id"),
+                "candidate_id": candidate_id,
                 "adapter_type": candidate.get("adapter_type", "unknown"),
                 "run_count": 0,
                 "latest_run_id": None,
@@ -214,7 +217,7 @@ def _agent_rollups(candidates: list[dict], runs: list[dict]) -> list[dict[str, o
         if not name:
             continue
         row = rows.setdefault(
-            name,
+            candidate_id,
             {
                 "name": name,
                 "candidate_id": candidate_id,
@@ -233,7 +236,10 @@ def _agent_rollups(candidates: list[dict], runs: list[dict]) -> list[dict[str, o
                 if isinstance(run.get("pass_count"), int) and isinstance(run.get("total_count"), int):
                     row["score"] = f"{run['pass_count']}/{run['total_count']}"
 
-    return sorted(rows.values(), key=lambda row: int(row["run_count"]), reverse=True)
+    return sorted(
+        rows.values(),
+        key=lambda row: (-int(row["run_count"]), str(row["name"]).lower(), str(row["candidate_id"])),
+    )
 
 
 def _run_rows_for_candidate(runs: list[dict], candidate: CandidateConfig) -> list[dict[str, object]]:

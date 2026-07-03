@@ -50,7 +50,7 @@ export default async function AgentsPage() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.name}>
+                <tr key={row.candidate_id ?? row.name}>
                   <td data-label="Agent">
                     {row.candidate_id ? (
                       <Link prefetch={false} href={`/agents/${row.candidate_id}`} className="ws-cell-strong">{row.name}</Link>

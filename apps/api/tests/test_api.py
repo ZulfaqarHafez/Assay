@@ -297,6 +297,34 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert "origin" in exam_pack_summary_response.headers["vary"].lower()
 
 
+def test_agent_summary_keeps_same_named_candidates_separate() -> None:
+    with TestClient(app) as client:
+        first = client.post(
+            "/candidates",
+            json={
+                "name": "Twin Agent",
+                "adapter_type": "mock",
+                "system_prompt": "# Twin Agent\n\nFirst implementation.",
+            },
+        ).json()
+        second = client.post(
+            "/candidates",
+            json={
+                "name": "Twin Agent",
+                "adapter_type": "mock",
+                "system_prompt": "# Twin Agent\n\nSecond implementation.",
+            },
+        ).json()
+        first_run = client.post("/runs", json={"candidate_id": first["id"]}).json()
+        second_run = client.post("/runs", json={"candidate_id": second["id"]}).json()
+        summaries = client.get("/agents/summary").json()
+
+    twins = [row for row in summaries if row["name"] == "Twin Agent"]
+    assert {row["candidate_id"] for row in twins} == {first["id"], second["id"]}
+    assert {row["latest_run_id"] for row in twins} == {first_run["id"], second_run["id"]}
+    assert all(row["run_count"] == 1 for row in twins)
+
+
 def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.routers.health.resolve_openai_key", lambda: "test-key")
 

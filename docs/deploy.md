@@ -46,9 +46,10 @@ npm run deploy:dry       # dry run both targets
 For local use, run `npx vercel link` once in `apps/web` and `apps/api`. The
 generated `.vercel/` directories are intentionally not committed.
 
-GitHub Actions deploys production from pushes to `main` with
-`.github/workflows/deploy.yml`. Configure these repository secrets before
-expecting the workflow to upload deployments:
+GitHub Actions deploys production from pushes to `main` that change deployable
+runtime inputs (`apps/api/**`, `apps/web/**`, `package.json`, or
+`package-lock.json`) with `.github/workflows/deploy.yml`. Configure these
+repository secrets before expecting the workflow to upload deployments:
 
 - `VERCEL_TOKEN`
 - `VERCEL_ORG_ID`
