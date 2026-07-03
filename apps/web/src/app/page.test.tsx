@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AnnouncerProvider } from "@/components/announcer";
 import { HomeClient } from "./HomeClient";
-import type { WorkspaceBoot } from "@/types/assay";
+import type { CandidateConfig, WorkspaceBoot } from "@/types/assay";
 
 /**
  * The page composes TanStack Query hooks and the announcer context, so tests
@@ -25,14 +25,14 @@ function renderHome(initialBoot: WorkspaceBoot | null = workspaceBootPayload) {
   );
 }
 
-const candidate = {
+const candidate: CandidateConfig = {
   id: "cand_demo",
   name: "Demo Candidate",
   adapter_type: "mock",
   metadata: {}
 };
 
-const httpCandidate = {
+const httpCandidate: CandidateConfig = {
   id: "cand_http",
   name: "Webhook Candidate",
   adapter_type: "http",

@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $patterns = @(
-  @{ Name = "OpenAI API key"; Regex = "sk-[A-Za-z0-9_-]{20,}" },
+  @{ Name = "OpenAI API key"; Regex = "sk-(proj|svcacct|admin)-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{32,}" },
   @{ Name = "Supabase secret key"; Regex = "sb_secret_[A-Za-z0-9_-]+" },
   @{ Name = "Supabase personal access token"; Regex = "sbp_[A-Za-z0-9_-]+" },
   @{ Name = "Supabase service role JWT"; Regex = "SUPABASE_SERVICE_ROLE_KEY\s*=\s*`"?eyJ[A-Za-z0-9_-]{20,}" }

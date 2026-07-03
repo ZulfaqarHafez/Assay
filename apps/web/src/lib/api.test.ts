@@ -8,6 +8,14 @@ function json(body: unknown) {
   }));
 }
 
+function fetchJson(body: unknown) {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    void input;
+    void init;
+    return json(body);
+  });
+}
+
 describe("assayApi request headers", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -16,7 +24,7 @@ describe("assayApi request headers", () => {
 
   it("keeps GET reads as simple cross-origin requests", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json([]));
+    const fetchMock = fetchJson([]);
     global.fetch = fetchMock;
 
     await assayApi.runs();
@@ -28,7 +36,7 @@ describe("assayApi request headers", () => {
 
   it("uses slim summary endpoints for workspace list views", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json([]));
+    const fetchMock = fetchJson([]);
     global.fetch = fetchMock;
 
     await assayApi.runSummaries();
@@ -44,7 +52,7 @@ describe("assayApi request headers", () => {
 
   it("uses the workspace boot endpoint for home first paint", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ schema: "assay.workspace_boot.v1" }));
+    const fetchMock = fetchJson({ schema: "assay.workspace_boot.v1" });
     global.fetch = fetchMock;
 
     await assayApi.workspaceBoot();
@@ -54,7 +62,7 @@ describe("assayApi request headers", () => {
 
   it("reads a single run without assembling a proof bundle", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ id: "run_1" }));
+    const fetchMock = fetchJson({ id: "run_1" });
     global.fetch = fetchMock;
 
     await assayApi.run("run_1");
@@ -64,7 +72,7 @@ describe("assayApi request headers", () => {
 
   it("uses the slim verdict endpoint for run-detail first paint", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ schema: "assay.run_verdict.v1" }));
+    const fetchMock = fetchJson({ schema: "assay.run_verdict.v1" });
     global.fetch = fetchMock;
 
     await assayApi.runVerdict("run_1");
@@ -74,7 +82,7 @@ describe("assayApi request headers", () => {
 
   it("uses the bundled run surfaces endpoint for secondary run-detail panels", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ schema: "assay.run_surfaces.v1" }));
+    const fetchMock = fetchJson({ schema: "assay.run_surfaces.v1" });
     global.fetch = fetchMock;
 
     await assayApi.runSurfaces("run_1");
@@ -84,7 +92,7 @@ describe("assayApi request headers", () => {
 
   it("uses the slim payoff endpoint after a live run completes", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ schema: "assay.run_payoff.v1" }));
+    const fetchMock = fetchJson({ schema: "assay.run_payoff.v1" });
     global.fetch = fetchMock;
 
     await assayApi.runPayoff("run_1");
@@ -94,7 +102,7 @@ describe("assayApi request headers", () => {
 
   it("adds JSON content type for mutation bodies", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ id: "run_1" }));
+    const fetchMock = fetchJson({ id: "run_1" });
     global.fetch = fetchMock;
 
     await assayApi.createRun("cand_1");
@@ -107,7 +115,7 @@ describe("assayApi request headers", () => {
 
   it("uses the fast run detail endpoint by default", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ schema: "assay.proof_bundle.v1" }));
+    const fetchMock = fetchJson({ schema: "assay.proof_bundle.v1" });
     global.fetch = fetchMock;
 
     await assayApi.proofBundle("run_1");
@@ -117,7 +125,7 @@ describe("assayApi request headers", () => {
 
   it("keeps the full proof bundle endpoint for exports", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json({ schema: "assay.proof_bundle.v1" }));
+    const fetchMock = fetchJson({ schema: "assay.proof_bundle.v1" });
     global.fetch = fetchMock;
 
     await assayApi.proofBundle("run_1", "full");
@@ -127,7 +135,7 @@ describe("assayApi request headers", () => {
 
   it("can request only events after the latest received sequence", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
-    const fetchMock = vi.fn(async () => json([]));
+    const fetchMock = fetchJson([]);
     global.fetch = fetchMock;
 
     await assayApi.events("run_1", 7);

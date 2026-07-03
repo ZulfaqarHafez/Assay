@@ -3,11 +3,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "./CommandPalette";
+import type { ExamPackSummary, RunSummary } from "@/types/assay";
 
 const pushMock = vi.hoisted(() => vi.fn());
 const queryMocks = vi.hoisted(() => ({
-  useRunSummaries: vi.fn(() => ({ data: [] })),
-  useExamPackSummaries: vi.fn(() => ({ data: [] }))
+  useRunSummaries: vi.fn(() => ({ data: [] as RunSummary[] })),
+  useExamPackSummaries: vi.fn(() => ({ data: [] as ExamPackSummary[] }))
 }));
 
 vi.mock("next/navigation", () => ({
@@ -81,8 +82,16 @@ describe("CommandPalette", () => {
           candidate_id: "cand_support",
           candidate_name: "Support Triage Agent",
           exam_pack_id: "support-triage-v1",
+          source_pack_id: null,
           status: "completed",
-          certified: true
+          k: 1,
+          baseline_run_id: null,
+          certified: true,
+          pass_count: 1,
+          total_count: 1,
+          degraded: false,
+          qualification_status: "deterministic",
+          role_brief_summary: null
         }
       ]
     });
