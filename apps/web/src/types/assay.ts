@@ -244,6 +244,14 @@ export type DeployabilityDecision = {
   generated_at: string;
 };
 
+export type RunVerdict = {
+  schema: "assay.run_verdict.v1";
+  run: RunRecord;
+  candidate: CandidateSummary | null;
+  scorecard: Scorecard | null;
+  deployability: DeployabilityDecision | null;
+};
+
 export type BriefCompetency = {
   key: string;
   label: string;

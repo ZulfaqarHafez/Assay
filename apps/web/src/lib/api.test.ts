@@ -48,6 +48,16 @@ describe("assayApi request headers", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1");
   });
 
+  it("uses the slim verdict endpoint for run-detail first paint", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
+    const fetchMock = vi.fn(async () => json({ schema: "assay.run_verdict.v1" }));
+    global.fetch = fetchMock;
+
+    await assayApi.runVerdict("run_1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/run_1/verdict");
+  });
+
   it("adds JSON content type for mutation bodies", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
     const fetchMock = vi.fn(async () => json({ id: "run_1" }));

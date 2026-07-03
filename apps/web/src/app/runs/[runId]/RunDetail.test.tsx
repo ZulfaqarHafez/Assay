@@ -191,10 +191,15 @@ describe("RunDetail query fanout", () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
       paths.push(url.pathname);
-      if (url.pathname === "/runs/run_demo") return json(runRecord);
-      if (url.pathname === "/candidates/summary") return json([candidate]);
-      if (url.pathname === "/runs/run_demo/scorecard") return json(scorecard);
-      if (url.pathname === "/runs/run_demo/deployability") return json(deployability);
+      if (url.pathname === "/runs/run_demo/verdict") {
+        return json({
+          schema: "assay.run_verdict.v1",
+          run: runRecord,
+          candidate,
+          scorecard,
+          deployability
+        });
+      }
       if (url.pathname === "/runs/run_demo/agent-spec") return json(agentSpec);
       if (url.pathname === "/runs/run_demo/reviewers") return json(proofBundle.product_review);
       if (url.pathname === "/candidates/cand_demo/progress") return json(proofBundle.candidate_progress);
@@ -226,11 +231,12 @@ describe("RunDetail query fanout", () => {
     renderRunDetail();
 
     await screen.findByText("Demo Candidate");
-    await waitFor(() => expect(paths).toContain("/runs/run_demo"));
+    await waitFor(() => expect(paths).toContain("/runs/run_demo/verdict"));
 
-    expect(paths).toContain("/runs/run_demo/scorecard");
-    expect(paths).toContain("/runs/run_demo/deployability");
-    expect(paths).toContain("/candidates/summary");
+    expect(paths).not.toContain("/runs/run_demo");
+    expect(paths).not.toContain("/runs/run_demo/scorecard");
+    expect(paths).not.toContain("/runs/run_demo/deployability");
+    expect(paths).not.toContain("/candidates/summary");
     expect(paths).not.toContain("/runs/run_demo/detail");
     expect(paths).not.toContain("/runs/run_demo/proof-bundle");
     expect(paths).not.toContain("/runs/run_demo/agent-spec/diff");

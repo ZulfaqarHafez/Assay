@@ -24,6 +24,7 @@ export const queryKeys = {
   runs: () => ["runs"] as const,
   runSummaries: () => ["runs", "summary"] as const,
   run: (runId: string) => ["runs", runId] as const,
+  runVerdict: (runId: string) => ["runs", runId, "verdict"] as const,
   scorecard: (runId: string) => ["runs", runId, "scorecard"] as const,
   trace: (runId: string) => ["runs", runId, "trace"] as const,
   events: (runId: string) => ["runs", runId, "events"] as const,

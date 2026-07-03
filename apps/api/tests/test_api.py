@@ -51,6 +51,7 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         reviewers = client.get(f"/runs/{run['id']}/reviewers").json()
         events = client.get(f"/runs/{run['id']}/events").json()
         public_scorecard = client.get(f"/runs/{run['id']}/scorecard").json()
+        verdict = client.get(f"/runs/{run['id']}/verdict").json()
         trace = client.get(f"/runs/{run['id']}/trace").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
         detail = client.get(f"/runs/{run['id']}/detail").json()
@@ -63,6 +64,14 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert scorecard["trace_audit"]["tas_score"] == 88
     assert events
     assert public_scorecard["trace_audit"]["raw"] == {}
+    assert verdict["schema"] == "assay.run_verdict.v1"
+    assert verdict["run"]["id"] == run["id"]
+    assert verdict["candidate"]["id"] == candidate_id
+    assert verdict["candidate"]["name"]
+    assert verdict["scorecard"]["trace_audit"]["raw"] == {}
+    assert verdict["deployability"]["schema"] == "assay.deployability_decision.v1"
+    assert "events" not in verdict
+    assert "product_review" not in verdict
     assert trace["scorecard"]["run_id"] == run["id"]
     assert trace["scorecard"]["trace_audit"]["raw"] == {}
     assert bundle["schema"] == "assay.proof_bundle.v1"

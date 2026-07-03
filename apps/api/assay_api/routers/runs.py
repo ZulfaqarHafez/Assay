@@ -173,6 +173,42 @@ def run_scorecard(run_id: str) -> dict:
     return _scorecard_payload(scorecard, include_trace_raw=False)
 
 
+@router.get("/runs/{run_id}/verdict")
+def run_verdict(run_id: str) -> dict:
+    """Slim first-paint payload for the run detail page.
+
+    Bundles the records needed to render the verdict strip and action controls
+    without assembling the heavier proof surfaces.
+    """
+    run = get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    candidate = get_candidate(run.candidate_id)
+    scorecard = get_scorecard(run_id)
+    deployability = None
+    if scorecard is not None:
+        deployability = evaluate_scorecard(scorecard, policy_for_run(run)).model_dump(
+            mode="json",
+            by_alias=True,
+        )
+    return {
+        "schema": "assay.run_verdict.v1",
+        "run": run.model_dump(mode="json"),
+        "candidate": (
+            {
+                "id": candidate.id,
+                "name": candidate.name,
+                "adapter_type": candidate.adapter_type,
+                "created_at": candidate.created_at.isoformat(),
+            }
+            if candidate is not None
+            else None
+        ),
+        "scorecard": _scorecard_payload(scorecard, include_trace_raw=False) if scorecard else None,
+        "deployability": deployability,
+    }
+
+
 @router.get("/runs/{run_id}/reviewers")
 def run_reviewers(run_id: str) -> dict:
     payload = product_review_for_run(run_id)

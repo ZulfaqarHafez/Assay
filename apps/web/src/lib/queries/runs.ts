@@ -15,6 +15,7 @@ import type {
   RunEvent,
   RunRecord,
   RunSummary,
+  RunVerdict,
   Scorecard,
   TracePayload
 } from "@/types/assay";
@@ -42,6 +43,15 @@ export function useRun(runId: string | null | undefined, options?: QueryOpts<Run
   return useQuery({
     queryKey: queryKeys.run(runId ?? ""),
     queryFn: () => assayApi.run(runId as string),
+    enabled: Boolean(runId),
+    ...options
+  });
+}
+
+export function useRunVerdict(runId: string | null | undefined, options?: QueryOpts<RunVerdict>) {
+  return useQuery({
+    queryKey: queryKeys.runVerdict(runId ?? ""),
+    queryFn: () => assayApi.runVerdict(runId as string),
     enabled: Boolean(runId),
     ...options
   });
@@ -210,6 +220,7 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.run(runId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.runVerdict(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.scorecard(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.events(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.trace(runId) });

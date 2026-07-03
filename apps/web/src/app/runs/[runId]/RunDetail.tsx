@@ -23,12 +23,9 @@ import {
 import {
   useAgentSpec,
   useCandidateProgress,
-  useCandidateSummaries,
-  useDeployability,
   useReviewers,
-  useRun,
   useRunComparison,
-  useScorecard,
+  useRunVerdict,
   useTrace
 } from "@/lib/queries";
 import { assayApi } from "@/lib/api";
@@ -61,24 +58,22 @@ export default function RunDetail({ runId }: { runId: string }) {
   );
   const drawerOpen = drawer !== null;
 
+  const verdictQuery = useRunVerdict(runId);
+  const verdict = verdictQuery.data ?? null;
+  const runRecord = verdict?.run ?? null;
+  const candidateId = runRecord?.candidate_id ?? null;
   const [richSurfacesReady, setRichSurfacesReady] = React.useState(false);
+  const criticalSettled = Boolean(verdict) || verdictQuery.isError;
   React.useEffect(() => {
     setRichSurfacesReady(false);
-    const handle = window.setTimeout(() => setRichSurfacesReady(true), 1500);
+    if (!criticalSettled) return;
+    const handle = window.setTimeout(() => setRichSurfacesReady(true), 1200);
     return () => window.clearTimeout(handle);
-  }, [runId]);
+  }, [runId, criticalSettled]);
 
-  const runQuery = useRun(runId);
-  const runRecord = runQuery.data ?? null;
-  const candidateId = runRecord?.candidate_id ?? null;
-  const candidatesQuery = useCandidateSummaries({ staleTime: 60_000 });
-  const candidateSummary = candidatesQuery.data?.find((candidate) => candidate.id === candidateId) ?? null;
   const traceQuery = useTrace(runId, {
     enabled: drawerOpen
   });
-  const scorecardQuery = useScorecard(runId);
-  // Fast, policy-honest decision (no proof-bundle wait); scorecard is fallback.
-  const deployabilityQuery = useDeployability(runId, { retry: false });
   const agentSpecQuery = useAgentSpec(runId, {
     enabled: richSurfacesReady,
     retry: false
@@ -87,19 +82,19 @@ export default function RunDetail({ runId }: { runId: string }) {
     enabled: richSurfacesReady,
     retry: false
   });
-  const progressQuery = useCandidateProgress(candidateId);
+  const progressQuery = useCandidateProgress(richSurfacesReady ? candidateId : null);
   const [badgeCopied, setBadgeCopied] = React.useState(false);
   const [cardBusy, setCardBusy] = React.useState(false);
   const [exportingProof, setExportingProof] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
 
   const trace = traceQuery.data ?? null;
-  const scorecard = scorecardQuery.data ?? null;
-  const deployability = deployabilityQuery.data ?? null;
+  const scorecard = verdict?.scorecard ?? null;
+  const deployability = verdict?.deployability ?? null;
   const reviewers = reviewersQuery.data ?? null;
   const events = trace?.events ?? [];
   const agentSpec = agentSpecQuery.data ?? null;
-  const candidateName = candidateSummary?.name ?? agentSpec?.candidate_name ?? "Candidate";
+  const candidateName = verdict?.candidate?.name ?? agentSpec?.candidate_name ?? "Candidate";
   // Rerun against the originally-requested pack (a tailored run repoints exam_pack_id at a gen-* id).
   const rerunPackId = runRecord?.source_pack_id ?? runRecord?.exam_pack_id ?? agentSpec?.exam_pack_id ?? "hr-v1";
   // This run tested a refined agent when it carries a baseline; conversely a
@@ -122,9 +117,9 @@ export default function RunDetail({ runId }: { runId: string }) {
     };
   }, [candidateId, runRecord?.candidate_id, runId, scorecard]);
 
-  // Gate the analytics on the fast scorecard, not the slower proof surfaces.
-  const isLoading = scorecardQuery.isLoading && !scorecard;
-  const loadError = scorecardQuery.error ?? runQuery.error;
+  // Gate the analytics on the slim verdict payload, not the slower proof surfaces.
+  const isLoading = verdictQuery.isLoading && !scorecard;
+  const loadError = verdictQuery.error;
   const passEntries = scorecard ? Object.values(scorecard.pass_at_k ?? {}) : [];
   const passCount = passEntries.filter(Boolean).length;
   const passTotal = passEntries.length;
@@ -298,11 +293,11 @@ export default function RunDetail({ runId }: { runId: string }) {
             comparison={comparisonFallback}
           />
           <ProgressTrend
-            candidateId={candidateId}
+            candidateId={richSurfacesReady ? candidateId : null}
             progress={progressQuery.data ?? undefined}
           />
           <DiagnosticLibrary
-            candidateId={candidateId}
+            candidateId={richSurfacesReady ? candidateId : null}
           />
         </div>
       )}
