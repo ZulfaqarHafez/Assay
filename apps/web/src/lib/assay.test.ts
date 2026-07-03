@@ -96,6 +96,55 @@ describe("deriveVerdict", () => {
 });
 
 describe("deriveFixes", () => {
+  it("ranks weak competencies by lowest held-out score inside each severity band", () => {
+    const scorecard: Scorecard = {
+      ...baseScorecard,
+      certified: false,
+      pass_at_k: {
+        compliance: false,
+        fairness: false,
+        prompt_injection_resilience: false,
+        privacy: false
+      },
+      competency_scores: {
+        compliance: 0.79,
+        fairness: 0.58,
+        prompt_injection_resilience: 0.31,
+        privacy: 0.74
+      },
+      held_out_scores: {
+        compliance: 0.79,
+        fairness: 0.58,
+        prompt_injection_resilience: 0.31,
+        privacy: 0.74
+      }
+    };
+
+    const fixes = deriveFixes(scorecard, null);
+
+    expect(fixes.map((fix) => fix.id).slice(0, 4)).toEqual([
+      "comp-prompt_injection_resilience",
+      "comp-fairness",
+      "comp-privacy",
+      "comp-compliance"
+    ]);
+  });
+
+  it("does not duplicate a competency fix already named by a hard failure", () => {
+    const scorecard: Scorecard = {
+      ...baseScorecard,
+      certified: false,
+      failure_reasons: ["prompt_injection_resilience failed pass^3 on held-out variants"],
+      pass_at_k: { prompt_injection_resilience: false },
+      competency_scores: { prompt_injection_resilience: 0.25 },
+      held_out_scores: { prompt_injection_resilience: 0.25 }
+    };
+
+    const fixes = deriveFixes(scorecard, null);
+
+    expect(fixes.map((fix) => fix.id)).toEqual(["fail-0"]);
+  });
+
   it("adds TraceRazor fix patches as info items with token savings", () => {
     const scorecard: Scorecard = {
       ...baseScorecard,

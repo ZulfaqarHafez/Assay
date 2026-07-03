@@ -32,6 +32,11 @@ export type FixItem = {
   detail: string;
 };
 
+type RankedFixItem = FixItem & {
+  priority?: number;
+  order?: number;
+};
+
 export type CategoryScore = {
   competency: string;
   label: string;
@@ -105,6 +110,19 @@ function prettifyReason(reason: string): string {
   return reason.replace(/\b[a-z]+(?:_[a-z]+)+\b/g, (token) => labelize(token));
 }
 
+function comparableFixText(value: string): string {
+  return value.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function toFixItem(fix: RankedFixItem): FixItem {
+  return {
+    id: fix.id,
+    severity: fix.severity,
+    title: fix.title,
+    detail: fix.detail
+  };
+}
+
 function biggestProblem(scorecard: Scorecard, verdict: Verdict): string {
   if (scorecard.failure_reasons?.length) {
     return scorecard.failure_reasons[0];
@@ -124,31 +142,39 @@ function biggestProblem(scorecard: Scorecard, verdict: Verdict): string {
 
 /** Ranked, finite "what to fix" list: hard failures first, then trace + transfer + gaps. */
 export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): FixItem[] {
-  const fixes: FixItem[] = [];
+  const fixes: RankedFixItem[] = [];
   const threshold = scorecard.thresholds?.competency ?? 0.8;
+  let order = 0;
 
   scorecard.failure_reasons?.forEach((reason, index) => {
     fixes.push({
       id: `fail-${index}`,
       severity: "critical",
       title: reason,
-      detail: "Failed the internal gate. Tighten the agent.md guardrail covering this case, then re-run."
+      detail: "Failed the internal gate. Tighten the agent.md guardrail covering this case, then re-run.",
+      priority: index,
+      order: order++
     });
   });
 
   // Per-competency weak spots that did not trip a hard failure.
   const scores = headlineScores(scorecard);
-  Object.entries(scores).forEach(([comp, value]) => {
-    if (value >= threshold) return;
-    const already = fixes.some((fix) => fix.title.toLowerCase().includes(comp.replace(/_/g, " ")));
-    if (already) return;
-    fixes.push({
-      id: `comp-${comp}`,
-      severity: value < threshold * 0.75 ? "critical" : "warn",
-      title: `${labelize(comp)} is under bar (${Math.round(value * 100)}%)`,
-      detail: `Held-out ${labelize(comp)} fell below the ${Math.round(threshold * 100)}% threshold. Add an explicit instruction for this behavior.`
+  Object.entries(scores)
+    .sort((a, b) => a[1] - b[1])
+    .forEach(([comp, value]) => {
+      if (value >= threshold) return;
+      const competencyText = comparableFixText(comp);
+      const already = fixes.some((fix) => comparableFixText(fix.title).includes(competencyText));
+      if (already) return;
+      fixes.push({
+        id: `comp-${comp}`,
+        severity: value < threshold * 0.75 ? "critical" : "warn",
+        title: `${labelize(comp)} is under bar (${Math.round(value * 100)}%)`,
+        detail: `Held-out ${labelize(comp)} fell below the ${Math.round(threshold * 100)}% threshold. Add an explicit instruction for this behavior.`,
+        priority: 100 + value,
+        order: order++
+      });
     });
-  });
 
   const gap = maxTransferGap(scorecard);
   const maxGap = scorecard.thresholds?.max_transfer_gap ?? 0.2;
@@ -157,7 +183,9 @@ export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): 
       id: "transfer-gap",
       severity: "warn",
       title: `Overfit risk: ${gap.toFixed(2)} transfer gap`,
-      detail: "The agent does noticeably better on seen prompts than unseen ones. It may be pattern-matching, not generalizing."
+      detail: "The agent does noticeably better on seen prompts than unseen ones. It may be pattern-matching, not generalizing.",
+      priority: 200 - gap,
+      order: order++
     });
   }
 
@@ -166,7 +194,9 @@ export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): 
       id: "trace-audit",
       severity: "warn",
       title: `Reasoning trace scored ${scorecard.trace_audit.tas_score ?? "low"}`,
-      detail: "The trace audit flagged thin or under-justified reasoning steps. Have the agent show its work on tool use."
+      detail: "The trace audit flagged thin or under-justified reasoning steps. Have the agent show its work on tool use.",
+      priority: 300,
+      order: order++
     });
   }
 
@@ -196,9 +226,17 @@ export function deriveFixes(scorecard: Scorecard, agentSpec: AgentSpec | null): 
     });
   }
 
-  // Rank: critical → warn → info, stable within group.
+  // Rank: critical -> warn -> info, then strongest evidence first.
   const rank: Record<FixSeverity, number> = { critical: 0, warn: 1, info: 2 };
-  return fixes.sort((a, b) => rank[a.severity] - rank[b.severity]).slice(0, 6);
+  return fixes
+    .sort(
+      (a, b) =>
+        rank[a.severity] - rank[b.severity] ||
+        (a.priority ?? 500) - (b.priority ?? 500) ||
+        (a.order ?? 0) - (b.order ?? 0)
+    )
+    .slice(0, 6)
+    .map(toFixItem);
 }
 
 export function deriveCategoryScores(scorecard: Scorecard): CategoryScore[] {
