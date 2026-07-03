@@ -24,8 +24,9 @@ from typing import Any
 
 from .agent_refinery import load_agent_spec
 from .models import AgentResearch, AgentResearchSource, AgentSpec, SubAgentIdea
+from .paths import project_root
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = project_root()
 
 DEFAULT_FAST_MODEL = os.environ.get("ASSAY_OPENAI_MODEL", "gpt-4.1")
 DEFAULT_DEEP_MODEL = os.environ.get("ASSAY_OPENAI_DEEP_MODEL", "o4-mini-deep-research")

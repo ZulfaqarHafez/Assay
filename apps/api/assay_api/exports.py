@@ -8,8 +8,9 @@ from typing import Any
 from .agent_refinery import load_agent_spec
 from .exam_packs import exam_pack_export
 from .models import AgentSpecFileExport, ExamPackFileExport
+from .paths import project_root
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = project_root()
 EXPORT_ROOT = PROJECT_ROOT / "exports" / "exam-packs"
 AGENT_EXPORT_ROOT = PROJECT_ROOT / "exports" / "agents"
 
