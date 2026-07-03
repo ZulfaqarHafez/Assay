@@ -10,14 +10,26 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() })
 }));
 
-function renderRunDetail(searchParams = "") {
+function runVerdict(overrides: Record<string, unknown> = {}) {
+  return {
+    schema: "assay.run_verdict.v1" as const,
+    run: runRecord,
+    candidate,
+    scorecard,
+    deployability,
+    comparison: null,
+    ...overrides
+  };
+}
+
+function renderRunDetail(searchParams = "", initialVerdict?: ReturnType<typeof runVerdict>) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <NuqsTestingAdapter searchParams={searchParams}>
-        <RunDetail runId="run_demo" />
+        <RunDetail runId="run_demo" initialVerdict={initialVerdict} />
       </NuqsTestingAdapter>
     </QueryClientProvider>
   );
@@ -260,6 +272,30 @@ describe("RunDetail query fanout", () => {
     expect(paths).not.toContain("/candidates/cand_demo/lessons");
     expect(paths).not.toContain("/runs/run_demo/detail");
     expect(paths).not.toContain("/runs/run_demo/proof-bundle");
+  }, 15000);
+
+  it("seeds the first paint from a server-loaded verdict", async () => {
+    const paths: string[] = [];
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      paths.push(url.pathname);
+      if (url.pathname === "/runs/run_demo/surfaces") {
+        return json({
+          schema: "assay.run_surfaces.v1",
+          run_id: "run_demo",
+          agent_spec: agentSpec,
+          product_review: proofBundle.product_review,
+          candidate_progress: proofBundle.candidate_progress,
+          diagnostic_library: []
+        });
+      }
+      return Promise.resolve(new Response("not mocked", { status: 404 }));
+    });
+
+    renderRunDetail("", runVerdict());
+
+    await screen.findByText("Demo Candidate");
+    expect(paths).not.toContain("/runs/run_demo/verdict");
   }, 15000);
 
   it("loads trace drawer evidence from events without the duplicate trace payload", async () => {

@@ -1,4 +1,11 @@
-import type { AgentHomeSummary, AgentSummary, ExamPackSummary, RunSummary, WorkspaceBoot } from "@/types/assay";
+import type {
+  AgentHomeSummary,
+  AgentSummary,
+  ExamPackSummary,
+  RunSummary,
+  RunVerdict,
+  WorkspaceBoot
+} from "@/types/assay";
 
 function serverApiBaseUrl() {
   return (
@@ -28,6 +35,10 @@ async function serverRequest<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getRunSummaries() {
   return serverRequest<RunSummary[]>("/runs/summary");
+}
+
+export function getRunVerdict(runId: string) {
+  return serverRequest<RunVerdict>(`/runs/${encodeURIComponent(runId)}/verdict`);
 }
 
 export function getAgentSummaries() {

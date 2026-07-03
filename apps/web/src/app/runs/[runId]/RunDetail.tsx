@@ -33,7 +33,13 @@ import { policyRuleSentence } from "@/lib/assay";
 import { VERDICT_LABEL, bandFromDecision, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import ViewportDeferred from "@/components/ui/ViewportDeferred";
-import type { DeployabilityDecision, RunComparison as RunComparisonData, RunEvent, Scorecard } from "@/types/assay";
+import type {
+  DeployabilityDecision,
+  RunComparison as RunComparisonData,
+  RunEvent,
+  RunVerdict,
+  Scorecard
+} from "@/types/assay";
 
 const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
   loading: () => null
@@ -72,7 +78,13 @@ const DiagnosticLibrary = dynamic(() => import("@/components/library/DiagnosticL
  * (radar, comparison, trend, library, trace drawer). The trace drawer's open
  * state is mirrored into `?drawer=trace` so the URL fully describes the view.
  */
-export default function RunDetail({ runId }: { runId: string }) {
+export default function RunDetail({
+  runId,
+  initialVerdict = null
+}: {
+  runId: string;
+  initialVerdict?: RunVerdict | null;
+}) {
   // Drawer open/closed driven by the URL so the view is deep-linkable.
   // Only the trace inspector exists; the old spec/research values opened the
   // same view with mismatched intent, so the enum is narrowed to what renders.
@@ -82,7 +94,11 @@ export default function RunDetail({ runId }: { runId: string }) {
   );
   const drawerOpen = drawer !== null;
 
-  const verdictQuery = useRunVerdict(runId);
+  const seededVerdict = initialVerdict?.run.id === runId ? initialVerdict : undefined;
+  const verdictQuery = useRunVerdict(
+    runId,
+    seededVerdict ? { initialData: seededVerdict, staleTime: 30_000 } : undefined
+  );
   const verdict = verdictQuery.data ?? null;
   const runRecord = verdict?.run ?? null;
   const candidateId = runRecord?.candidate_id ?? null;
