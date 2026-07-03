@@ -4,7 +4,8 @@ param(
 
   [switch]$Prod,
   [switch]$DryRun,
-  [switch]$KeepStage
+  [switch]$KeepStage,
+  [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -119,6 +120,115 @@ function New-WebStage {
   return $script:stageRoot
 }
 
+function Get-TargetProjectPath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("api", "web")]
+    [string]$Name
+  )
+
+  if ($Name -eq "api") {
+    return (Join-Path $repoRoot "apps/api")
+  }
+  return (Join-Path $repoRoot "apps/web")
+}
+
+function Get-ExistingDeploymentForCommit {
+  param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("api", "web")]
+    [string]$Name
+  )
+
+  $projectPath = Get-TargetProjectPath -Name $Name
+  $args = @(
+    "vercel",
+    "ls",
+    "--cwd",
+    $projectPath,
+    "--status",
+    "READY",
+    "--format",
+    "json",
+    "--yes"
+  )
+
+  if ($Prod) {
+    $args += @("--environment", "production")
+  }
+
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $raw = (& npx @args 2>$null) -join "`n"
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+
+  if ($exitCode -ne 0) {
+    Write-Warning "Could not check existing Vercel deployments for ${Name}; vercel ls exited with $exitCode."
+    return $null
+  }
+
+  if ([string]::IsNullOrWhiteSpace($raw)) {
+    return $null
+  }
+
+  try {
+    $result = $raw | ConvertFrom-Json
+  } catch {
+    Write-Warning "Could not parse Vercel deployment list for ${Name}; continuing with deploy."
+    return $null
+  }
+
+  foreach ($deployment in @($result.deployments)) {
+    $sha = [string]$deployment.meta.githubCommitSha
+    if ($sha -eq $commitSha -or $sha -eq $commitShort) {
+      return $deployment
+    }
+  }
+
+  return $null
+}
+
+function Use-ExistingDeployment {
+  param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("api", "web")]
+    [string]$Name,
+
+    [Parameter(Mandatory = $true)]
+    $Deployment
+  )
+
+  $url = [string]$Deployment.url
+  if ([string]::IsNullOrWhiteSpace($url)) {
+    return $false
+  }
+
+  Write-Host "Deploy target: $Name"
+  Write-Host "Commit: $commitShort ($branch)"
+  Write-Host "Found existing READY deployment for this commit: https://$url"
+
+  if ($DryRun) {
+    Write-Host "Dry run: would reuse existing deployment instead of uploading a new one."
+    return $true
+  }
+
+  if ($Prod) {
+    $projectPath = Get-TargetProjectPath -Name $Name
+    Write-Host "Promoting existing deployment to production aliases."
+    $args = @("vercel", "promote", $url, "--cwd", $projectPath, "--yes")
+    & npx @args
+    if ($LASTEXITCODE -ne 0) {
+      throw "Vercel promote failed for $Name with exit code $LASTEXITCODE"
+    }
+  }
+
+  return $true
+}
+
 function Invoke-VercelDeploy {
   param(
     [Parameter(Mandatory = $true)]
@@ -166,6 +276,13 @@ $targets = if ($Target -eq "all") { @("api", "web") } else { @($Target) }
 foreach ($item in $targets) {
   $stage = $null
   try {
+    if (!$Force) {
+      $existing = Get-ExistingDeploymentForCommit -Name $item
+      if ($existing -and (Use-ExistingDeployment -Name $item -Deployment $existing)) {
+        continue
+      }
+    }
+
     $stage = if ($item -eq "api") { New-ApiStage } else { New-WebStage }
     Invoke-VercelDeploy -Name $item -StagePath $stage
   } finally {
