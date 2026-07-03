@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..agent_formats import normalize_agent_definition
+from ..agent_refinery import agent_spec_payload
 from ..cache_headers import public_read_json_headers
 from ..agent_intake import detect_agent_facts
 from ..agent_research import resolve_openai_key
@@ -15,6 +16,7 @@ from ..database import (
     list_candidate_summaries,
     list_candidates,
     list_run_summaries,
+    list_run_summaries_for_candidate,
     save_candidate,
 )
 from ..models import CandidateConfig
@@ -73,6 +75,29 @@ def candidate_summaries() -> JSONResponse:
 def agent_summaries() -> JSONResponse:
     return JSONResponse(
         content=_agent_rollups(list_candidate_summaries(), list_run_summaries()),
+        headers=public_read_json_headers(),
+    )
+
+
+@router.get("/agents/{candidate_id}/home")
+def agent_home(candidate_id: str) -> JSONResponse:
+    candidate = get_candidate(candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    runs = list_run_summaries_for_candidate(candidate_id)
+    payload = {
+        "schema": "assay.agent_home.v1",
+        "candidate": {
+            "id": candidate.id,
+            "name": candidate.name,
+            "adapter_type": candidate.adapter_type,
+            "created_at": candidate.created_at.isoformat(),
+        },
+        "runs": _run_rows_for_candidate(runs, candidate),
+        "latest_agent_markdown": _latest_agent_markdown(runs),
+    }
+    return JSONResponse(
+        content=payload,
         headers=public_read_json_headers(),
     )
 
@@ -200,3 +225,29 @@ def _agent_rollups(candidates: list[dict], runs: list[dict]) -> list[dict[str, o
                     row["score"] = f"{run['pass_count']}/{run['total_count']}"
 
     return sorted(rows.values(), key=lambda row: int(row["run_count"]), reverse=True)
+
+
+def _run_rows_for_candidate(runs: list[dict], candidate: CandidateConfig) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for run in runs:
+        row: dict[str, object] = dict(run)
+        row["candidate_name"] = candidate.name
+        row["candidate_adapter_type"] = candidate.adapter_type
+        rows.append(row)
+    return rows
+
+
+def _latest_agent_markdown(runs: list[dict]) -> str | None:
+    for run in runs:
+        if run.get("status") != "completed":
+            continue
+        run_id = run.get("id")
+        if not isinstance(run_id, str):
+            continue
+        try:
+            spec = agent_spec_payload(run_id)
+        except KeyError:
+            return None
+        if spec and isinstance(spec.get("agent_markdown"), str):
+            return spec["agent_markdown"]
+    return None

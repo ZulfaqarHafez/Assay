@@ -203,11 +203,12 @@ export function useCreateRun(options?: MutationOpts<RunRecord, CreateRunVars>) {
         competencyThreshold
       }),
     ...options,
-    onSettled: (...args) => {
+    onSettled: (data, error, vars, ...rest) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.agentSummaries() });
-      options?.onSettled?.(...args);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentHome(vars.candidateId) });
+      options?.onSettled?.(data, error, vars, ...rest);
     }
   });
 }
@@ -231,6 +232,7 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.agentSummaries() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.agentHomes() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.run(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runVerdict(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSurfaces(runId) });

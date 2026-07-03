@@ -220,11 +220,13 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
         candidate_summary_response = client.get("/candidates/summary")
         run_summary_response = client.get("/runs/summary")
         agent_summary_response = client.get("/agents/summary")
+        agent_home_response = client.get(f"/agents/{candidate['id']}/home")
         exam_packs_response = client.get("/exam-packs")
         exam_pack_summary_response = client.get("/exam-packs/summary")
         candidate_summary = candidate_summary_response.json()[0]
         run_summary = run_summary_response.json()[0]
         agent_summary = agent_summary_response.json()[0]
+        agent_home = agent_home_response.json()
         exam_pack_summary = exam_pack_summary_response.json()[0]
 
     assert candidate_summary["id"] == candidate["id"]
@@ -260,6 +262,21 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert "job_scope" not in agent_summary
     assert agent_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert "origin" in agent_summary_response.headers["vary"].lower()
+
+    assert agent_home_response.status_code == 200
+    assert agent_home["schema"] == "assay.agent_home.v1"
+    assert agent_home["candidate"]["id"] == candidate["id"]
+    assert agent_home["candidate"]["name"] == "Verbose Agent"
+    assert agent_home["candidate"]["adapter_type"] == "mock"
+    assert len(agent_home["runs"]) == 1
+    assert agent_home["runs"][0]["id"] == run["id"]
+    assert agent_home["runs"][0]["candidate_name"] == "Verbose Agent"
+    assert agent_home["latest_agent_markdown"].startswith("# Verbose Agent")
+    assert "system_prompt" not in agent_home["candidate"]
+    assert "metadata" not in agent_home["candidate"]
+    assert "job_scope" not in agent_home["runs"][0]
+    assert agent_home_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert "origin" in agent_home_response.headers["vary"].lower()
 
     assert exam_packs_response.status_code == 200
     assert exam_packs_response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=1800"

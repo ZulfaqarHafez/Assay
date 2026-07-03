@@ -24,6 +24,13 @@ export type AgentSummary = {
   score: string | null;
 };
 
+export type AgentHomeSummary = {
+  schema: "assay.agent_home.v1";
+  candidate: CandidateSummary;
+  runs: RunSummary[];
+  latest_agent_markdown: string | null;
+};
+
 export type Health = {
   ok: boolean;
   tracerazor_importable: boolean;

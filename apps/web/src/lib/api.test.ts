@@ -34,10 +34,12 @@ describe("assayApi request headers", () => {
     await assayApi.runSummaries();
     await assayApi.candidateSummaries();
     await assayApi.agentSummaries();
+    await assayApi.agentHome("cand_1");
 
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/summary");
     expect(fetchMock.mock.calls[1][0]).toBe("https://api.assay.test/candidates/summary");
     expect(fetchMock.mock.calls[2][0]).toBe("https://api.assay.test/agents/summary");
+    expect(fetchMock.mock.calls[3][0]).toBe("https://api.assay.test/agents/cand_1/home");
   });
 
   it("uses the workspace boot endpoint for home first paint", async () => {

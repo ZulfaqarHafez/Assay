@@ -4,7 +4,7 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, AlertTriangle, Circle, FlaskConical } from "lucide-react";
-import { useCandidateSummaries, useRunSummaries, useAgentSpec } from "@/lib/queries";
+import { useAgentHome } from "@/lib/queries";
 import AgentRunControls from "@/components/assay/AgentRunControls";
 import { AgentArt } from "@/components/ui/EmptyArt";
 import ViewportDeferred from "@/components/ui/ViewportDeferred";
@@ -19,24 +19,18 @@ const RunComparison = dynamic(() => import("@/components/scorecard/RunComparison
 });
 
 /**
- * The agent's home: lead with the score trajectory (does it get better across
- * runs?), keep the iterate controls one click away, and list the run history.
+ * Per-agent home. The API returns the candidate, only this agent's run rows,
+ * and the latest refined markdown in one scoped payload.
  */
 export default function AgentHome({ candidateId }: { candidateId: string }) {
-  const candidatesQuery = useCandidateSummaries();
-  const runsQuery = useRunSummaries();
-
-  const candidate = (candidatesQuery.data ?? []).find((item) => item.id === candidateId) ?? null;
-  const runs = React.useMemo(
-    () => (runsQuery.data ?? []).filter((run) => run.candidate_id === candidateId),
-    [runsQuery.data, candidateId]
-  );
-  const latest = runs[0] ?? null; // GET /runs is newest-first
-  const agentSpecQuery = useAgentSpec(latest?.id ?? null);
+  const homeQuery = useAgentHome(candidateId);
+  const candidate = homeQuery.data?.candidate ?? null;
+  const runs = React.useMemo(() => homeQuery.data?.runs ?? [], [homeQuery.data]);
+  const latest = runs[0] ?? null;
 
   const name = candidate?.name ?? "Agent";
   const packId = latest?.source_pack_id ?? latest?.exam_pack_id ?? "hr-v1";
-  const refinedMarkdown = agentSpecQuery.data?.agent_markdown ?? null;
+  const refinedMarkdown = homeQuery.data?.latest_agent_markdown ?? null;
 
   const scored = runs.filter((run) => run.status === "completed" && typeof run.certified === "boolean");
   const latestScore = scoreOf(scored[0]);
@@ -50,10 +44,10 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
           <Link href="/agents" className="rd-back-link"><ArrowLeft size={14} /> Agents</Link>
           <h1>{name}</h1>
           <p>
-            {candidate?.adapter_type ?? "agent"} · {runs.length} run{runs.length === 1 ? "" : "s"}
+            {candidate?.adapter_type ?? "agent"} - {runs.length} run{runs.length === 1 ? "" : "s"}
             {latestScore != null && (
               <>
-                {" · latest "}
+                {" - latest "}
                 <strong>{latestScore}%</strong>
                 {delta != null && delta !== 0 && (
                   <span className={delta > 0 ? "agent-delta up" : "agent-delta down"}>
@@ -73,7 +67,19 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
         />
       </header>
 
-      {runs.length === 0 ? (
+      {homeQuery.isLoading ? (
+        <div className="ws-table-wrap" aria-hidden="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div className="ws-skeleton-row" key={i} />
+          ))}
+        </div>
+      ) : homeQuery.isError ? (
+        <div className="ws-empty-rich" role="alert">
+          <AgentArt size={104} className="ws-empty-art" />
+          <h2>Agent unavailable</h2>
+          <p>{homeQuery.error.message}</p>
+        </div>
+      ) : runs.length === 0 ? (
         <div className="ws-empty-rich">
           <AgentArt size={104} className="ws-empty-art" />
           <h2>No runs yet for this agent</h2>
@@ -125,12 +131,12 @@ export default function AgentHome({ candidateId }: { candidateId: string }) {
                         ) : verdict === "hold" ? (
                           <span className="ws-verdict hold"><AlertTriangle size={13} /> Needs review</span>
                         ) : (
-                          <span className="ws-verdict idle">—</span>
+                          <span className="ws-verdict idle">-</span>
                         )}
                       </td>
                       <td className="num" data-label="Score">{score}</td>
                       <td data-label="Status"><span className="ws-status done"><Circle size={9} /> {run.status}</span></td>
-                      <td className="num ws-row-action"><Link prefetch={false} href={`/runs/${run.id}`} className="ws-row-link">Open →</Link></td>
+                      <td className="num ws-row-action"><Link prefetch={false} href={`/runs/${run.id}`} className="ws-row-link">Open -&gt;</Link></td>
                     </tr>
                   );
                 })}
@@ -159,5 +165,5 @@ function scoreLabel(run: RunSummary): string {
   if (typeof run.pass_count === "number" && typeof run.total_count === "number") {
     return `${run.pass_count}/${run.total_count}`;
   }
-  return "—";
+  return "-";
 }

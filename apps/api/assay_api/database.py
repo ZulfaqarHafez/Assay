@@ -101,6 +101,13 @@ class DataStore(ABC):
         scorecards = self.get_scorecards([run.id for run in run_records if run.status == "completed"])
         return [_run_summary_from_model(run, scorecards.get(run.id)) for run in run_records]
 
+    def list_run_summaries_for_candidate(self, candidate_id: str) -> list[dict[str, Any]]:
+        return [
+            run
+            for run in self.list_run_summaries()
+            if run.get("candidate_id") == candidate_id
+        ]
+
     @abstractmethod
     def get_run(self, run_id: str) -> RunRecord | None:
         raise NotImplementedError
@@ -328,6 +335,28 @@ class SQLiteStore(DataStore):
                 ORDER BY created_at DESC
                 """,
                 (current_tenant_id(),),
+            ).fetchall()
+            completed_ids = [row["id"] for row in run_rows if row["status"] == "completed"]
+            scorecard_rows: dict[str, dict[str, Any]] = {}
+            if completed_ids:
+                placeholders = ", ".join("?" for _ in completed_ids)
+                rows = conn.execute(
+                    f"SELECT run_id, payload FROM scorecards WHERE tenant_id = ? AND run_id IN ({placeholders})",
+                    (current_tenant_id(), *completed_ids),
+                ).fetchall()
+                scorecard_rows = {row["run_id"]: _payload_dict(row["payload"]) for row in rows}
+        return [_run_summary_from_row(row, scorecard_rows.get(row["id"])) for row in run_rows]
+
+    def list_run_summaries_for_candidate(self, candidate_id: str) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            run_rows = conn.execute(
+                """
+                SELECT id, candidate_id, exam_pack_id, status, payload, created_at, updated_at
+                FROM runs
+                WHERE tenant_id = ? AND candidate_id = ?
+                ORDER BY created_at DESC
+                """,
+                (current_tenant_id(), candidate_id),
             ).fetchall()
             completed_ids = [row["id"] for row in run_rows if row["status"] == "completed"]
             scorecard_rows: dict[str, dict[str, Any]] = {}
@@ -601,6 +630,31 @@ class SupabaseStore(DataStore):
         if completed_ids and self._table_available("scorecards"):
             query = self.client.table(self.tables["scorecards"]).select("run_id, payload").in_("run_id", completed_ids)
             response = self._with_tenant_filter("scorecards", query).execute()
+            scorecards = {
+                str(_row_get(row, "run_id")): _payload_dict(_row_get(row, "payload"))
+                for row in response.data or []
+            }
+        return [_run_summary_from_row(row, scorecards.get(str(_row_get(row, "id")))) for row in run_rows]
+
+    def list_run_summaries_for_candidate(self, candidate_id: str) -> list[dict[str, Any]]:
+        self._ensure_schema()
+        if not self._table_available("runs"):
+            return []
+        query = (
+            self.client.table(self.tables["runs"])
+            .select("id, candidate_id, exam_pack_id, status, created_at, updated_at, payload")
+            .eq("candidate_id", candidate_id)
+        )
+        run_rows = self._with_tenant_filter("runs", query).order("created_at", desc=True).execute().data or []
+        completed_ids = [
+            str(_row_get(row, "id"))
+            for row in run_rows
+            if (_row_get(row, "status") or _payload_dict(_row_get(row, "payload")).get("status")) == "completed"
+        ]
+        scorecards: dict[str, dict[str, Any]] = {}
+        if completed_ids and self._table_available("scorecards"):
+            scorecard_query = self.client.table(self.tables["scorecards"]).select("run_id, payload").in_("run_id", completed_ids)
+            response = self._with_tenant_filter("scorecards", scorecard_query).execute()
             scorecards = {
                 str(_row_get(row, "run_id")): _payload_dict(_row_get(row, "payload"))
                 for row in response.data or []
@@ -888,6 +942,10 @@ def list_runs() -> list[RunRecord]:
 
 def list_run_summaries() -> list[dict[str, Any]]:
     return store().list_run_summaries()
+
+
+def list_run_summaries_for_candidate(candidate_id: str) -> list[dict[str, Any]]:
+    return store().list_run_summaries_for_candidate(candidate_id)
 
 
 def get_run(run_id: str) -> RunRecord | None:
