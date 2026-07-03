@@ -51,6 +51,7 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         events = client.get(f"/runs/{run['id']}/events").json()
         trace = client.get(f"/runs/{run['id']}/trace").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
+        detail = client.get(f"/runs/{run['id']}/detail").json()
 
     assert scorecard["run_id"] == run["id"]
     assert db_health["backend"] == "sqlite"
@@ -75,6 +76,17 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert bundle["product_review"]["schema"] == "assay.product_review.v1"
     assert bundle["deployability"]["schema"] == "assay.deployability_decision.v1"
     assert bundle["summary"]["deployability_label"] in {"Ship", "Probation", "Do not ship"}
+    assert detail["schema"] == "assay.proof_bundle.v1"
+    assert detail["detail_profile"] == "fast"
+    assert detail["summary"]["event_count"] == len(events)
+    assert detail["product_review"]["schema"] == "assay.product_review.v1"
+    assert detail["agent_spec"]["schema"] == "assay.agent_spec.v1"
+    assert detail["candidate_progress"]["schema"] == "assay.candidate_progress.v1"
+    assert isinstance(detail["diagnostic_library"], list)
+    assert "database" not in detail
+    assert "connectors" not in detail
+    assert "connector_probes" not in detail
+    assert "role_analysis" not in detail
 
 
 def test_agent_spec_endpoint_and_export(monkeypatch) -> None:

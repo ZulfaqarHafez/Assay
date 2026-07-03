@@ -791,7 +791,11 @@ def trace_payload(run_id: str) -> dict[str, Any]:
     }
 
 
-def proof_bundle(run_id: str) -> dict[str, Any] | None:
+def proof_bundle(
+    run_id: str,
+    *,
+    product_review_db_health: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     run = get_run(run_id)
     if run is None:
         return None
@@ -801,7 +805,7 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
     try:
         from .product_review import product_review_for_run
 
-        product_review = product_review_for_run(run_id)
+        product_review = product_review_for_run(run_id, db_health=product_review_db_health)
     except Exception:
         product_review = None
     # What the judge was qualified with (Phase 1-2): the persisted role brief and,

@@ -11,6 +11,7 @@ from ..agent_refinery import agent_spec_payload
 from ..agent_research import research_agent_spec
 from ..connectors import connector_probes, connector_registry
 from ..database import (
+    database_backend_name,
     database_health,
     get_candidate,
     get_lesson,
@@ -335,6 +336,43 @@ def run_proof_bundle(run_id: str) -> dict:
         "connector_probes": connector_probes(),
         "agent_spec": agent_spec,
         "role_analysis": role_analysis_bundle,
+        "candidate_progress": progress_bundle,
+        "diagnostic_library": diagnostic_library,
+    }
+
+
+@router.get("/runs/{run_id}/detail")
+def run_detail(run_id: str) -> dict:
+    try:
+        backend = database_backend_name()
+    except Exception:
+        backend = "unknown"
+    bundle = proof_bundle(
+        run_id,
+        product_review_db_health={
+            "ok": True,
+            "backend": backend,
+            "scope": "read-path",
+        },
+    )
+    if bundle is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    try:
+        agent_spec = agent_spec_payload(run_id)
+    except KeyError:
+        agent_spec = None
+    run_record = get_run(run_id)
+    progress_bundle = None
+    diagnostic_library: list[dict] = []
+    if run_record is not None:
+        progress_payload = candidate_progress(run_record.candidate_id)
+        progress_bundle = progress_payload.model_dump(mode="json") if progress_payload else None
+        diagnostic_library = [
+            lesson.model_dump(mode="json") for lesson in lesson_library(run_record.candidate_id)
+        ]
+    return bundle | {
+        "detail_profile": "fast",
+        "agent_spec": agent_spec,
         "candidate_progress": progress_bundle,
         "diagnostic_library": diagnostic_library,
     }

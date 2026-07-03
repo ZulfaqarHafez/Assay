@@ -348,7 +348,7 @@ beforeEach(() => {
     if (url.endsWith("/runs/run_demo/trace")) {
       return json({ run_id: "run_demo", events, scorecard });
     }
-    if (url.endsWith("/runs/run_demo/proof-bundle")) {
+    if (url.endsWith("/runs/run_demo/detail") || url.endsWith("/runs/run_demo/proof-bundle")) {
       return json(agentSpecOverride ? { ...proofBundle, agent_spec: agentSpecOverride } : proofBundle);
     }
     if (url.endsWith("/runs/run_demo/reviewers")) {

@@ -440,14 +440,15 @@ export type ProofBundle = {
   deployability?: DeployabilityDecision | null;
   role_brief?: RoleBrief | null;
   tailored_exam_pack?: ExamPack | null;
-  database: DatabaseHealth | Record<string, unknown>;
-  connectors: Connector[];
-  connector_probes: ConnectorProbe[];
+  database?: DatabaseHealth | Record<string, unknown>;
+  connectors?: Connector[];
+  connector_probes?: ConnectorProbe[];
   agent_spec: AgentSpec | null;
   role_analysis?: RoleAnalysis | null;
   product_review?: ProductReview | null;
   candidate_progress?: CandidateProgress | null;
   diagnostic_library?: DiagnosticLesson[];
+  detail_profile?: "fast";
 };
 
 // --- Phase 0: closed learning loop (diagnostic library + progress) ---

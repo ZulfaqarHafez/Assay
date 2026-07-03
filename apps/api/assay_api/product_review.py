@@ -7,16 +7,19 @@ from .deployability import evaluate_scorecard, policy_for_run
 from .models import ProductReview, ProductReviewer, RunRecord, Scorecard
 
 
-def product_review_for_run(run_id: str) -> ProductReview | None:
+def product_review_for_run(run_id: str, db_health: dict[str, Any] | None = None) -> ProductReview | None:
     run = get_run(run_id)
     if run is None:
         return None
     scorecard = get_scorecard(run_id)
     events = list_events(run_id)
-    try:
-        db = database_health()
-    except Exception as exc:
-        db = {"ok": False, "backend": "unknown", "error": str(exc)}
+    if db_health is None:
+        try:
+            db = database_health()
+        except Exception as exc:
+            db = {"ok": False, "backend": "unknown", "error": str(exc)}
+    else:
+        db = db_health
 
     return ProductReview(
         run_id=run_id,

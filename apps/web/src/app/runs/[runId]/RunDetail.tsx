@@ -72,6 +72,8 @@ export default function RunDetail({ runId }: { runId: string }) {
   // Fast, policy-honest decision (no proof-bundle wait); bundle is fallback.
   const deployabilityQuery = useDeployability(runId, { retry: false });
   const [badgeCopied, setBadgeCopied] = React.useState(false);
+  const [exportingProof, setExportingProof] = React.useState(false);
+  const [exportError, setExportError] = React.useState<string | null>(null);
 
   const trace = traceQuery.data ?? traceFromBundle;
   const scorecard = scorecardQuery.data ?? proofBundle?.scorecard ?? null;
@@ -118,6 +120,19 @@ export default function RunDetail({ runId }: { runId: string }) {
       : "hold";
   const verdictLabel = deployability ? decisionLabel(deployability.verdict) : VERDICT_LABEL[verdictBand];
 
+  async function exportProofBundle() {
+    setExportError(null);
+    setExportingProof(true);
+    try {
+      const fullBundle = await assayApi.proofBundle(runId, "full");
+      downloadJson(`assay-${runId}-proof-bundle.json`, fullBundle);
+    } catch (exc) {
+      setExportError(errorMessage(exc));
+    } finally {
+      setExportingProof(false);
+    }
+  }
+
   return (
     <main className="rd-shell">
       <header className="rd-header">
@@ -151,10 +166,10 @@ export default function RunDetail({ runId }: { runId: string }) {
           <button
             type="button"
             className="command-button"
-            disabled={!proofBundle}
-            onClick={() => proofBundle && downloadJson(`assay-${runId}-proof-bundle.json`, proofBundle)}
+            disabled={exportingProof || !proofBundle}
+            onClick={() => void exportProofBundle()}
           >
-            <Save size={16} /> Export proof
+            <Save size={16} /> {exportingProof ? "Exporting" : "Export proof"}
           </button>
           <button
             type="button"
@@ -207,6 +222,10 @@ export default function RunDetail({ runId }: { runId: string }) {
       {proofBundleQuery.isLoading && !proofBundle && (
         <p className="rd-bundle-hint" role="status">Assembling proof bundle…</p>
       )}
+
+      {exportError ? (
+        <p className="rd-error" role="alert">Could not export proof: {exportError}</p>
+      ) : null}
 
       {reviewers ? (
         <ReviewCouncil review={reviewers} decision={deployability} />

@@ -6,6 +6,7 @@ import { Download, X, Telescope } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Sprite from "@/components/ui/Sprite";
+import { assayApi } from "@/lib/api";
 import { useAgentResearch } from "@/lib/queries";
 import { downloadJson, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import type {
@@ -85,10 +86,17 @@ export function TraceDrawer({
   // the drawer runs it on demand and shows the result, seeded from any prop value.
   const researchMutation = useAgentResearch();
   const research = researchMutation.data ?? agentResearch;
+  const [downloadingProof, setDownloadingProof] = React.useState(false);
 
-  const handleDownload = () => {
-    if (!proofBundle) return;
-    downloadJson(`assay-${proofBundle.run.id}-proof-bundle.json`, proofBundle);
+  const handleDownload = async () => {
+    if (!runId) return;
+    setDownloadingProof(true);
+    try {
+      const fullBundle = await assayApi.proofBundle(runId, "full");
+      downloadJson(`assay-${runId}-proof-bundle.json`, fullBundle);
+    } finally {
+      setDownloadingProof(false);
+    }
   };
 
   return (
@@ -147,8 +155,8 @@ export function TraceDrawer({
                 variant="icon"
                 aria-label="Download proof bundle"
                 title="Download proof bundle"
-                onClick={handleDownload}
-                disabled={!proofBundle}
+                onClick={() => void handleDownload()}
+                disabled={!runId || downloadingProof}
               >
                 <Download size={18} />
               </Button>

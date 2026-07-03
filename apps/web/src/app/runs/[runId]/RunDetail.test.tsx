@@ -171,7 +171,7 @@ describe("RunDetail query fanout", () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
       paths.push(url.pathname);
-      if (url.pathname === "/runs/run_demo/proof-bundle") return json(proofBundle);
+      if (url.pathname === "/runs/run_demo/detail") return json(proofBundle);
       if (url.pathname === "/runs/run_demo/scorecard") return json(scorecard);
       if (url.pathname === "/runs/run_demo/deployability") return json(deployability);
       return Promise.resolve(new Response("not mocked", { status: 404 }));
@@ -180,10 +180,11 @@ describe("RunDetail query fanout", () => {
     renderRunDetail();
 
     await screen.findByText("Demo Candidate");
-    await waitFor(() => expect(paths).toContain("/runs/run_demo/proof-bundle"));
+    await waitFor(() => expect(paths).toContain("/runs/run_demo/detail"));
 
     expect(paths).toContain("/runs/run_demo/scorecard");
     expect(paths).toContain("/runs/run_demo/deployability");
+    expect(paths).not.toContain("/runs/run_demo/proof-bundle");
     expect(paths).not.toContain("/runs/run_demo/trace");
     expect(paths).not.toContain("/runs/run_demo/reviewers");
     expect(paths).not.toContain("/runs/run_demo/comparison");
