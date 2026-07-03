@@ -11,7 +11,7 @@ import type { RunStreamStatus } from "@/lib/useRunStream";
 
 /**
  * Visual surface for `useRunStream`: a determinate progress bar, the current
- * state label, a live list of graded cases as they arrive, and a Cancel button
+ * state label, a live list of graded probes as they arrive, and a Cancel button
  * (enabled only while the run is in flight). Sprites carry the status accent.
  */
 export type RunStateMachineProps = {
@@ -35,14 +35,14 @@ const STATUS_META: Record<
   canceled: { label: "Canceled", badge: "neutral", sprite: "run-queued", sheet: "runs", thinking: false }
 };
 
-type GradedCase = {
+type GradedProbe = {
   spanId: string;
   competency: string;
   passed: boolean;
   score: number | null;
 };
 
-function gradedCases(events: RunEvent[]): GradedCase[] {
+function gradedProbes(events: RunEvent[]): GradedProbe[] {
   return events
     .filter((event) => event.event_type === "response_graded")
     .sort((a, b) => a.sequence - b.sequence)
@@ -63,13 +63,13 @@ export function RunStateMachine({
   onCancel
 }: RunStateMachineProps) {
   const meta = STATUS_META[status];
-  const cases = React.useMemo(() => gradedCases(events), [events]);
+  const probes = React.useMemo(() => gradedProbes(events), [events]);
   const isActive = status === "queued" || status === "running";
   const determinate = totalExpected > 0;
   const pct = Math.round((determinate ? progress : isActive ? 0 : 1) * 100);
   const progressLabel = determinate
-    ? `${gradedCount} / ${totalExpected} cases graded`
-    : `${gradedCount} case${gradedCount === 1 ? "" : "s"} graded`;
+    ? `${gradedCount} / ${totalExpected} probes graded`
+    : `${gradedCount} probe${gradedCount === 1 ? "" : "s"} graded`;
 
   return (
     <Card aria-label="Run progress">
@@ -125,18 +125,18 @@ export function RunStateMachine({
 
         <div style={{ display: "grid", gap: 4 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-fg-muted)" }}>
-            Graded cases
+            Graded probes
           </span>
-          {cases.length === 0 ? (
+          {probes.length === 0 ? (
             <span style={{ fontSize: 12, color: "var(--color-fg-muted)" }}>
-              {isActive ? "Waiting for the first grade…" : "No cases graded yet."}
+              {isActive ? "Waiting for the first grade…" : "No probes graded yet."}
             </span>
           ) : (
             <ul
               aria-live="polite"
               style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 4, maxHeight: 180, overflowY: "auto" }}
             >
-              {cases.map((item) => (
+              {probes.map((item) => (
                 <li
                   key={item.spanId}
                   style={{

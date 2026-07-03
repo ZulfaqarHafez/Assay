@@ -27,7 +27,7 @@ const gradedEvents: RunEvent[] = [
 ];
 
 describe("RunStateMachine", () => {
-  it("shows a determinate progressbar and graded cases while running", () => {
+  it("shows a determinate progressbar and graded probes while running", () => {
     render(
       <RunStateMachine
         status="running"
@@ -40,7 +40,7 @@ describe("RunStateMachine", () => {
     );
     const bar = screen.getByRole("progressbar", { name: /run progress/i });
     expect(bar).toHaveAttribute("aria-valuenow", "50");
-    expect(screen.getByText("2 / 4 cases graded")).toBeInTheDocument();
+    expect(screen.getByText("2 / 4 probes graded")).toBeInTheDocument();
     expect(screen.getByText("Compliance")).toBeInTheDocument();
     expect(screen.getByText("Fairness")).toBeInTheDocument();
     expect(screen.getByText("Running")).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe("RunStateMachine", () => {
         onCancel={vi.fn()}
       />
     );
-    expect(screen.getByText("3 cases graded")).toBeInTheDocument();
+    expect(screen.getByText("3 probes graded")).toBeInTheDocument();
     const bar = screen.getByRole("progressbar");
     expect(bar).not.toHaveAttribute("aria-valuenow");
   });

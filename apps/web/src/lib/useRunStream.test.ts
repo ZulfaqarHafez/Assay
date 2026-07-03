@@ -107,15 +107,15 @@ describe("useRunStream", () => {
 
     act(() => result.current.start("run_1", { k: 1, itemCount: 2 }));
     expect(result.current.status).toBe("queued");
-    expect(result.current.totalExpected).toBe(2);
+    expect(result.current.totalExpected).toBe(4);
 
     emit([gradedEvent(1, "compliance")]);
     expect(result.current.status).toBe("running");
     expect(result.current.gradedCount).toBe(1);
-    expect(result.current.progress).toBeCloseTo(0.5);
+    expect(result.current.progress).toBeCloseTo(0.25);
 
     emit([gradedEvent(1, "compliance"), gradedEvent(2, "fairness")]);
-    expect(result.current.progress).toBeCloseTo(1);
+    expect(result.current.progress).toBeCloseTo(0.5);
 
     await act(async () => {
       resolveStart(baseScorecard);
@@ -194,6 +194,7 @@ describe("useRunStream", () => {
 
     await waitFor(() => expect(result.current.gradedCount).toBe(2));
 
+    expect(result.current.totalExpected).toBe(4);
     expect(result.current.events.map((event) => event.sequence)).toEqual([1, 2]);
     expect(eventUrls[0]).toMatch(/\/runs\/run_1\/events$/);
     expect(eventUrls[1]).toContain("/runs/run_1/events?after=1");

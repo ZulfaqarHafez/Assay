@@ -18,11 +18,11 @@ export type RunStreamStatus = "idle" | "queued" | "running" | "completed" | "fai
 
 export type RunStreamState = {
   status: RunStreamStatus;
-  /** 0..1 determinate progress from graded cases / expected cases. */
+  /** 0..1 determinate progress from graded probes / expected probes. */
   progress: number;
   /** Number of `response_graded` events seen so far. */
   gradedCount: number;
-  /** Expected total graded cases (`items.length * k`); 0 when unknown. */
+  /** Expected total graded probes (`items.length * k * 2 variants`); 0 when unknown. */
   totalExpected: number;
   /** Live event stream as it arrives from polling. */
   events: RunEvent[];
@@ -35,9 +35,9 @@ export type RunStreamState = {
 };
 
 export type StartRunOptions = {
-  /** Cases per held-out variant, used to size the determinate progress bar. */
+  /** Trials per item, used to size the determinate progress bar. */
   k?: number;
-  /** Number of exam items, used to size the determinate progress bar. */
+  /** Number of exam items; each item has seen and held-out probes. */
   itemCount?: number;
 };
 
@@ -211,7 +211,7 @@ const INITIAL: RunStreamState = {
  *
  * After `start(runId)` it POSTs `/runs/{id}/start` (abortable via `cancel()`)
  * and concurrently polls `/runs/{id}/events` ~1s to update determinate progress
- * = gradedCount / (itemCount * k). When the start request resolves it captures
+ * = gradedCount / (itemCount * k * 2 variants). When the start request resolves it captures
  * the scorecard and transitions to `completed`; rejection → `failed`; an abort →
  * `canceled`. The event source is injectable so an SSE implementation can drop in
  * later without changing this hook's public surface.
@@ -262,7 +262,7 @@ export function useRunStream(source?: RunEventSource): UseRunStream {
       unsubscribeRef.current?.();
       abortRef.current?.abort();
 
-      const totalExpected = Math.max(0, (options?.itemCount ?? 0) * (options?.k ?? 0));
+      const totalExpected = Math.max(0, (options?.itemCount ?? 0) * (options?.k ?? 0) * 2);
       totalExpectedRef.current = totalExpected;
 
       const controller = new AbortController();
