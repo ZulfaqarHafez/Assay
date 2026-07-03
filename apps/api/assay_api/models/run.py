@@ -14,7 +14,7 @@ from .trace import TraceAuditSummary
 
 class RunCreate(BaseModel):
     candidate_id: str
-    exam_pack_id: str = "hr-v1"
+    exam_pack_id: str = "guardrail-v1"
     k: int = Field(default=3, ge=1, le=8)
     competency_threshold: float = Field(default=0.80, ge=0, le=1)
     max_transfer_gap: float = Field(default=0.20, ge=0, le=1)
@@ -34,7 +34,7 @@ class RunRecord(BaseModel):
     id: str = Field(default_factory=lambda: f"run_{uuid4().hex[:10]}")
     tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
     candidate_id: str
-    exam_pack_id: str = "hr-v1"
+    exam_pack_id: str = "guardrail-v1"
     status: RunStatus = "created"
     k: int = 3
     competency_threshold: float = 0.80

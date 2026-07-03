@@ -153,7 +153,7 @@ def _parser() -> argparse.ArgumentParser:
 def _add_run_args(parser: argparse.ArgumentParser, *, agent_flag: str) -> None:
     parser.add_argument(agent_flag, required=True, dest="agent", help="Path to the agent.md or AGENTS.md file")
     parser.add_argument("--loop", help="Interview loop JSON produced by assay make-loop")
-    parser.add_argument("--pack", default="hr-v1", help="Exam pack id when no loop is supplied")
+    parser.add_argument("--pack", default="guardrail-v1", help="Exam pack id when no loop is supplied")
     parser.add_argument("--pack-file", help="Optional JSON/YAML exam pack file to register before running")
     parser.add_argument("--policy", default=None, help="strict, advisory, or path to assay.policy.yaml/json")
     parser.add_argument("--pass-threshold", type=float, default=0.8, help="Minimum held-out competency threshold")

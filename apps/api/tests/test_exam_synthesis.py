@@ -91,7 +91,7 @@ def test_non_ok_brief_falls_back(monkeypatch) -> None:
 
 
 def test_all_paraphrased_items_fall_back(monkeypatch) -> None:
-    # Every held-out is a paraphrase of its seen prompt → guard drops all → fallback.
+    # Every held-out is a paraphrase of its seen prompt; guard drops all; fallback.
     paraphrased = [
         {
             "competency": "refund_policy",
@@ -202,7 +202,7 @@ def test_tailored_run_registers_pack_and_marks_status(monkeypatch) -> None:
 
 def test_deterministic_brief_recorded_when_tailored_disabled(monkeypatch) -> None:
     """With the tailored stage off (the default), a grounded role brief is still
-    recorded so RoleBriefCard / waterfall / timeline populate — while grading
+    recorded so RoleBriefCard / waterfall / timeline populate while grading
     stays on the static pack (qualification_status 'deterministic')."""
     monkeypatch.delenv("ASSAY_TAILORED_EXAMS_ENABLED", raising=False)
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
@@ -263,12 +263,12 @@ def test_tailored_reruns_carry_lessons_across_distinct_generated_packs(monkeypat
     with TestClient(app) as client:
         candidate_id = client.get("/candidates").json()[0]["id"]
 
-        run_a = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        run_a = client.post("/runs", json={"candidate_id": candidate_id, "exam_pack_id": "hr-v1"}).json()
         client.post(f"/runs/{run_a['id']}/start")
         fetched_a = client.get(f"/runs/{run_a['id']}").json()
         lessons_after_a = client.get(f"/candidates/{candidate_id}/lessons").json()
 
-        run_b = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        run_b = client.post("/runs", json={"candidate_id": candidate_id, "exam_pack_id": "hr-v1"}).json()
         scorecard_b = client.post(f"/runs/{run_b['id']}/start").json()
         fetched_b = client.get(f"/runs/{run_b['id']}").json()
 
@@ -282,6 +282,6 @@ def test_tailored_reruns_carry_lessons_across_distinct_generated_packs(monkeypat
     # Run A seeded the library; lessons are stored under the source pack, not gen-*.
     assert lessons_after_a
     assert {lesson["exam_pack_id"] for lesson in lessons_after_a} == {"hr-v1"}
-    # Run B applies them and links the baseline — the loop survived tailoring.
+    # Run B applies them and links the baseline; the loop survived tailoring.
     assert scorecard_b["lessons_applied"]
     assert scorecard_b["prior_run_id"] == run_a["id"]

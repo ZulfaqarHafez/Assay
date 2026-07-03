@@ -464,7 +464,11 @@ def test_agent_spec_recommends_subagents_for_failing_run(monkeypatch) -> None:
 
     with TestClient(app) as client:
         candidate_id = client.get("/candidates").json()[0]["id"]
-        run = client.post("/runs", json={"candidate_id": candidate_id}).json()
+        # Pin the plain HR pack: this exercises the grade_response path the test
+        # monkeypatches, not the guardrail scenario grader (now the default pack).
+        run = client.post(
+            "/runs", json={"candidate_id": candidate_id, "exam_pack_id": "hr-v1"}
+        ).json()
         client.post(f"/runs/{run['id']}/start")
         spec = client.get(f"/runs/{run['id']}/agent-spec").json()
 

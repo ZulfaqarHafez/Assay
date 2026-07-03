@@ -382,10 +382,6 @@ EXAM_PACKS = {
     CODING_AGENT_V1.id: CODING_AGENT_V1,
 }
 
-from .scenario_packs import SCENARIO_PACKS  # noqa: E402
-
-EXAM_PACKS.update(SCENARIO_PACKS)
-
 
 def list_exam_packs() -> list[ExamPack]:
     return list(EXAM_PACKS.values())
@@ -539,3 +535,12 @@ def _dataset_card(pack: ExamPack, row_count: int) -> str:
             "Certificates produced from this pack are internal capability bars only, not legal or standards compliance claims.",
         ]
     )
+
+
+# Register the behavioral guardrail scenario packs. Done at the very bottom
+# (after register_exam_pack / _validate_pack_contract are defined) and importing
+# scenario_packs — which no longer imports back — so the dependency is acyclic.
+from .scenario_packs import SCENARIO_PACKS as _SCENARIO_PACKS  # noqa: E402
+
+for _guardrail_pack in _SCENARIO_PACKS.values():
+    register_exam_pack(_guardrail_pack)

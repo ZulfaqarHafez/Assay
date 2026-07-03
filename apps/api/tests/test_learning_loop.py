@@ -55,7 +55,7 @@ def _passing_grade(item, response, threshold, **_kwargs):
 
 
 def _start_run(client: TestClient, candidate_id: str) -> str:
-    run = client.post("/runs", json={"candidate_id": candidate_id}).json()
+    run = client.post("/runs", json={"candidate_id": candidate_id, "exam_pack_id": "hr-v1"}).json()
     client.post(f"/runs/{run['id']}/start")
     return run["id"]
 
