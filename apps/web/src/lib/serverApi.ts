@@ -1,4 +1,4 @@
-import type { AgentSummary, RunSummary } from "@/types/assay";
+import type { AgentSummary, ExamPackSummary, RunSummary } from "@/types/assay";
 
 function serverApiBaseUrl() {
   return (
@@ -32,4 +32,8 @@ export function getRunSummaries() {
 
 export function getAgentSummaries() {
   return serverRequest<AgentSummary[]>("/agents/summary");
+}
+
+export function getExamPackSummaries() {
+  return serverRequest<ExamPackSummary[]>("/exam-packs/summary");
 }

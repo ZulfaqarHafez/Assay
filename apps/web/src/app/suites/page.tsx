@@ -1,47 +1,16 @@
-"use client";
-
-import * as React from "react";
-import { Download, Upload } from "lucide-react";
-import { assayApi } from "@/lib/api";
-import { downloadJson, errorMessage } from "@/lib/derive";
-import { useExamPackSummaries, useImportExamPackFile } from "@/lib/queries";
 import { ProbeArrayArt } from "@/components/ui/EmptyArt";
+import { getExamPackSummaries } from "@/lib/serverApi";
+import type { ExamPackSummary } from "@/types/assay";
+import { SuiteExportButton, SuiteImportControl } from "./SuiteActions";
+
+export const dynamic = "force-dynamic";
 
 /**
- * Test suites — the adversarial datasets agents are run against. Each pack is a
+ * Test suites - the adversarial datasets agents are run against. Each pack is a
  * versioned set of probes with seen + held-out variants and documented checks.
  */
-export default function SuitesPage() {
-  const packsQuery = useExamPackSummaries();
-  const importPack = useImportExamPackFile();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [message, setMessage] = React.useState<string | null>(null);
-  const packs = packsQuery.data ?? [];
-
-  async function handleImport(file: File | undefined) {
-    if (!file) return;
-    setMessage(null);
-    try {
-      const content = await file.text();
-      const format = file.name.endsWith(".yml") ? "yml" : file.name.endsWith(".yaml") ? "yaml" : "json";
-      const pack = await importPack.mutateAsync({ content, format });
-      setMessage(`Imported ${pack.name}`);
-    } catch (exc) {
-      setMessage(errorMessage(exc));
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
-  async function exportPack(packId: string) {
-    setMessage(null);
-    try {
-      const payload = await assayApi.examPackExport(packId);
-      downloadJson(`${packId}-assay-exam-pack.json`, payload);
-    } catch (exc) {
-      setMessage(errorMessage(exc));
-    }
-  }
+export default async function SuitesPage() {
+  const { packs, error } = await loadSuites();
 
   return (
     <main className="ws-page">
@@ -50,35 +19,14 @@ export default function SuitesPage() {
           <h1>Test suites</h1>
           <p>Versioned datasets of adversarial probes with seen and held-out variants, graded against documented checks.</p>
         </div>
-        <div className="ws-toolbar">
-          <button
-            type="button"
-            className="ws-icon-button"
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="Import suite"
-            title="Import suite"
-            disabled={importPack.isPending}
-          >
-            <Upload size={15} />
-          </button>
-          <span className="ws-count">{packs.length} suite{packs.length === 1 ? "" : "s"}</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,.yaml,.yml,application/json,text/yaml,text/x-yaml"
-            hidden
-            onChange={(event) => void handleImport(event.target.files?.[0])}
-          />
-        </div>
+        <SuiteImportControl count={packs.length} />
       </header>
 
-      {message ? <p className="ws-surface-message" role="status">{message}</p> : null}
-
-      {packsQuery.isLoading ? (
-        <div className="ws-grid" aria-hidden="true">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div className="ws-skeleton-card" key={i} />
-          ))}
+      {error ? (
+        <div className="ws-empty-rich" role="alert">
+          <ProbeArrayArt size={104} className="ws-empty-art" />
+          <h2>Suites unavailable</h2>
+          <p>{error}</p>
         </div>
       ) : packs.length === 0 ? (
         <div className="ws-empty-rich">
@@ -100,18 +48,12 @@ export default function SuitesPage() {
                   <span className="ws-chip">seen + held-out</span>
                 </div>
                 <div className="ws-card-meta">
-                  {competencies.slice(0, 6).map((c) => (
-                    <span className="ws-chip" key={c}>{labelize(c)}</span>
+                  {competencies.slice(0, 6).map((competency) => (
+                    <span className="ws-chip" key={competency}>{labelize(competency)}</span>
                   ))}
                 </div>
                 <div className="ws-card-actions">
-                  <button
-                    type="button"
-                    className="ws-row-link as-button"
-                    onClick={() => void exportPack(pack.id)}
-                  >
-                    <Download size={13} /> Export JSON
-                  </button>
+                  <SuiteExportButton packId={pack.id} />
                 </div>
               </article>
             );
@@ -122,6 +64,14 @@ export default function SuitesPage() {
   );
 }
 
+async function loadSuites(): Promise<{ packs: ExamPackSummary[]; error: string | null }> {
+  try {
+    return { packs: await getExamPackSummaries(), error: null };
+  } catch (exc) {
+    return { packs: [], error: exc instanceof Error ? exc.message : "Could not load test suites." };
+  }
+}
+
 function labelize(key: string) {
-  return key.replace(/[_-]+/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+  return key.replace(/[_-]+/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
 }
