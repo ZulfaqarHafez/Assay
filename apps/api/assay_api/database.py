@@ -812,7 +812,7 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
         if event.get("event_type") == "role_qualified":
             role_brief = event.get("payload")
             break
-    tailored_exam_pack = _tailored_pack_payload(run.generated_pack_id)
+    tailored_exam_pack = _tailored_pack_payload(run)
     qualification_status = scorecard.qualification_status if scorecard else None
     deployability = None
     if scorecard is not None:
@@ -851,18 +851,21 @@ def proof_bundle(run_id: str) -> dict[str, Any] | None:
     }
 
 
-def _tailored_pack_payload(generated_pack_id: str | None) -> dict[str, Any] | None:
-    """The generated exam pack for a tailored run, if still in the registry.
+def _tailored_pack_payload(run: RunRecord) -> dict[str, Any] | None:
+    """Generated exam pack for a tailored run.
 
-    Generated packs live in-process, so this resolves for a bundle fetched in the
-    same process as the run; after a cold restart it is simply absent.
+    New runs persist the pack payload on the run so proof bundles survive
+    serverless cold starts. The registry fallback keeps older in-process runs
+    readable.
     """
-    if not generated_pack_id:
+    if run.tailored_exam_pack:
+        return run.tailored_exam_pack
+    if not run.generated_pack_id:
         return None
     try:
         from .exam_packs import get_exam_pack
 
-        return get_exam_pack(generated_pack_id).model_dump(mode="json", by_alias=True)
+        return get_exam_pack(run.generated_pack_id).model_dump(mode="json", by_alias=True)
     except Exception:
         return None
 

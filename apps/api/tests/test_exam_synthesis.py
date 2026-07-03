@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from assay_api import exam_synthesis, role_qualification
-from assay_api.exam_packs import _validate_pack_contract
+from assay_api.exam_packs import EXAM_PACKS, _validate_pack_contract
 from assay_api.main import app
 from assay_api.models import BriefCompetency, RoleBrief, RunRecord
 
@@ -165,11 +165,21 @@ def test_tailored_run_registers_pack_and_marks_status(monkeypatch) -> None:
         scorecard = client.post(f"/runs/{run['id']}/start").json()
         events = client.get(f"/runs/{run['id']}/events").json()
         fetched_run = client.get(f"/runs/{run['id']}").json()
-        bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
+        generated_pack_id = f"gen-{run['id']}"
+        # Simulate a Vercel/serverless cold start: the in-memory registry no
+        # longer has the generated pack, but the proof bundle must still carry
+        # the bespoke rubric from the persisted run payload.
+        generated_pack = EXAM_PACKS.pop(generated_pack_id, None)
+        try:
+            bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
+        finally:
+            if generated_pack is not None:
+                EXAM_PACKS[generated_pack_id] = generated_pack
         runs_list = client.get("/runs").json()
 
     assert scorecard["qualification_status"] == "tailored"
     assert fetched_run["generated_pack_id"] == f"gen-{run['id']}"
+    assert fetched_run["tailored_exam_pack"]["id"] == f"gen-{run['id']}"
     types = [e["event_type"] for e in events]
     assert "role_qualified" in types
     assert "tailored_exam_generated" in types

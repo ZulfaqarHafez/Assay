@@ -71,6 +71,7 @@ def resolve_pack(run: RunRecord, role_brief: Any, recorder: RunRecorder) -> Pack
     if status == "tailored":
         run.exam_pack_id = pack.id
         run.generated_pack_id = pack.id
+        run.tailored_exam_pack = pack.model_dump(mode="json", by_alias=True)
         save_run(run)
         recorder.event(
             run.id,

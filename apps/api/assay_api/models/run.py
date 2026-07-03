@@ -44,10 +44,12 @@ class RunRecord(BaseModel):
     error: str | None = None
     job_scope: JobScope | None = None
     baseline_run_id: str | None = None
-    # Set when the run synthesized a tailored exam pack from a role brief; the
-    # pack itself lives in the in-process registry and is re-derivable from the
-    # persisted ``role_qualified`` event.
+    # Set when the run synthesized a tailored exam pack from a role brief.
     generated_pack_id: str | None = None
+    # Durable copy of the generated pack. The in-process registry is only warm
+    # per server/function instance; proof bundles must still carry the bespoke
+    # rubric after a cold start or on another deployment worker.
+    tailored_exam_pack: dict[str, Any] | None = None
     # The originally-requested exam pack, captured before a tailored run overwrites
     # ``exam_pack_id`` with its per-run ``gen-*`` id. Diagnostics/lessons key off
     # this so the closed learning loop carries across reruns even in tailored mode.

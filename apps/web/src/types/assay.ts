@@ -112,6 +112,7 @@ export type RunRecord = {
   job_scope?: JobScope | null;
   baseline_run_id?: string | null;
   generated_pack_id?: string | null;
+  tailored_exam_pack?: ExamPack | null;
   source_pack_id?: string | null;
   // Optional scorecard summary attached by GET /runs for the Experiments table.
   certified?: boolean;
