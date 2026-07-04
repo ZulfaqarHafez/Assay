@@ -10,7 +10,7 @@ from ..models import CandidateResponse, TokenCounts, ToolCall
 from ..models.scenario import ScenarioSpec
 from ..sandbox import ToolSandbox
 from .base import CandidateAdapterError
-from .prompt import PromptAgentAdapter, _RateLimited, _output_text
+from .prompt import PromptAgentAdapter, _RateLimited, _is_unsupported_sampling_error, _output_text
 
 # Hard caps so a looping agent cannot run away with the exam or the bill.
 _MAX_TURNS = 6
@@ -140,8 +140,12 @@ class SandboxedAgentAdapter(PromptAgentAdapter):
             if status == 429:
                 raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
             message = str(getattr(exc, "message", None) or exc).lower()
-            unsupported_sampling = "temperature" in message or "seed" in message or "unsupported" in message
-            if status == 400 and sampling and unsupported_sampling:
+            if status == 400 and _is_unsupported_sampling_error(message, sampling):
+                sampling.clear()
+                return self._responses_create(client, conversation, tools, sampling)
+            raise
+        except TypeError as exc:
+            if _is_unsupported_sampling_error(str(exc), sampling):
                 sampling.clear()
                 return self._responses_create(client, conversation, tools, sampling)
             raise

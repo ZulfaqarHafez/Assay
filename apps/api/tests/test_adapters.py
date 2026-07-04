@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import socket
+import sys
+import types
 
 import httpx
 import pytest
@@ -65,6 +67,105 @@ def test_prompt_adapter_omits_sampling_when_disabled(monkeypatch: pytest.MonkeyP
     adapter = PromptAgentAdapter(config)
 
     assert adapter._sampling_params(1) == {}
+
+
+def test_prompt_adapter_retries_without_sampling_when_sdk_rejects_seed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from assay_api.adapters.prompt import PromptAgentAdapter
+
+    calls: list[dict] = []
+
+    class FakeRateLimitError(Exception):
+        pass
+
+    class FakeAPIStatusError(Exception):
+        pass
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            if "seed" in kwargs:
+                raise TypeError("Responses.create() got an unexpected keyword argument 'seed'")
+            return types.SimpleNamespace(output_text="ok")
+
+    class FakeOpenAI:
+        def __init__(self, **_: object):
+            self.responses = FakeResponses()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "openai",
+        types.SimpleNamespace(
+            APIStatusError=FakeAPIStatusError,
+            OpenAI=FakeOpenAI,
+            RateLimitError=FakeRateLimitError,
+        ),
+    )
+
+    config = CandidateConfig(
+        id="cand_live",
+        name="Live",
+        adapter_type="openai-compatible",
+        system_prompt="# Agent\nDo the job.",
+    )
+    adapter = PromptAgentAdapter(config)
+
+    response = adapter._call_openai("test-key", "question", trial=1)
+
+    assert response.output_text == "ok"
+    assert "seed" in calls[0]
+    assert "temperature" in calls[0]
+    assert "seed" not in calls[1]
+    assert "temperature" not in calls[1]
+
+
+def test_sandboxed_adapter_retries_without_sampling_when_sdk_rejects_seed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from assay_api.adapters.sandboxed import SandboxedAgentAdapter
+
+    calls: list[dict] = []
+
+    class FakeRateLimitError(Exception):
+        pass
+
+    class FakeAPIStatusError(Exception):
+        pass
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            if "seed" in kwargs:
+                raise TypeError("Responses.create() got an unexpected keyword argument 'seed'")
+            return types.SimpleNamespace(output=[], output_text="ok")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "openai",
+        types.SimpleNamespace(APIStatusError=FakeAPIStatusError, RateLimitError=FakeRateLimitError),
+    )
+
+    config = CandidateConfig(
+        id="cand_live",
+        name="Live",
+        adapter_type="openai-compatible",
+        system_prompt="# Agent\nDo the job.",
+    )
+    adapter = SandboxedAgentAdapter(config)
+
+    response = adapter._responses_create(
+        types.SimpleNamespace(responses=FakeResponses()),
+        conversation=[],
+        tools=[],
+        sampling={"temperature": 0.7, "seed": 123},
+    )
+
+    assert response.output_text == "ok"
+    assert "seed" in calls[0]
+    assert "temperature" in calls[0]
+    assert "seed" not in calls[1]
+    assert "temperature" not in calls[1]
 
 
 @pytest.mark.asyncio

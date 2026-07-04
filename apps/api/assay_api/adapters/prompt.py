@@ -155,6 +155,8 @@ class PromptAgentAdapter(CandidateAdapter):
         # caller falls back to a deterministic demo answer.
         max_attempts = max(1, int(os.environ.get("ASSAY_OPENAI_MAX_RETRIES", "2")))
         max_wait = float(os.environ.get("ASSAY_OPENAI_MAX_RETRY_WAIT_S", "5"))
+        if sampling:
+            max_attempts = max(max_attempts, 2)
         for attempt in range(1, max_attempts + 1):
             try:
                 return client.responses.create(
@@ -180,11 +182,19 @@ class PromptAgentAdapter(CandidateAdapter):
                     raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
                 # A model that rejects temperature/seed (some reasoning models):
                 # drop the sampling params and retry once, plain.
-                if status == 400 and sampling and ("temperature" in message or "seed" in message or "unsupported" in message):
+                if status == 400 and _is_unsupported_sampling_error(message, sampling):
                     sampling = {}
                     continue
                 if status is not None and 500 <= status < 600 and attempt < max_attempts:
                     time.sleep(min(max_wait, 2.0 ** attempt) + random.uniform(0.2, 0.8))
+                    continue
+                raise
+            except TypeError as exc:
+                # Some OpenAI SDK versions reject unsupported kwargs locally
+                # before making an HTTP request, so the APIStatusError fallback
+                # above never gets a chance to run.
+                if _is_unsupported_sampling_error(str(exc), sampling):
+                    sampling = {}
                     continue
                 raise
         # Unreachable: the loop either returns or raises.
@@ -204,6 +214,18 @@ def _output_text(response: Any) -> str:
             if piece:
                 chunks.append(piece)
     return "".join(chunks)
+
+
+def _is_unsupported_sampling_error(message: str, sampling: dict[str, Any]) -> bool:
+    if not sampling:
+        return False
+    text = message.lower()
+    mentions_sampling = any(key.lower() in text for key in sampling)
+    return mentions_sampling and (
+        "unexpected keyword argument" in text
+        or "unsupported" in text
+        or "not supported" in text
+    )
 
 
 def _token_counts(

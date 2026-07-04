@@ -4,15 +4,17 @@ Scope: Assay / Guardrail Prover handover verification for the current `main` dep
 
 ## Summary
 
-Status: pass with one local infrastructure limitation.
+Status: pass after one production-smoke fix, with one local infrastructure limitation and one external Supabase preview check requiring project access.
 
 - No sandbox execution primitive was found in the simulated tool sandbox or sandboxed adapter.
 - SSRF protections reject loopback, localhost, link-local metadata, private RFC1918, and non-HTTP endpoints.
 - Tracked secret scan passed.
 - API auth, CORS, hardening, rate limiting, request ID, and safe error-envelope tests passed.
 - API and web test suites passed after tightening one stale web test fixture type.
+- Production live-run smoke initially found an OpenAI SDK compatibility failure; the adapter now retries without sampling params when the SDK rejects `seed`/`temperature` locally.
 - Python and production npm dependency audits reported no known vulnerabilities.
 - Docker container smoke could not run locally because Docker Desktop's Linux engine was not running.
+- GitHub's external Supabase Preview check failed because the remote project has migration history not present locally; this Codex session does not have permission on the failing Supabase preview project ref.
 
 ## Evidence
 
@@ -41,7 +43,7 @@ Results:
 - Focused security/adapter tests: `47 passed`.
 - `pip-audit`: `No known vulnerabilities found`.
 - npm production audit: `found 0 vulnerabilities`.
-- Full API tests: `219 passed`.
+- Full API tests: `221 passed` after the production-smoke fix.
 - Web lint: passed.
 - Web type-check: passed.
 - Web unit tests: `87 passed`.
@@ -49,6 +51,9 @@ Results:
 - CLI and guardrail e2e tests: `5 passed`.
 - Playwright production-build smoke: `8 passed` after rebuilding the local smoke artifact with `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8010`.
 - Docker build/container smoke: blocked locally by Docker engine availability: `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`.
+- Production API smoke before the fix: `POST /runs/{run_id}/start` returned a safe 500 envelope with request id `15166804123d478ba0a699075f7f0c99`.
+- Vercel runtime error for that request: `Responses.create() got an unexpected keyword argument 'seed'`.
+- Regression coverage added for both `PromptAgentAdapter` and `SandboxedAgentAdapter` SDK-side sampling rejection.
 
 ## Review Notes
 
@@ -83,7 +88,15 @@ Input caps and DoS:
 - Candidate payload shape tests reject oversized answer/reasoning fields, excessive tool calls, oversized tool parameters, invalid JSON shapes, and invalid token values.
 - Sandboxed live model runs enforce max turns and max tool calls.
 
+OpenAI SDK compatibility:
+
+- Live prompt runs and sandboxed tool-call runs both pass per-trial sampling params for pass^k reliability.
+- Some OpenAI SDK/runtime combinations reject unsupported kwargs locally as `TypeError` instead of returning an API error.
+- Both adapters now treat SDK-side unsupported sampling errors the same way as API-side unsupported sampling errors: clear sampling params and retry once plainly.
+- The fallback is intentionally narrow and only triggers when the error mentions a current sampling key plus an unsupported/unexpected-keyword message.
+
 ## Remaining Non-Blocking Items
 
 - Docker Desktop's Linux engine must be started to rerun the container smoke locally.
 - The handover's web-cut task is still not complete: the production build still contains `/agents` and `/suites`. That is a product-surface cleanup item, not a newly introduced security regression in this review.
+- Supabase Preview is failing on project `ypihroslccijbkdigwkw` with `Remote migration versions not found in local migrations directory.` The authenticated Supabase connector has access to the older documented project `yeuvdqhwqjninzifqdgz`, but not to the failing preview project, so the exact remote migration versions could not be pulled in this session.
