@@ -4,13 +4,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import RunDetail from "./RunDetail";
-import type { RunComparison as RunComparisonData } from "@/types/assay";
+import type {
+  DeployabilityDecision,
+  RunComparison as RunComparisonData,
+  RunRecord,
+  RunVerdict,
+  Scorecard
+} from "@/types/assay";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() })
 }));
 
-function runVerdict(overrides: Record<string, unknown> = {}) {
+function runVerdict(overrides: Partial<RunVerdict> = {}): RunVerdict {
   return {
     schema: "assay.run_verdict.v1" as const,
     run: runRecord,
@@ -35,7 +41,7 @@ function renderRunDetail(searchParams = "", initialVerdict?: ReturnType<typeof r
   );
 }
 
-const scorecard = {
+const scorecard: Scorecard = {
   run_id: "run_demo",
   status: "completed",
   certified: true,
@@ -59,13 +65,16 @@ const scorecard = {
     total_tokens: 1200,
     metrics: {},
     savings: {},
-    fixes: []
+    fixes: [],
+    raw: {}
   },
   failure_reasons: [],
-  created_at: "2026-06-27T00:00:00Z"
+  created_at: "2026-06-27T00:00:00Z",
+  lessons_applied: [],
+  prior_run_id: null
 };
 
-const runRecord = {
+const runRecord: RunRecord = {
   id: "run_demo",
   candidate_id: "cand_demo",
   exam_pack_id: "hr-v1",
@@ -81,7 +90,7 @@ const runRecord = {
 const candidate = {
   id: "cand_demo",
   name: "Demo Candidate",
-  adapter_type: "mock",
+  adapter_type: "mock" as const,
   metadata: {}
 };
 
@@ -98,7 +107,7 @@ const events = [
   }
 ];
 
-const deployability = {
+const deployability: DeployabilityDecision = {
   schema: "assay.deployability_decision.v1",
   run_id: "run_demo",
   verdict: "ship",
@@ -108,16 +117,21 @@ const deployability = {
   policy: {
     schema: "assay.deployability_policy.v1",
     name: "strict",
+    k: 3,
     competency_threshold: 0.8,
     max_transfer_gap: 0.2,
     tas_threshold: 70,
+    critical_findings_allowed: 0,
     require_trace: true,
     allow_degraded: false
   },
   passed_checks: ["compliance:pass^k"],
   failed_checks: [],
   blocking_reasons: [],
-  warnings: []
+  warnings: [],
+  critical_findings: [],
+  metrics: {},
+  generated_at: "2026-06-27T00:00:00Z"
 };
 
 const comparison: RunComparisonData = {

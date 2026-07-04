@@ -305,6 +305,7 @@ def test_openai_can_be_disabled_even_when_key_exists(monkeypatch: pytest.MonkeyP
     "endpoint_url",
     [
         "http://127.0.0.1:9000/ask",
+        "http://localhost:9000/ask",
         "http://169.254.169.254/latest/meta-data",
         "http://10.0.0.5/ask",
         "file:///etc/passwd",
