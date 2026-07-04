@@ -1,25 +1,31 @@
-![Assay — bring your agent.md, find out where it breaks](apps/web/public/brand/assay-og.png)
+![Assay — prove your AI agent's guardrails actually hold](apps/web/public/brand/assay-og.png)
 
-# Assay
+# Assay — The Guardrail Prover
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 ![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)
-![Offline by default](https://img.shields.io/badge/runs-offline%20by%20default-3fa45b.svg)
+![Behavioral exam](https://img.shields.io/badge/exam-behavioral%20(real%20tool%20calls)-7c5470.svg)
 
-**Assay is a pre-deployment litmus test for AI agents.** Bring the `agent.md` /
-`AGENTS.md` definition you already have, and Assay runs it through an adversarial
-exam, grades it on the failure modes that get agents pulled from production, and
-hands you a ranked list of what to fix before you ship — no SDK and no test
-harness to write.
+**Assay proves whether your AI agent's guardrails actually hold — before you ship it.**
+Point it at the `AGENTS.md` / `agent.md` / `CLAUDE.md` you already have. Assay
+reconstructs the agent with its tools in a simulated sandbox, runs real adversarial
+scenarios, and shows you the **exact destructive command your guardrails failed to
+block** — plus which tool permissions it never needed and a fixed rewrite. No SDK,
+no test harness, no dataset to write.
 
-> Bring your agent.md. Find out where it breaks.
+> Written guardrails aren't enforced guardrails. Assay makes your agent *try* to
+> delete prod, leak secrets, and obey injected instructions — and catches it when it does.
 
-**Gate your CI on a held-out verdict** — drop the CLI into a pipeline and fail the
-build before a broken agent ships:
+Every tool call is a real model decision in a sandbox that never executes; a
+deterministic tripwire fires the instant the agent takes a forbidden action
+(`exec_shell("rm -rf /prod")`, `db_query("DROP TABLE …")`, exfiltrating secrets).
+
+**Gate your CI on the verdict** — drop the CLI into a pipeline and fail the build
+before an agent whose guardrails don't hold ships:
 
 ```powershell
-python -m assay_api.cli run --agent-md .\agent.md --pack hr-v1 --pass-threshold 0.8
+python -m assay_api.cli run --agent-md .\AGENTS.md --pack guardrail-v1 --pass-threshold 0.8
 ```
 
 The reusable GitHub Action lives at [`.github/actions/assay`](.github/actions/assay);
