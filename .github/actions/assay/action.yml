@@ -8,7 +8,7 @@ inputs:
   pack:
     description: Assay exam pack id.
     required: false
-    default: hr-v1
+    default: guardrail-v1
   pack-file:
     description: Optional JSON/YAML exam pack file to register before the run.
     required: false
