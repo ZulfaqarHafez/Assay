@@ -263,20 +263,35 @@ def load_local_env() -> None:
     This is dependency-free and never overrides variables already in the
     environment.
     """
-    candidates = [os.environ.get("ASSAY_ENV_FILE"), ".env", "env"]
-    for name in candidates:
-        if not name:
-            continue
-        path = Path(name)
-        if not path.is_absolute():
-            path = PROJECT_ROOT / name
-        if path.is_file():
-            _parse_env_file(path)
+    # Search the API package dir, each parent up to the repo root, and the cwd —
+    # so a root-level `.env` (the documented location) is found even though the
+    # package lives at apps/api. Without this the key silently never loads and
+    # the product falls back to demo mode.
+    search_dirs = [PROJECT_ROOT, *PROJECT_ROOT.parents, Path.cwd()]
+    explicit = os.environ.get("ASSAY_ENV_FILE")
+    if explicit:
+        explicit_path = Path(explicit)
+        if not explicit_path.is_absolute():
+            explicit_path = PROJECT_ROOT / explicit
+        if explicit_path.is_file():
+            _parse_env_file(explicit_path)
+    seen: set[Path] = set()
+    for name in (".env", "env"):
+        for base in search_dirs:
+            path = (base / name).resolve()
+            if path in seen:
+                continue
+            seen.add(path)
+            if path.is_file():
+                _parse_env_file(path)
+                break  # first match for this filename wins
 
 
 def _parse_env_file(path: Path) -> None:
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        # utf-8-sig strips a Windows BOM so the first key isn't read as
+        # "﻿OPENAI_API_KEY" and silently lost.
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
     except OSError:
         return
     for line in lines:
