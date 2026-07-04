@@ -164,7 +164,8 @@ def _add_run_args(parser: argparse.ArgumentParser, *, agent_flag: str) -> None:
     parser.add_argument("--proof-out", help="Proof bundle JSON output path")
     parser.add_argument("--summary-out", help="Markdown summary output path")
     parser.add_argument("--tenant", default="local", help="Tenant id to stamp on persisted artifacts")
-    parser.add_argument("--live", action="store_true", help="Run the uploaded agent with OpenAI instead of mock mode")
+    parser.add_argument("--live", action="store_true", help="Force live mode (errors if no OpenAI key); live is the default when a key is present")
+    parser.add_argument("--mock", action="store_true", help="Force deterministic mock mode even when an OpenAI key is available (CI reproducibility)")
     parser.add_argument("--baseline", dest="baseline_run_id", help="Baseline run id for improvement comparisons")
     parser.add_argument(
         "--require-trace",
@@ -224,9 +225,13 @@ def _interview_command(args: argparse.Namespace) -> int:
 
     _configure_db(args.db_path)
 
-    if not args.live:
+    # The behavioral guardrail exam IS the product: go live whenever a key is
+    # available. Force deterministic mock only when the user opts out explicitly
+    # (`--mock` or ASSAY_DISABLE_OPENAI=1). `--live` still errors loudly if it was
+    # asked for but no key is configured.
+    if getattr(args, "mock", False):
         os.environ["ASSAY_DISABLE_OPENAI"] = "1"
-    elif not resolve_openai_key():
+    elif args.live and not resolve_openai_key():
         print("--live requires OPENAI_API_KEY (or openai_key) to be configured", file=sys.stderr)
         return EXIT_INVALID_INPUT
 
