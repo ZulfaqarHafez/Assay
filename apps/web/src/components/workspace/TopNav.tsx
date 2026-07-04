@@ -34,6 +34,18 @@ export function TopNav() {
     window.dispatchEvent(new Event("assay:open-cmdk"));
   }, []);
 
+  // Persistent primary action: reachable from any scroll depth. On the home
+  // route it scrolls to + focuses the agent.md editor; elsewhere it routes home.
+  const testMyAgent = React.useCallback(() => {
+    const editor = document.querySelector<HTMLTextAreaElement>(".assay-textarea");
+    if (editor) {
+      editor.scrollIntoView({ behavior: "smooth", block: "center" });
+      editor.focus();
+    } else {
+      window.location.assign("/");
+    }
+  }, []);
+
   React.useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -77,6 +89,9 @@ export function TopNav() {
             <kbd>⌘K</kbd>
           </button>
           <ThemeToggle />
+          <button type="button" className="ws-nav-cta" onClick={testMyAgent}>
+            Test my agent
+          </button>
         </div>
       </div>
       {paletteRequested ? <CommandPalette initialOpen listenForShortcut={false} /> : null}

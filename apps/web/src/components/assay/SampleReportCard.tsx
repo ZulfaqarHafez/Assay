@@ -1,19 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { XCircle, AlertTriangle, ShieldCheck } from "lucide-react";
 import { VERDICT_LABEL, VERDICT_SCALE } from "@/lib/verdict";
 
 /**
  * A static, representative verdict card used both as the hero's product preview
- * and inside the landing's "report" section. Mirrors the real VerdictPanel
- * (score meter + ranked findings) so the page shows the product, not just a form.
+ * and inside the landing's "report" section. It leads with the one artifact only
+ * Assay produces — the exact forbidden tool call the guardrails failed to block —
+ * as a real monospace command line, then the fixed-rewrite payoff.
  */
 
-const FIXES = [
-  { sev: "critical", label: "Critical", Icon: XCircle, title: "Leaks internal notes under probing", cap: "Confidentiality" },
-  { sev: "warn", label: "Warning", Icon: AlertTriangle, title: "Refund cap bypassable via roleplay", cap: "Policy" },
-  { sev: "info", label: "Note", Icon: CheckCircle2, title: "No escalation path for edge disputes", cap: "Coverage" }
+const FINDINGS = [
+  { sev: "critical", Icon: XCircle, cmd: 'exec_shell("rm -rf /prod")', cap: "Destructive command · did not block" },
+  { sev: "warn", Icon: AlertTriangle, cmd: 'db_query("DROP TABLE audit_log")', cap: "Destructive command · did not block" },
+  { sev: "info", Icon: AlertTriangle, cmd: "reply(body=$INTERNAL_NOTES)", cap: "Confidentiality · leaked" }
 ] as const;
 
 export function SampleReportCard() {
@@ -24,22 +25,25 @@ export function SampleReportCard() {
         <div className="lp-report-head">
           <div>
             <span className="lp-report-agent">support-triage.md</span>
-            <strong>{VERDICT_LABEL.risky}</strong>
+            <strong>{VERDICT_LABEL.hold}</strong>
           </div>
-          <div className="lp-report-score"><strong>72</strong><span>/100</span></div>
+          <div className="lp-report-score"><strong>34</strong><span>/100</span></div>
         </div>
-        <div className="lp-report-meter"><span className="knob" style={{ left: "72%" }} /></div>
+        <div className="lp-report-meter"><span className="knob" style={{ left: "34%" }} /></div>
         <div className="lp-report-scale">{VERDICT_SCALE.map((b) => <span key={b}>{b}</span>)}</div>
         <div className="lp-report-fixes">
-          {FIXES.map((f) => (
-            <div className={`lp-report-fix ${f.sev}`} key={f.title}>
+          {FINDINGS.map((f) => (
+            <div className={`lp-report-fix ${f.sev}`} key={f.cmd}>
               <f.Icon size={15} />
               <span>
-                <strong>{f.title}</strong>
+                <code className="lp-report-cmd">{f.cmd}</code>
                 <small>{f.cap}</small>
               </span>
             </div>
           ))}
+        </div>
+        <div className="lp-report-fixline">
+          <ShieldCheck size={13} /> Fixed rewrite blocks all three — re-run verdict: <strong>{VERDICT_LABEL.ship}</strong>
         </div>
       </div>
     </div>
