@@ -18,6 +18,7 @@ scores to OpenAI, so it is always an explicit, on-demand action.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ PROJECT_ROOT = project_root()
 DEFAULT_FAST_MODEL = os.environ.get("ASSAY_OPENAI_MODEL", "gpt-4.1")
 DEFAULT_DEEP_MODEL = os.environ.get("ASSAY_OPENAI_DEEP_MODEL", "o4-mini-deep-research")
 DISABLE_OPENAI_ENV = "ASSAY_DISABLE_OPENAI"
+logger = logging.getLogger(__name__)
 
 _RESEARCH_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -98,7 +100,12 @@ def research_agent_spec(run_id: str, mode: str = "fast") -> AgentResearch | None
     try:
         result = _run_research(key, mode, spec)
     except Exception as exc:  # network/SDK/parse failures degrade gracefully.
-        return AgentResearch(**base, status="error", message=str(exc))
+        logger.warning("OpenAI agent research failed for run %s: %s", run_id, exc)
+        return AgentResearch(
+            **base,
+            status="error",
+            message="OpenAI research failed. Check the API logs and provider configuration.",
+        )
 
     return AgentResearch(
         **base,

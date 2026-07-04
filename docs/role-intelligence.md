@@ -186,17 +186,13 @@ serialized `RoleAnalysis`:
 
 ## API
 
-- `POST /role-analysis` — analyze raw text on demand. Body:
-  `{ raw_text, extract, override_pack_id }`, where `extract` is
-  `keyword | openai-fast | openai-deep` (defaults to `keyword`). With a non-keyword
-  mode the API attempts OpenAI extraction and falls back to keyword extraction on
-  any failure; an unknown `override_pack_id` returns `404`. Returns the
-  `assay.role_analysis.v1` payload. (`raw_text` capped server-side.)
-- `GET /runs/{run_id}/role-analysis` — analysis for a persisted run, computed
-  from the run's stored job scope (or an empty scope) and treating the run's
-  exam pack as a pack override so the analysis reflects the pack the run actually
-  used. `404` if the run is unknown.
-- `GET /runs/{run_id}/proof-bundle` — embeds the same analysis under
+The standalone role-analysis routes are retired from the supported API surface.
+Role intelligence now runs as an internal helper during run creation and proof
+assembly:
+
+- `POST /runs` uses `analyze_job_scope` when a run includes `job_scope` and no
+  explicit pack, allowing `recommended_exam_pack_id` to select the pack.
+- `GET /runs/{run_id}/proof-bundle` may embed the same analysis under
   `role_analysis` so the portable proof bundle is self-contained. If the analysis
   cannot be produced, the field is `null` and the rest of the bundle is
   unaffected.

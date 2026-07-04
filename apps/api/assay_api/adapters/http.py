@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from typing import Any
@@ -52,19 +53,20 @@ class HttpCandidateAdapter(CandidateAdapter):
         try:
             # Enforce a connect/read timeout on EVERY request (including a
             # caller-supplied client) so a slow or hung candidate cannot stall a run.
-            response = await self._client_for_run().post(
+            async with self._client_for_run().stream(
+                "POST",
                 str(self.config.endpoint_url),
                 json=payload,
                 timeout=_request_timeout(),
-            )
-            response.raise_for_status()
+                follow_redirects=False,
+            ) as response:
+                response.raise_for_status()
+                body = await _read_capped_body(response)
         except httpx.HTTPError as exc:
             raise CandidateAdapterError(f"HTTP candidate request failed: {exc}") from exc
 
-        _reject_oversize_response(response)
-
         try:
-            data = response.json()
+            data = json.loads(body)
         except ValueError as exc:
             raise CandidateAdapterError("HTTP candidate returned invalid JSON") from exc
         if not isinstance(data, dict):
@@ -82,8 +84,8 @@ class HttpCandidateAdapter(CandidateAdapter):
         return self._client
 
 
-def _reject_oversize_response(response: httpx.Response) -> None:
-    """Reject responses larger than the configured cap before parsing JSON."""
+async def _read_capped_body(response: httpx.Response) -> bytes:
+    """Read a response stream while enforcing the configured byte cap."""
 
     limit = _max_response_bytes()
     declared = response.headers.get("content-length")
@@ -96,10 +98,14 @@ def _reject_oversize_response(response: httpx.Response) -> None:
         except ValueError:
             # Malformed Content-Length: fall through to the body-size check below.
             pass
-    # ``response.content`` is already buffered by httpx; guard against servers
-    # that omit or understate Content-Length.
-    if len(response.content) > limit:
-        raise CandidateAdapterError(f"HTTP candidate response exceeds {limit} byte limit")
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        if total > limit:
+            raise CandidateAdapterError(f"HTTP candidate response exceeds {limit} byte limit")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _parse_candidate_response(data: dict[str, Any], fallback_latency_ms: int) -> CandidateResponse:

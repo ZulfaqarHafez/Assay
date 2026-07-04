@@ -32,7 +32,7 @@ def test_research_is_unavailable_without_key(monkeypatch) -> None:
 
     with TestClient(app) as client:
         run_id = _started_run(client)
-        research = client.post(f"/runs/{run_id}/agent-spec/research?mode=fast").json()
+        research = agent_research.research_agent_spec(run_id, mode="fast").model_dump(mode="json")
 
     assert research["status"] == "unavailable"
     assert research["mode"] == "fast"
@@ -60,7 +60,7 @@ def test_research_fast_returns_structured_result(monkeypatch) -> None:
 
     with TestClient(app) as client:
         run_id = _started_run(client)
-        research = client.post(f"/runs/{run_id}/agent-spec/research?mode=fast").json()
+        research = agent_research.research_agent_spec(run_id, mode="fast").model_dump(mode="json")
 
     assert research["status"] == "ok"
     assert research["model"] == "gpt-4.1"
@@ -89,7 +89,7 @@ def test_research_deep_passes_sources_through(monkeypatch) -> None:
 
     with TestClient(app) as client:
         run_id = _started_run(client)
-        research = client.post(f"/runs/{run_id}/agent-spec/research?mode=deep").json()
+        research = agent_research.research_agent_spec(run_id, mode="deep").model_dump(mode="json")
 
     assert research["status"] == "ok"
     assert research["sources"][0]["url"] == "https://example.com/eeoc"
@@ -106,21 +106,24 @@ def test_research_errors_degrade_gracefully(monkeypatch) -> None:
 
     with TestClient(app) as client:
         run_id = _started_run(client)
-        research = client.post(f"/runs/{run_id}/agent-spec/research?mode=fast").json()
+        research = agent_research.research_agent_spec(run_id, mode="fast").model_dump(mode="json")
 
     assert research["status"] == "error"
-    assert "openai exploded" in research["message"]
+    assert research["message"] == "OpenAI research failed. Check the API logs and provider configuration."
+    assert "openai exploded" not in research["message"]
 
 
-def test_research_rejects_invalid_mode() -> None:
+def test_research_missing_run_returns_none_and_invalid_mode_clamps(monkeypatch) -> None:
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+    monkeypatch.setattr(agent_research, "resolve_openai_key", lambda: "")
+
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
-        run = client.post("/runs", json={"candidate_id": candidate_id}).json()
-        response = client.post(f"/runs/{run['id']}/agent-spec/research?mode=sideways")
-        missing = client.post("/runs/run_missing/agent-spec/research?mode=fast")
+        run_id = _started_run(client)
+        research = agent_research.research_agent_spec(run_id, mode="sideways")
 
-    assert response.status_code == 422
-    assert missing.status_code == 404
+    assert research is not None
+    assert research.mode == "fast"
+    assert agent_research.research_agent_spec("run_missing", mode="fast") is None
 
 
 def test_env_loader_sets_missing_keys_without_overriding(tmp_path, monkeypatch) -> None:

@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { CheckCircle2, AlertTriangle, XCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard, Sparkles } from "lucide-react";
 import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, type FixSeverity } from "@/lib/assay";
-import RoleBriefCard from "@/components/assay/RoleBriefCard";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import PrivilegeDeltaPanel from "@/components/assay/PrivilegeDeltaPanel";
 import StaticLintPanel from "@/components/assay/StaticLintPanel";
@@ -222,7 +221,6 @@ export function VerdictPanel({
             {scorecard.prior_run_id && (
               <RunComparison runId={scorecard.run_id} className="assay-verdict-comparison" />
             )}
-            <RoleBriefCard runId={scorecard.run_id} />
             <ImprovePanel
               agentSpec={agentSpec}
               agentName={agentName}

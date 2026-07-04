@@ -10,20 +10,12 @@ export type HealthPayload = {
 /**
  * Centralized query-key factory. Keys must stay consistent across products so
  * invalidation works, so they live in one shared module even though the hooks
- * that use them are split per product surface (health, suites, agents, runs,
- * connectors).
+ * that use them are split per product surface.
  */
 export const queryKeys = {
   workspaceBoot: () => ["workspace", "boot"] as const,
   health: () => ["health"] as const,
   databaseHealth: () => ["health", "database"] as const,
-  examPacks: () => ["exam-packs"] as const,
-  examPackSummaries: () => ["exam-packs", "summary"] as const,
-  connectors: () => ["connectors"] as const,
-  connectorProbes: () => ["connectors", "probe"] as const,
-  agentSummaries: () => ["agents", "summary"] as const,
-  agentHomes: () => ["agents", "home"] as const,
-  agentHome: (candidateId: string) => ["agents", "home", candidateId] as const,
   candidates: () => ["candidates"] as const,
   candidateSummaries: () => ["candidates", "summary"] as const,
   runs: () => ["runs"] as const,
@@ -38,7 +30,6 @@ export const queryKeys = {
   agentSpec: (runId: string) => ["runs", runId, "agent-spec"] as const,
   agentSpecDiff: (runId: string) => ["runs", runId, "agent-spec", "diff"] as const,
   deployability: (runId: string) => ["runs", runId, "deployability"] as const,
-  reviewers: (runId: string) => ["runs", runId, "reviewers"] as const,
   runComparison: (runId: string, baseline?: string) =>
     ["runs", runId, "comparison", baseline ?? null] as const,
   runLessonsApplied: (runId: string) => ["runs", runId, "lessons-applied"] as const,

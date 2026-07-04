@@ -16,6 +16,10 @@ services:
         value: production
       - key: ASSAY_REQUIRE_HARDENING
         value: "1"
+      # Public browser mode is deliberate for the web-facing API. Keep CORS
+      # locked and rate limiting on; use tenant/API keys for private deployments.
+      - key: ASSAY_PUBLIC_BROWSER_API
+        value: "1"
       - key: ASSAY_DB_BACKEND
         value: supabase
       # Lock CORS to your Vercel web origin — this is the browser-facing

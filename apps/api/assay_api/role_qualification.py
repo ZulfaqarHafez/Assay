@@ -213,8 +213,8 @@ def _build_prompt(agent_md: str, job_scope: JobScope | None) -> str:
 def deterministic_brief(run: RunRecord, candidate: CandidateConfig) -> RoleBrief:
     """Public entry point for the offline, keyword-grounded role brief.
 
-    Used to surface *what the run was held to* (RoleBriefCard / waterfall /
-    timeline) even when the OpenAI-backed tailored-exam stage is off, without
+    Used to surface *what the run was held to* (waterfall / timeline / proof
+    context) even when the OpenAI-backed tailored-exam stage is off, without
     making any network call.
     """
     return _deterministic_brief(run, candidate, status="deterministic")

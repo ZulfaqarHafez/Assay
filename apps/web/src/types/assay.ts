@@ -127,22 +127,6 @@ export type ExamPackFileExport = {
   suggested_commands: string[];
 };
 
-export type Connector = {
-  id: string;
-  name: string;
-  status: "ready" | "planned" | "connected" | "unavailable";
-  description: string;
-};
-
-export type ConnectorProbe = {
-  id: string;
-  name: string;
-  status: "pass" | "warn" | "fail";
-  evidence: string;
-  details: Record<string, unknown>;
-  next_step?: string | null;
-};
-
 export type RunRecord = {
   id: string;
   tenant_id?: string;
@@ -544,8 +528,6 @@ export type ProofBundle = {
   role_brief?: RoleBrief | null;
   tailored_exam_pack?: ExamPack | null;
   database?: DatabaseHealth | Record<string, unknown>;
-  connectors?: Connector[];
-  connector_probes?: ConnectorProbe[];
   agent_spec: AgentSpec | null;
   role_analysis?: RoleAnalysis | null;
   product_review?: ProductReview | null;

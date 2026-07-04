@@ -1,34 +1,8 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AnnouncerProvider } from "@/components/announcer";
 import { TopNav } from "@/components/workspace/TopNav";
-
-// Self-hosted via next/font (no FOUT, no render-blocking @import). Inter carries
-// the body; Space Grotesk is the "Litmus Lab" display face for headings/wordmark;
-// IBM Plex Mono is the instrument face — IDs, scores, thresholds, and micro-labels
-// render in it (see docs/design/direction.md, "Lab Instrument").
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"]
-});
-
-const display = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-  weight: ["500", "600", "700"]
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-  weight: ["400", "500", "600"]
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://assay.dev"),
@@ -55,7 +29,7 @@ const themeInitScript = `(function(){try{var t=localStorage.getItem('assay-theme
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${display.variable} ${mono.variable}`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

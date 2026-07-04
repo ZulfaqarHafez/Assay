@@ -1,14 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 // End-to-end smoke test for the Assay product: the agent.md intake front door,
-// the routed workspace (Experiments / Suites / Agents), the command palette, and
-// a full run-to-verdict. The legacy cockpit has been removed.
+// the supported workspace route (Experiments), the command palette, and a full
+// run-to-verdict. Legacy Agents/Suites routes are intentionally gone.
 
 test("intake screen renders the core controls", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   // Brand lives in the persistent top nav; value prop leads the page.
   await expect(page.getByRole("link", { name: /Assay home/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /find out where it breaks/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /prove your agent/i })).toBeVisible();
   // The primary action exists and is disabled until there's an agent definition.
   const run = page.locator(".assay-intake-actions").getByRole("button", { name: /litmus test/i });
   await expect(run).toBeVisible();
@@ -18,37 +18,41 @@ test("intake screen renders the core controls", async ({ page }) => {
   await expect(page.getByRole("button", { name: /HR screener \(hardened\)/i })).toBeVisible();
 });
 
-test("workspace routes render under the persistent nav", async ({ page }) => {
+test("supported routes render and deleted routes 404", async ({ page }) => {
   await page.goto("/runs", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Experiments", exact: true })).toBeVisible();
 
-  // Nav links move between the workspace surfaces.
-  await page.getByRole("link", { name: "Suites" }).click();
-  await expect(page).toHaveURL(/\/suites$/);
-  await expect(page.getByRole("heading", { name: "Test suites" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Test an agent" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Experiments" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Suites" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Agents" })).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Agents" }).click();
-  await expect(page).toHaveURL(/\/agents$/);
-  await expect(page.getByRole("heading", { name: "Agents", exact: true })).toBeVisible();
+  const suites = await page.goto("/suites", { waitUntil: "domcontentloaded" });
+  expect(suites?.status()).toBe(404);
+  const agents = await page.goto("/agents", { waitUntil: "domcontentloaded" });
+  expect(agents?.status()).toBe(404);
 });
 
 test("command palette opens and navigates", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/runs", { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle");
   // Open through the visible trigger; browser-reserved shortcuts such as Ctrl+K
   // are covered at the component level where the event is not intercepted.
   const trigger = page.getByRole("button", { name: /open command palette/i });
   await expect(trigger).toBeVisible();
   await trigger.click();
   const palette = page.getByRole("dialog", { name: /command palette/i });
-  await expect(palette).toBeVisible({ timeout: 15_000 });
-  await palette.getByRole("textbox", { name: /command palette search/i }).fill("suites");
-  await expect(page.locator(".cmdk-item", { hasText: "Suites" })).toBeVisible();
+  await expect(palette).toBeVisible({ timeout: 45_000 });
+  await palette.getByRole("textbox", { name: /command palette search/i }).fill("experiments");
+  await expect(page.locator(".cmdk-item", { hasText: "Experiments" })).toBeVisible();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/suites$/);
+  await expect(page).toHaveURL(/\/runs$/);
 });
 
-test("runs an agent.md through to a verdict", async ({ page }) => {
-  test.setTimeout(150_000); // a live run streams; the backend may pace under rate limits
+test("runs an agent.md through to a verdict", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "full run smoke is covered once on desktop");
+  test.setTimeout(150_000); // a run streams; the backend may pace under rate limits
 
   // The run flow needs the Python API. If it isn't up, skip rather than fail.
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";

@@ -1,5 +1,5 @@
-/* Fonts are loaded via next/font (see app/layout.tsx) and exposed as
-   --font-sans (Inter) and --font-display (Space Grotesk). */
+/* Font variables resolve to local/system fallback stacks so production builds
+   never fetch remote font assets. */
 
 @tailwind base;
 @tailwind components;
@@ -78,7 +78,7 @@
   --litmus-soft: color-mix(in srgb, var(--color-accent) 8%, transparent);
   --accent-grad: var(--color-accent);
 
-  /* Type families (set by next/font on <html>). */
+  /* Type families resolved from local/system fallback stacks. */
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
   --font-display: "Space Grotesk", "Sora", var(--font-sans);
   --font-mono: "IBM Plex Mono", "Cascadia Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -2888,7 +2888,7 @@ pre {
    and the bespoke brand mark. Added on top of the Muted Editorial base.
    ===================================================================== */
 
-/* Display face for the marquee headings (Space Grotesk via next/font). */
+/* Display face for the marquee headings. */
 .assay-brand h1,
 .assay-intake-head h2,
 .assay-verdict-copy h2,

@@ -1,6 +1,29 @@
-import type { AgentDiff, AgentHomeSummary, AgentIntakeResponse, AgentResearch, AgentSpec, AgentSpecFileExport, AgentSummary, CandidateConfig, CandidateProgress, CandidateSummary, Connector, ConnectorProbe, DatabaseHealth, DeployabilityDecision, DiagnosticLesson, ExamPack, ExamPackExport, ExamPackFileExport, ExamPackSummary, Health, JobScope, ProductReview, ProofBundle, RoleAnalysis, RoleBrief, RunComparison, RunEvent, RunPayoff, RunRecord, RunSummary, RunSurfaces, RunVerdict, Scorecard, TracePayload, WorkspaceBoot } from "@/types/assay";
+import type {
+  AgentDiff,
+  AgentIntakeResponse,
+  AgentSpec,
+  CandidateConfig,
+  CandidateProgress,
+  CandidateSummary,
+  DatabaseHealth,
+  DeployabilityDecision,
+  DiagnosticLesson,
+  Health,
+  JobScope,
+  ProofBundle,
+  RunComparison,
+  RunEvent,
+  RunPayoff,
+  RunRecord,
+  RunSummary,
+  RunSurfaces,
+  RunVerdict,
+  Scorecard,
+  TracePayload,
+  WorkspaceBoot
+} from "@/types/assay";
 
-function apiBaseUrl() {
+export function apiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
@@ -10,8 +33,15 @@ function apiBaseUrl() {
     if (isLocal && Number.isFinite(port) && port >= 3000 && port < 4000) {
       return `${window.location.protocol}//${window.location.hostname}:${port + 5000}`;
     }
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("NEXT_PUBLIC_API_BASE_URL must be configured for the production web app.");
+    }
   }
   return "http://127.0.0.1:8000";
+}
+
+function pathSegment(value: string) {
+  return encodeURIComponent(value);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -39,31 +69,14 @@ export const assayApi = {
   workspaceBoot: () => request<WorkspaceBoot>("/workspace/boot?profile=summary&candidate_limit=24"),
   health: () => request<Health>("/health"),
   databaseHealth: () => request<DatabaseHealth>("/health/database"),
-  examPacks: () => request<ExamPack[]>("/exam-packs"),
-  examPackSummaries: () => request<ExamPackSummary[]>("/exam-packs/summary"),
-  importExamPackFile: (content: string, format: "json" | "yaml" | "yml") =>
-    request<ExamPack>("/exam-packs/import-file", {
-      method: "POST",
-      body: JSON.stringify({ content, format })
-    }),
-  examPackExport: (packId: string) => request<ExamPackExport>(`/exam-packs/${packId}/export`),
-  examPackFileExport: (packId: string) =>
-    request<ExamPackFileExport>(`/exam-packs/${packId}/export-files`, {
-      method: "POST"
-    }),
-  connectors: () => request<Connector[]>("/connectors"),
-  connectorProbes: () => request<ConnectorProbe[]>("/connectors/probe"),
   candidates: () => request<CandidateConfig[]>("/candidates"),
   candidateSummaries: () => request<CandidateSummary[]>("/candidates/summary"),
-  agentSummaries: () => request<AgentSummary[]>("/agents/summary"),
-  agentHome: (candidateId: string) =>
-    request<AgentHomeSummary>(`/agents/${candidateId}/home?include_agent_markdown=false`),
   runs: () => request<RunRecord[]>("/runs"),
   runSummaries: () => request<RunSummary[]>("/runs/summary"),
-  run: (runId: string) => request<RunRecord>(`/runs/${runId}`),
-  runVerdict: (runId: string) => request<RunVerdict>(`/runs/${runId}/verdict`),
-  runSurfaces: (runId: string) => request<RunSurfaces>(`/runs/${runId}/surfaces`),
-  runPayoff: (runId: string) => request<RunPayoff>(`/runs/${runId}/payoff`),
+  run: (runId: string) => request<RunRecord>(`/runs/${pathSegment(runId)}`),
+  runVerdict: (runId: string) => request<RunVerdict>(`/runs/${pathSegment(runId)}/verdict`),
+  runSurfaces: (runId: string) => request<RunSurfaces>(`/runs/${pathSegment(runId)}/surfaces`),
+  runPayoff: (runId: string) => request<RunPayoff>(`/runs/${pathSegment(runId)}/payoff`),
   createCandidate: (candidate: Partial<CandidateConfig>) =>
     request<CandidateConfig>("/candidates", {
       method: "POST",
@@ -95,54 +108,38 @@ export const assayApi = {
         ...(options.policyName ? { policy_name: options.policyName } : {}),
         ...(options.competencyThreshold != null ? { competency_threshold: options.competencyThreshold } : {})
       })
-    }),
+  }),
   startRun: (runId: string) =>
-    request<Scorecard>(`/runs/${runId}/start`, {
+    request<Scorecard>(`/runs/${pathSegment(runId)}/start`, {
       method: "POST"
     }),
   events: (runId: string, afterSequence?: number) =>
     request<RunEvent[]>(
-      `/runs/${runId}/events${afterSequence != null ? `?after=${encodeURIComponent(String(afterSequence))}` : ""}`
+      `/runs/${pathSegment(runId)}/events${afterSequence != null ? `?after=${encodeURIComponent(String(afterSequence))}` : ""}`
     ),
-  scorecard: (runId: string) => request<Scorecard>(`/runs/${runId}/scorecard`),
-  reviewers: (runId: string) => request<ProductReview>(`/runs/${runId}/reviewers`),
-  trace: (runId: string) => request<TracePayload>(`/runs/${runId}/trace`),
+  scorecard: (runId: string) => request<Scorecard>(`/runs/${pathSegment(runId)}/scorecard`),
+  trace: (runId: string) => request<TracePayload>(`/runs/${pathSegment(runId)}/trace`),
   proofBundle: (runId: string, profile: "detail" | "full" = "detail") =>
     request<ProofBundle>(
-      profile === "full" ? `/runs/${runId}/proof-bundle` : `/runs/${runId}/detail`
+      profile === "full" ? `/runs/${pathSegment(runId)}/proof-bundle` : `/runs/${pathSegment(runId)}/detail`
     ),
-  badgeUrl: (runId: string) => `${apiBaseUrl()}/runs/${runId}/badge.svg`,
-  cardUrl: (runId: string) => `${apiBaseUrl()}/runs/${runId}/card.svg`,
-  agentSpec: (runId: string) => request<AgentSpec>(`/runs/${runId}/agent-spec`),
-  agentSpecDiff: (runId: string) => request<AgentDiff>(`/runs/${runId}/agent-spec/diff`),
+  badgeUrl: (runId: string) => `${apiBaseUrl()}/runs/${pathSegment(runId)}/badge.svg`,
+  cardUrl: (runId: string) => `${apiBaseUrl()}/runs/${pathSegment(runId)}/card.svg`,
+  agentSpec: (runId: string) => request<AgentSpec>(`/runs/${pathSegment(runId)}/agent-spec`),
+  agentSpecDiff: (runId: string) => request<AgentDiff>(`/runs/${pathSegment(runId)}/agent-spec/diff`),
   deployability: (runId: string, policy?: "strict" | "advisory") =>
     request<DeployabilityDecision>(
-      `/runs/${runId}/deployability${policy ? `?policy=${policy}` : ""}`
+      `/runs/${pathSegment(runId)}/deployability${policy ? `?policy=${policy}` : ""}`
     ),
-  agentSpecFileExport: (runId: string) =>
-    request<AgentSpecFileExport>(`/runs/${runId}/agent-spec/export-files`, {
-      method: "POST"
-    }),
-  agentResearch: (runId: string, mode: "fast" | "deep") =>
-    request<AgentResearch>(`/runs/${runId}/agent-spec/research?mode=${mode}`, {
-      method: "POST"
-    }),
-  roleAnalysis: (rawText: string, extract: "keyword" | "openai-fast" | "openai-deep" = "keyword", overridePackId: string | null = null) =>
-    request<RoleAnalysis>("/role-analysis", {
-      method: "POST",
-      body: JSON.stringify({ raw_text: rawText, extract, override_pack_id: overridePackId })
-    }),
-  runRoleAnalysis: (runId: string) => request<RoleAnalysis>(`/runs/${runId}/role-analysis`),
-  roleBrief: (runId: string) => request<RoleBrief>(`/runs/${runId}/role-brief`),
   candidateProgress: (candidateId: string) =>
-    request<CandidateProgress>(`/candidates/${candidateId}/progress`),
+    request<CandidateProgress>(`/candidates/${pathSegment(candidateId)}/progress`),
   candidateLessons: (candidateId: string, examPackId?: string) =>
     request<DiagnosticLesson[]>(
-      `/candidates/${candidateId}/lessons${examPackId ? `?exam_pack_id=${encodeURIComponent(examPackId)}` : ""}`
+      `/candidates/${pathSegment(candidateId)}/lessons${examPackId ? `?exam_pack_id=${encodeURIComponent(examPackId)}` : ""}`
     ),
   runComparison: (runId: string, baseline?: string) =>
     request<RunComparison>(
-      `/runs/${runId}/comparison${baseline ? `?baseline=${encodeURIComponent(baseline)}` : ""}`
+      `/runs/${pathSegment(runId)}/comparison${baseline ? `?baseline=${encodeURIComponent(baseline)}` : ""}`
     ),
-  runLessonsApplied: (runId: string) => request<DiagnosticLesson[]>(`/runs/${runId}/lessons-applied`)
+  runLessonsApplied: (runId: string) => request<DiagnosticLesson[]>(`/runs/${pathSegment(runId)}/lessons-applied`)
 };

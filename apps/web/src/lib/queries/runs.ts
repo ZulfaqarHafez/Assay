@@ -4,12 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { assayApi } from "@/lib/api";
 import type {
   AgentDiff,
-  AgentResearch,
   AgentSpec,
   DeployabilityDecision,
   DiagnosticLesson,
   JobScope,
-  ProductReview,
   ProofBundle,
   RunComparison,
   RunEvent,
@@ -142,15 +140,6 @@ export function useDeployability(
   });
 }
 
-export function useReviewers(runId: string | null | undefined, options?: QueryOpts<ProductReview>) {
-  return useQuery({
-    queryKey: queryKeys.reviewers(runId ?? ""),
-    queryFn: () => assayApi.reviewers(runId as string),
-    enabled: Boolean(runId),
-    ...options
-  });
-}
-
 export function useRunComparison(
   runId: string | null | undefined,
   baseline?: string,
@@ -206,20 +195,8 @@ export function useCreateRun(options?: MutationOpts<RunRecord, CreateRunVars>) {
     onSettled: (data, error, vars, ...rest) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.agentSummaries() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.agentHome(vars.candidateId) });
       options?.onSettled?.(data, error, vars, ...rest);
     }
-  });
-}
-
-export function useAgentResearch(
-  options?: MutationOpts<AgentResearch, { runId: string; mode: "fast" | "deep" }>
-) {
-  return useMutation({
-    mutationFn: ({ runId, mode }: { runId: string; mode: "fast" | "deep" }) =>
-      assayApi.agentResearch(runId, mode),
-    ...options
   });
 }
 
@@ -231,8 +208,6 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
     onSettled: (data, error, runId, ...rest) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.runs() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSummaries() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.agentSummaries() });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.agentHomes() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.run(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runVerdict(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.runSurfaces(runId) });
@@ -240,7 +215,6 @@ export function useStartRun(options?: MutationOpts<Scorecard, string>) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.events(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.trace(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.proofBundle(runId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.reviewers(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.deployability(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.agentSpec(runId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.agentSpecDiff(runId) });

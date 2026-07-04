@@ -13,7 +13,10 @@ def isolated_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     monkeypatch.delenv("ASSAY_REQUIRE_TENANT", raising=False)
+    monkeypatch.delenv("ASSAY_TENANT_API_KEYS", raising=False)
     monkeypatch.delenv("ASSAY_DEFAULT_TENANT", raising=False)
+    monkeypatch.delenv("ASSAY_PUBLIC_BROWSER_API", raising=False)
+    monkeypatch.delenv("ASSAY_TRUST_PROXY_HEADERS", raising=False)
     # Keep the suite hermetic: never let app startup or resolve_openai_key() reload
     # the developer's real .env (which carries a live OPENAI key + Supabase backend)
     # back into the process. Tests that need a key mock resolve_openai_key directly.

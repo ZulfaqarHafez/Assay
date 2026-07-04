@@ -4,7 +4,14 @@ Single source of truth for anyone (human or coding agent) picking this up. Cover
 
 - **Repo:** monorepo — `apps/api` (FastAPI, package `assay_api`, Python 3.11) · `apps/web` (Next.js 15 / React 19 / TS).
 - **State:** the pivot (sprints S1–S6) is on `main`. Full design context: `.claude/plans/evaluate-a-spawn-multiple-elegant-quiche.md`.
-- **Test baseline:** API suite **218 passing**; web unit tests green; type-check clean.
+- **Test baseline:** API suite **214 passing**; web unit tests **77 passing**; type-check, lint, production build, dependency audits, secret scan, and Playwright smoke green on 2026-07-04.
+
+## Current deployment update (2026-07-04)
+
+- **Task A web cut:** implemented. `/agents`, `/suites`, old suite import/export routes, `/connectors`, `/connectors/probe`, and standalone role-analysis routes are retired and covered by 404 tests.
+- **Security audit:** implemented in [docs/security-review.md](docs/security-review.md). No high/critical dependency findings; sandbox grep and secret scan passed.
+- **Assets:** verified. Runtime bitmap assets are in `apps/web/public/brand`, `apps/web/public/art`, and `docs/images`; the old sprite-sheet docs now point to the Lucide-backed `Sprite` contract.
+- **Build/deploy readiness:** `npm --workspace apps/web run build` passes with only `/`, `/runs`, and `/runs/[runId]` as product routes. Docker container smoke is the only local infra-blocked check because Docker Desktop's Linux engine is not running.
 
 ---
 
@@ -80,7 +87,7 @@ Exam engine (FastAPI, assay_api)
 
 Do these in order. Each has exact steps and acceptance.
 
-### Task A — Finish the web cut (still unfinished)
+### Task A — Finish the web cut (completed 2026-07-04)
 `apps/web/src/app/agents/` and `.../suites/` still exist. Collapse to one loop + a minimal history.
 1. Delete `app/agents/`, `app/suites/`. Collapse `app/runs/[runId]/` to a read-only report reusing `VerdictPanel`. Keep `/` and `/runs` (shrink `/runs` table to: artifact · verdict stamp · score · date · link).
 2. Remove nav links to those routes (`components/workspace/TopNav.tsx` + command palette).
@@ -92,7 +99,7 @@ Do these in order. Each has exact steps and acceptance.
 
 **Acceptance:** `next build` green; route list has no `/agents` `/suites`; `npx eslint apps/web/src` clean (catches dead imports); API + web suites green.
 
-### Task B — Security audit
+### Task B — Security audit (completed 2026-07-04)
 The product now runs a live model with tools and a user key. Verify each surface, then write `docs/security-review.md` with ✓/finding per item.
 1. **Sandbox cannot execute** — `grep -rn "subprocess\|os.system\|eval(\|exec(\|Popen" apps/api/assay_api/sandbox.py apps/api/assay_api/adapters/sandboxed.py` → must be none (currently ✓). Tool "results" are scripted strings only.
 2. **Secrets server-side** — `OPENAI_API_KEY`/`openai_key` only via `agent_research.resolve_openai_key`; never in any `NEXT_PUBLIC_*` var or response body. Ensure `static_lint` never logs the artifact at INFO.
@@ -106,7 +113,7 @@ The product now runs a live model with tools and a user key. Verify each surface
 
 **Acceptance:** `docs/security-review.md` written; SSRF-reject test passing; audits clean or triaged.
 
-### Task C — Smoke matrix (run every one)
+### Task C — Smoke matrix (partially completed 2026-07-04)
 | # | Smoke | How | Pass |
 |---|---|---|---|
 | 1 | API boot | `uvicorn assay_api.main:app --app-dir apps/api` → `GET /health` | 200, no key |
@@ -125,7 +132,7 @@ The product now runs a live model with tools and a user key. Verify each surface
 
 **#4/#5/#8 need a real `OPENAI_API_KEY`** (the sandbox runs a live model — the only way the tripwire *catch*, vs the offline refusal-quality gate, fires). Keep `ASSAY_LIVE_K=1` and a cheap `ASSAY_OPENAI_MODEL` while iterating; budget a few cents.
 
-### Task D — Deploy
+### Task D — Deploy (current target)
 **API** (`apps/api/Dockerfile` exists; `render.yaml` at root):
 1. `docker build -t assay-api apps/api && docker run -p 8000:8000 -e ASSAY_ENV=prod assay-api` → `GET /health` 200.
 2. Deploy to Render from `render.yaml` (or Fly/Railway). Env: `OPENAI_API_KEY` (server-only), `ASSAY_CORS_ORIGINS=https://<web-domain>`, `ASSAY_API_KEYS=<random>` (if gating). Persistence: SQLite is **ephemeral** on Render — attach a disk or set `ASSAY_DB_BACKEND=supabase` + `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. TraceRazor optional (`TRACERAZOR_BIN`; degrades gracefully).

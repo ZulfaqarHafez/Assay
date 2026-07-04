@@ -40,8 +40,10 @@ describe("TopNav", () => {
     render(<TopNav />);
 
     expect(screen.getByLabelText("Assay home")).toHaveAttribute("data-prefetch", "false");
-    for (const label of ["Test an agent", "Experiments", "Suites", "Agents"]) {
+    for (const label of ["Test an agent", "Experiments"]) {
       expect(screen.getByRole("link", { name: label })).toHaveAttribute("data-prefetch", "false");
     }
+    expect(screen.queryByRole("link", { name: "Suites" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Agents" })).not.toBeInTheDocument();
   });
 });

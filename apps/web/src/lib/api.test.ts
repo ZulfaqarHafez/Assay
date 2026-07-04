@@ -34,20 +34,16 @@ describe("assayApi request headers", () => {
     expect(headers.has("Content-Type")).toBe(false);
   });
 
-  it("uses slim summary endpoints for workspace list views", async () => {
+  it("uses slim summary endpoints for supported list views", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.assay.test");
     const fetchMock = fetchJson([]);
     global.fetch = fetchMock;
 
     await assayApi.runSummaries();
     await assayApi.candidateSummaries();
-    await assayApi.agentSummaries();
-    await assayApi.agentHome("cand_1");
 
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.assay.test/runs/summary");
     expect(fetchMock.mock.calls[1][0]).toBe("https://api.assay.test/candidates/summary");
-    expect(fetchMock.mock.calls[2][0]).toBe("https://api.assay.test/agents/summary");
-    expect(fetchMock.mock.calls[3][0]).toBe("https://api.assay.test/agents/cand_1/home?include_agent_markdown=false");
   });
 
   it("uses the workspace boot endpoint for home first paint", async () => {

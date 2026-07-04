@@ -15,11 +15,18 @@ from .logging_config import (
 )
 from .models import CandidateConfig
 from .rate_limit import RATE_LIMIT_ENABLED_ENV, limiter, rate_limiting_enabled
-from .routers import candidates, connectors, health, role, runs, suites, workspace
-from .security import API_KEYS_ENV, configured_api_keys, require_api_key
+from .routers import candidates, health, runs
+from .security import (
+    API_KEYS_ENV,
+    TENANT_API_KEYS_ENV,
+    configured_api_keys,
+    configured_tenant_api_keys,
+    require_api_key,
+)
 from .tenancy import REQUIRE_TENANT_ENV, require_tenant, tenant_required
 
 _DEFAULT_CORS_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+PUBLIC_BROWSER_API_ENV = "ASSAY_PUBLIC_BROWSER_API"
 
 
 def _cors_origins() -> list[str]:
@@ -72,12 +79,8 @@ app.add_middleware(
 
 # Mount one router per product surface. Route handlers live in ``routers/``.
 app.include_router(health.router)
-app.include_router(workspace.router)
-app.include_router(suites.router)
 app.include_router(candidates.router)
 app.include_router(runs.router)
-app.include_router(role.router)
-app.include_router(connectors.router)
 
 
 def _load_local_env() -> None:
@@ -123,17 +126,19 @@ def production_hardening_findings() -> list[str]:
     findings: list[str] = []
     cors_locked = bool(os.environ.get("ASSAY_CORS_ORIGINS", "").strip())
     has_keys = bool(configured_api_keys())
-    # A browser frontend cannot hold a secret key (NEXT_PUBLIC_* is public), so a
-    # CORS-locked deployment is protected by its origin allowlist + rate limiting.
-    # Require API keys only when there is no locked CORS allowlist (a programmatic
-    # or wide-open API). Requiring both would 401 the web app whenever keys are set.
+    public_browser_api = _truthy(os.environ.get(PUBLIC_BROWSER_API_ENV))
+    # A browser frontend cannot hold a secret key (NEXT_PUBLIC_* is public). If a
+    # deployment intentionally exposes a public browser API, make that decision
+    # explicit instead of silently treating CORS as authentication.
     if not cors_locked:
         findings.append("ASSAY_CORS_ORIGINS is unset")
-        if not has_keys:
-            findings.append(f"{API_KEYS_ENV} is unset")
+    if not has_keys and not (cors_locked and public_browser_api):
+        findings.append(f"{API_KEYS_ENV} is unset")
+    if public_browser_api and not cors_locked:
+        findings.append(f"{PUBLIC_BROWSER_API_ENV} requires ASSAY_CORS_ORIGINS")
     # Tenant attribution still needs keys regardless of the CORS posture.
-    if tenant_required() and not has_keys:
-        findings.append(f"{REQUIRE_TENANT_ENV} requires API keys")
+    if tenant_required() and not configured_tenant_api_keys():
+        findings.append(f"{REQUIRE_TENANT_ENV} requires {TENANT_API_KEYS_ENV}")
     if not rate_limiting_enabled():
         findings.append(f"{RATE_LIMIT_ENABLED_ENV} disables rate limiting")
     return findings

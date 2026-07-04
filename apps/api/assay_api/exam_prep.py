@@ -34,8 +34,8 @@ def qualify(run: RunRecord, candidate: CandidateConfig, recorder: RunRecorder) -
     """Qualify the judge and record a ``role_qualified`` brief for the run.
 
     Always returns a :class:`~assay_api.models.RoleBrief` and emits the event, so
-    the "what we held it to" surfaces (RoleBriefCard, judging waterfall, run
-    timeline) are grounded on every run. When the tailored-exam stage is enabled
+    the "what we held it to" surfaces (judging waterfall, run timeline, proof
+    context) are grounded on every run. When the tailored-exam stage is enabled
     the brief is OpenAI-researched (and drives pack synthesis in
     :func:`resolve_pack`); otherwise it is a deterministic, offline brief seeded
     from role intelligence — no network call, grading unchanged.

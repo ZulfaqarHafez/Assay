@@ -57,42 +57,43 @@ def test_shared_metadata_cache_disables_when_key_configured(monkeypatch: pytest.
     with TestClient(app) as client:
         candidates = client.get("/candidates/summary", headers=headers)
         runs = client.get("/runs/summary", headers=headers)
-        packs = client.get("/exam-packs", headers=headers)
         boot = client.get("/workspace/boot?profile=summary", headers=headers)
 
     assert candidates.status_code == 200
     assert runs.status_code == 200
-    assert packs.status_code == 200
     assert boot.status_code == 200
     assert candidates.headers["cache-control"] == "no-store"
     assert runs.headers["cache-control"] == "no-store"
-    assert packs.headers["cache-control"] == "no-store"
     assert boot.headers["cache-control"] == "no-store"
     assert "origin" in candidates.headers["vary"].lower()
     assert "origin" in runs.headers["vary"].lower()
-    assert "origin" in packs.headers["vary"].lower()
     assert "origin" in boot.headers["vary"].lower()
 
 
 def test_tenant_header_required_in_hosted_tenant_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
     monkeypatch.setenv("ASSAY_REQUIRE_TENANT", "1")
+    monkeypatch.setenv("ASSAY_TENANT_API_KEYS", "tenant_a:tenant-a-key")
     with TestClient(app) as client:
-        missing = client.get("/candidates", headers={"X-API-Key": "secret-key-1"})
+        missing = client.get("/candidates", headers={"X-API-Key": "tenant-a-key"})
         present = client.get(
             "/candidates",
-            headers={"X-API-Key": "secret-key-1", "X-Assay-Tenant": "tenant_a"},
+            headers={"X-API-Key": "tenant-a-key", "X-Assay-Tenant": "tenant_a"},
+        )
+        mismatched = client.get(
+            "/candidates",
+            headers={"X-API-Key": "tenant-a-key", "X-Assay-Tenant": "tenant_b"},
         )
 
     assert missing.status_code == 400
     assert present.status_code == 200
+    assert mismatched.status_code == 403
 
 
 def test_tenant_scope_isolates_candidates_and_runs(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
     monkeypatch.setenv("ASSAY_REQUIRE_TENANT", "1")
-    headers_a = {"X-API-Key": "secret-key-1", "X-Assay-Tenant": "tenant_a"}
-    headers_b = {"X-API-Key": "secret-key-1", "X-Assay-Tenant": "tenant_b"}
+    monkeypatch.setenv("ASSAY_TENANT_API_KEYS", "tenant_a:tenant-a-key,tenant_b:tenant-b-key")
+    headers_a = {"X-API-Key": "tenant-a-key", "X-Assay-Tenant": "tenant_a"}
+    headers_b = {"X-API-Key": "tenant-b-key", "X-Assay-Tenant": "tenant_b"}
 
     with TestClient(app) as client:
         created = client.post(
@@ -139,8 +140,8 @@ def test_badge_is_public_but_run_routes_stay_protected(monkeypatch: pytest.Monke
 
 
 def test_badge_public_even_in_tenant_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ASSAY_API_KEYS", "secret-key-1")
     monkeypatch.setenv("ASSAY_REQUIRE_TENANT", "1")
+    monkeypatch.setenv("ASSAY_TENANT_API_KEYS", "tenant_a:tenant-a-key")
     with TestClient(app) as client:
         badge = client.get("/runs/run_any/badge.svg")
     assert badge.status_code == 200
@@ -275,6 +276,7 @@ def test_hardening_ok_for_cors_locked_web_deploy(monkeypatch: pytest.MonkeyPatch
     monkeypatch.delenv("ASSAY_API_KEYS", raising=False)
     monkeypatch.setenv("ASSAY_CORS_ORIGINS", "https://assay.example.app")
     monkeypatch.setenv("ASSAY_RATE_LIMIT_ENABLED", "1")
+    monkeypatch.setenv("ASSAY_PUBLIC_BROWSER_API", "1")
     monkeypatch.delenv("ASSAY_REQUIRE_TENANT", raising=False)
 
     assert production_hardening_findings() == []
@@ -343,16 +345,6 @@ def test_create_http_candidate_accepts_public_resolved_host(monkeypatch: pytest.
 
     assert response.status_code == 200
     assert response.json()["endpoint_url"] == "https://candidate.example.com/ask"
-
-
-def test_role_analysis_rejects_bad_override_pack_id() -> None:
-    with TestClient(app) as client:
-        response = client.post(
-            "/role-analysis",
-            json={"raw_text": "screen candidates", "override_pack_id": "../bad"},
-        )
-
-    assert response.status_code == 422
 
 
 def test_request_id_header_present_on_responses() -> None:

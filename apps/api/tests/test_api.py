@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -49,7 +46,6 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         pending_verdict_response = client.get(f"/runs/{run['id']}/verdict")
         scorecard = client.post(f"/runs/{run['id']}/start").json()
-        reviewers = client.get(f"/runs/{run['id']}/reviewers").json()
         events_response = client.get(f"/runs/{run['id']}/events")
         events = events_response.json()
         incremental_events_response = client.get(
@@ -148,15 +144,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert bundle["schema"] == "assay.proof_bundle.v1"
     assert bundle["summary"]["event_count"] == len(events)
     assert bundle["database"]["backend"] == "sqlite"
-    assert any(probe["id"] == "tracerazor" for probe in bundle["connector_probes"])
-    assert reviewers["schema"] == "assay.product_review.v1"
-    assert [reviewer["key"] for reviewer in reviewers["reviewers"]] == [
-        "role_analyst",
-        "security_interviewer",
-        "tool_auditor",
-        "tracerazor_auditor",
-        "release_manager",
-    ]
+    assert "connectors" not in bundle
+    assert "connector_probes" not in bundle
     assert bundle["product_review"]["schema"] == "assay.product_review.v1"
     assert bundle["deployability"]["schema"] == "assay.deployability_decision.v1"
     assert bundle["summary"]["deployability_label"] in {"Ship", "Probation", "Do not ship"}
@@ -220,18 +209,10 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
         client.post(f"/runs/{run['id']}/start")
         candidate_summary_response = client.get("/candidates/summary")
         run_summary_response = client.get("/runs/summary")
-        agent_summary_response = client.get("/agents/summary")
-        agent_home_response = client.get(
-            f"/agents/{candidate['id']}/home",
-            params={"include_agent_markdown": "false"},
-        )
-        exam_packs_response = client.get("/exam-packs")
-        exam_pack_summary_response = client.get("/exam-packs/summary")
+        boot_response = client.get("/workspace/boot?profile=summary")
         candidate_summary = candidate_summary_response.json()[0]
         run_summary = run_summary_response.json()[0]
-        agent_summary = agent_summary_response.json()[0]
-        agent_home = agent_home_response.json()
-        exam_pack_summary = exam_pack_summary_response.json()[0]
+        exam_pack_summary = boot_response.json()["exam_pack_summaries"][0]
 
     assert candidate_summary["id"] == candidate["id"]
     assert candidate_summary["name"] == "Verbose Agent"
@@ -254,50 +235,15 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert run_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
     assert "origin" in run_summary_response.headers["vary"].lower()
 
-    assert agent_summary_response.status_code == 200
-    assert agent_summary["name"] == "Verbose Agent"
-    assert agent_summary["candidate_id"] == candidate["id"]
-    assert agent_summary["adapter_type"] == "mock"
-    assert agent_summary["run_count"] == 1
-    assert agent_summary["latest_run_id"] == run["id"]
-    assert agent_summary["verdict"] in {"ship", "hold"}
-    assert "system_prompt" not in agent_summary
-    assert "metadata" not in agent_summary
-    assert "job_scope" not in agent_summary
-    assert agent_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
-    assert "origin" in agent_summary_response.headers["vary"].lower()
-
-    assert agent_home_response.status_code == 200
-    assert agent_home["schema"] == "assay.agent_home.v1"
-    assert agent_home["candidate"]["id"] == candidate["id"]
-    assert agent_home["candidate"]["name"] == "Verbose Agent"
-    assert agent_home["candidate"]["adapter_type"] == "mock"
-    assert len(agent_home["runs"]) == 1
-    assert agent_home["runs"][0]["id"] == run["id"]
-    assert agent_home["runs"][0]["candidate_name"] == "Verbose Agent"
-    # Agent home stays a fast summary payload; refined markdown is fetched from
-    # /runs/{id}/agent-spec only if the user asks to test the improved version.
-    assert agent_home["latest_agent_markdown"] is None
-    assert "system_prompt" not in agent_home["candidate"]
-    assert "metadata" not in agent_home["candidate"]
-    assert "job_scope" not in agent_home["runs"][0]
-    assert agent_home_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
-    assert "origin" in agent_home_response.headers["vary"].lower()
-
-    assert exam_packs_response.status_code == 200
-    assert exam_packs_response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=1800"
-    assert "origin" in exam_packs_response.headers["vary"].lower()
-
-    assert exam_pack_summary_response.status_code == 200
     assert exam_pack_summary["id"]
     assert exam_pack_summary["item_count"] >= 1
     assert exam_pack_summary["competencies"]
     assert "items" not in exam_pack_summary
-    assert exam_pack_summary_response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=1800"
-    assert "origin" in exam_pack_summary_response.headers["vary"].lower()
+    assert boot_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
+    assert "origin" in boot_response.headers["vary"].lower()
 
 
-def test_agent_summary_keeps_same_named_candidates_separate() -> None:
+def test_run_summary_keeps_same_named_candidates_separate() -> None:
     with TestClient(app) as client:
         first = client.post(
             "/candidates",
@@ -317,12 +263,11 @@ def test_agent_summary_keeps_same_named_candidates_separate() -> None:
         ).json()
         first_run = client.post("/runs", json={"candidate_id": first["id"]}).json()
         second_run = client.post("/runs", json={"candidate_id": second["id"]}).json()
-        summaries = client.get("/agents/summary").json()
+        summaries = client.get("/runs/summary").json()
 
-    twins = [row for row in summaries if row["name"] == "Twin Agent"]
+    twins = [row for row in summaries if row["candidate_name"] == "Twin Agent"]
     assert {row["candidate_id"] for row in twins} == {first["id"], second["id"]}
-    assert {row["latest_run_id"] for row in twins} == {first_run["id"], second_run["id"]}
-    assert all(row["run_count"] == 1 for row in twins)
+    assert {row["id"] for row in twins} == {first_run["id"], second_run["id"]}
 
 
 def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
@@ -452,7 +397,6 @@ def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
         client.post(f"/runs/{run['id']}/start")
         spec_response = client.get(f"/runs/{run['id']}/agent-spec")
         spec = spec_response.json()
-        export = client.post(f"/runs/{run['id']}/agent-spec/export-files").json()
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
 
     assert spec["schema"] == "assay.agent_spec.v1"
@@ -462,21 +406,6 @@ def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
     assert spec["agent_markdown"].startswith("# Demo Candidate")
     assert isinstance(spec["sub_agents"], list)
     assert spec["metrics"]["tas_score"] == 88
-
-    assert export["run_id"] == run["id"]
-    assert "AGENTS.md" in export["files"]
-    agents_md = Path(export["files"]["AGENTS.md"])
-    assert agents_md.exists()
-    assert "Operating Notes" in agents_md.read_text(encoding="utf-8")
-
-    # Sub-agent .md files are written to disk, one per recommendation.
-    assert export["sub_agent_count"] == len(spec["sub_agents"])
-    subagent_keys = [name for name in export["files"] if name.startswith("subagents/")]
-    assert len(subagent_keys) == export["sub_agent_count"]
-    if subagent_keys:
-        sub_md = Path(export["files"][subagent_keys[0]])
-        assert sub_md.exists()
-        assert "## When to delegate" in sub_md.read_text(encoding="utf-8")
 
     assert bundle["agent_spec"]["schema"] == "assay.agent_spec.v1"
     assert bundle["agent_spec"]["run_id"] == run["id"]
@@ -537,30 +466,6 @@ def test_agent_spec_requires_started_run(monkeypatch) -> None:
     assert missing.status_code == 404
 
 
-def test_connector_probe_reports_local_evidence(monkeypatch) -> None:
-    monkeypatch.setattr("assay_api.connectors._load_tracerazor_client", lambda: object)
-    monkeypatch.setattr("assay_api.connectors.shutil.which", lambda command: f"C:/tools/{command}.exe" if command == "hf" else None)
-    monkeypatch.setattr(
-        "assay_api.connectors._run_command",
-        lambda command: {
-            "command": command,
-            "exit_code": 0 if command == ["hf", "version"] else 1,
-            "stdout": "huggingface_hub version: 0.36.2" if command == ["hf", "version"] else "",
-            "stderr": "Not logged in" if command == ["hf", "auth", "whoami"] else "",
-        },
-    )
-
-    with TestClient(app) as client:
-        probes = client.get("/connectors/probe").json()
-
-    by_id = {probe["id"]: probe for probe in probes}
-    assert by_id["mock"]["status"] == "pass"
-    assert by_id["tracerazor"]["status"] == "pass"
-    assert by_id["hugging-face"]["status"] == "warn"
-    assert by_id["vercel-agent-browser"]["status"] == "warn"
-    assert "evidence" in by_id["supabase"]
-
-
 class _RoleFakeAudit:
     def __init__(self, threshold: float):
         self.threshold = threshold
@@ -574,43 +479,35 @@ class _RoleFakeAudit:
         )
 
 
-def test_role_analysis_keyword_endpoint() -> None:
+def test_retired_workspace_routes_are_not_mounted() -> None:
     with TestClient(app) as client:
-        analysis = client.post(
-            "/role-analysis",
-            json={"raw_text": "screen and rank candidates fairly", "extract": "keyword"},
-        )
+        run = client.post(
+            "/runs",
+            json={"candidate_id": client.get("/candidates").json()[0]["id"]},
+        ).json()
+        retired = [
+            ("GET", "/agents/summary"),
+            ("GET", f"/agents/{run['candidate_id']}/home"),
+            ("GET", "/suites"),
+            ("GET", "/exam-packs"),
+            ("GET", "/exam-packs/summary"),
+            ("POST", "/exam-packs/import"),
+            ("POST", "/exam-packs/import-file"),
+            ("GET", "/connectors"),
+            ("GET", "/connectors/probe"),
+            ("POST", "/role-analysis"),
+            ("GET", f"/runs/{run['id']}/role-analysis"),
+            ("GET", f"/runs/{run['id']}/role-brief"),
+            ("GET", f"/runs/{run['id']}/reviewers"),
+            ("POST", f"/runs/{run['id']}/agent-spec/export-files"),
+            ("POST", f"/runs/{run['id']}/agent-spec/research"),
+        ]
+        statuses = [
+            client.request(method, path, json={"raw_text": "screen candidates"}).status_code
+            for method, path in retired
+        ]
 
-    assert analysis.status_code == 200
-    payload = analysis.json()
-    assert payload["schema"] == "assay.role_analysis.v1"
-    assert payload["extraction_status"] == "keyword"
-    assert len(payload["requirements"]) >= 1
-
-
-def test_role_analysis_openai_endpoint_reports_extraction(monkeypatch) -> None:
-    from assay_api.models import JobScope
-
-    def fake_extract(raw_text: str, mode: str = "fast") -> JobScope:
-        return JobScope(
-            raw_text=raw_text,
-            title="Recruiting analyst",
-            responsibilities=["Audit hiring compliance"],
-            extraction="openai-fast",
-        )
-
-    monkeypatch.setattr("assay_api.routers.role.extract_job_scope_openai", fake_extract)
-
-    with TestClient(app) as client:
-        analysis = client.post(
-            "/role-analysis",
-            json={"raw_text": "screen and rank candidates fairly", "extract": "openai-fast"},
-        )
-
-    assert analysis.status_code == 200
-    payload = analysis.json()
-    assert payload["extraction_status"] == "openai-fast"
-    assert payload["job_scope"]["extraction"] == "openai-fast"
+    assert statuses == [404] * len(statuses)
 
 
 def test_run_round_trips_job_scope_and_proof_bundle(monkeypatch) -> None:
@@ -630,7 +527,6 @@ def test_run_round_trips_job_scope_and_proof_bundle(monkeypatch) -> None:
             json={"candidate_id": candidate_id, "job_scope": job_scope},
         ).json()
         fetched = client.get(f"/runs/{run['id']}").json()
-        role = client.get(f"/runs/{run['id']}/role-analysis").json()
         client.post(f"/runs/{run['id']}/start")
         bundle = client.get(f"/runs/{run['id']}/proof-bundle").json()
         events = client.get(f"/runs/{run['id']}/events").json()
@@ -640,153 +536,17 @@ def test_run_round_trips_job_scope_and_proof_bundle(monkeypatch) -> None:
     assert fetched["job_scope"]["title"] == "Recruiting Screener"
     assert fetched["job_scope"]["raw_text"].startswith("Screen and rank")
 
-    # Role analysis is exposed per-run and in the proof bundle.
-    assert role["schema"] == "assay.role_analysis.v1"
+    # Role analysis remains available in the proof bundle without a standalone route.
     assert bundle["role_analysis"]["schema"] == "assay.role_analysis.v1"
 
     # The role scope is applied as a deterministic orchestration event.
     assert any(event["event_type"] == "role_scope_applied" for event in events)
 
 
-def test_run_role_analysis_missing_run_is_404() -> None:
-    with TestClient(app) as client:
-        response = client.get("/runs/run_missing/role-analysis")
-    assert response.status_code == 404
-
-
-def test_run_reviewers_missing_run_is_404() -> None:
-    with TestClient(app) as client:
-        response = client.get("/runs/run_missing/reviewers")
-    assert response.status_code == 404
-
-
-def test_exam_pack_export_and_import() -> None:
-    with TestClient(app) as client:
-        packs = client.get("/exam-packs").json()
-        export = client.get("/exam-packs/hr-injection-v1/export").json()
-        imported = client.post(
-            "/exam-packs/import",
-            json={
-                "id": "unit-pack-v1",
-                "name": "Unit test exam pack",
-                "simulator_model": "unit-sim-v1",
-                "items": [
-                    {
-                        "id": "unit-001",
-                        "competency": "unit_competency",
-                        "prompt": "Seen prompt with job-related criteria.",
-                        "held_out_prompt": "Held-out prompt with job-related criteria.",
-                        "rubric": "Use the expected check.",
-                        "expected_checks": [
-                            {
-                                "id": "criteria",
-                                "label": "Uses criteria",
-                                "keywords": ["criteria"],
-                                "forbidden": [],
-                                "weight": 1,
-                            }
-                        ],
-                        "difficulty": "intro",
-                        "counterfactual_group": None,
-                    }
-                ],
-            },
-        ).json()
-        imported_export = client.get("/exam-packs/unit-pack-v1/export").json()
-        file_export = client.post("/exam-packs/unit-pack-v1/export-files").json()
-
-    assert any(pack["id"] == "hr-injection-v1" for pack in packs)
-    assert any(pack["id"] == "support-triage-v1" for pack in packs)
-    assert export["schema"] == "assay.exam_pack.v1"
-    assert export["pack"]["id"] == "hr-injection-v1"
-    assert len(export["huggingface"]["files"]["data/assay_exam_rows.jsonl"]) == 6
-    assert "README.md" in export["huggingface"]["files"]
-    assert imported["id"] == "unit-pack-v1"
-    assert imported_export["huggingface"]["files"]["data/assay_exam_rows.jsonl"][0]["split"] == "seen"
-    assert file_export["pack_id"] == "unit-pack-v1"
-    assert file_export["row_count"] == 2
-    rows_path = Path(file_export["files"]["data/assay_exam_rows.jsonl"])
-    assert rows_path.exists()
-    rows = [json.loads(line) for line in rows_path.read_text(encoding="utf-8").splitlines()]
-    assert [row["split"] for row in rows] == ["seen", "held_out"]
-    assert Path(file_export["files"]["README.md"]).exists()
-    assert Path(file_export["files"]["assay-exam-pack.json"]).exists()
-
-
-def test_exam_pack_import_file_validates_schema() -> None:
-    content = json.dumps(
-        {
-            "schema": "assay.exam_pack.v1",
-            "id": "uploaded-pack-v1",
-            "name": "Uploaded Pack",
-            "simulator_model": "uploaded-sim-v1",
-            "items": [
-                {
-                    "id": "uploaded-001",
-                    "competency": "support_policy",
-                    "prompt": "Seen support prompt.",
-                    "held_out_prompt": "Held-out support prompt.",
-                    "rubric": "Follow policy.",
-                    "expected_checks": [
-                        {
-                            "id": "policy",
-                            "label": "Uses policy",
-                            "keywords": ["policy"],
-                            "forbidden": [],
-                            "weight": 1,
-                        }
-                    ],
-                    "difficulty": "intro",
-                }
-            ],
-        }
-    )
-    bad_content = json.dumps(
-        {
-            "id": "bad-pack-v1",
-            "name": "Bad Pack",
-            "simulator_model": "bad-sim-v1",
-            "items": [
-                {
-                    "id": "dup",
-                    "competency": "support_policy",
-                    "prompt": "Seen prompt.",
-                    "held_out_prompt": "",
-                    "rubric": "Follow policy.",
-                    "expected_checks": [],
-                    "difficulty": "intro",
-                },
-                {
-                    "id": "dup",
-                    "competency": "support_policy",
-                    "prompt": "Seen prompt.",
-                    "held_out_prompt": "Held prompt.",
-                    "rubric": "Follow policy.",
-                    "expected_checks": [],
-                    "difficulty": "intro",
-                },
-            ],
-        }
-    )
-
-    with TestClient(app) as client:
-        imported = client.post(
-            "/exam-packs/import-file",
-            json={"format": "json", "content": content},
-        )
-        bad = client.post(
-            "/exam-packs/import-file",
-            json={"format": "json", "content": bad_content},
-        )
-
-    assert imported.status_code == 200
-    assert imported.json()["id"] == "uploaded-pack-v1"
-    assert bad.status_code == 400
-    assert "Invalid exam pack schema" in bad.json()["detail"]
-
-
 def test_coding_agent_pack_lists_exports_and_runs(monkeypatch) -> None:
-    """The non-HR coding-agent pack appears in /suites, exports cleanly, and runs."""
+    """The non-HR coding-agent pack remains available to the run engine."""
+
+    from assay_api.exam_packs import get_exam_pack, list_exam_packs
 
     class FakeAudit:
         def __init__(self, threshold: float):
@@ -807,9 +567,10 @@ def test_coding_agent_pack_lists_exports_and_runs(monkeypatch) -> None:
 
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
 
+    packs = list_exam_packs()
+    pack = get_exam_pack("coding-agent-v1")
+
     with TestClient(app) as client:
-        packs = client.get("/exam-packs").json()
-        export = client.get("/exam-packs/coding-agent-v1/export").json()
         candidate_id = client.get("/candidates").json()[0]["id"]
         run = client.post(
             "/runs",
@@ -817,10 +578,8 @@ def test_coding_agent_pack_lists_exports_and_runs(monkeypatch) -> None:
         ).json()
         scorecard = client.post(f"/runs/{run['id']}/start").json()
 
-    assert any(pack["id"] == "coding-agent-v1" for pack in packs)
-    # 4 items x (seen + held_out) = 8 dataset rows.
-    assert len(export["huggingface"]["files"]["data/assay_exam_rows.jsonl"]) == 8
-    assert export["pack"]["schema"] == "assay.exam_pack.v1"
+    assert any(item.id == "coding-agent-v1" for item in packs)
+    assert len(pack.items) == 4
     assert run["exam_pack_id"] == "coding-agent-v1"
     assert scorecard["run_id"] == run["id"]
     # The pack's own competencies are graded, not the HR floor competencies.

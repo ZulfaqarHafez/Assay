@@ -10,8 +10,7 @@
 export { queryKeys, type HealthPayload, type QueryOpts, type MutationOpts } from "./keys";
 export { useWorkspaceBoot } from "./workspace";
 export { useHealth, useDatabaseHealth } from "./health";
-export { useExamPackSummaries, useExamPacks, useImportExamPackFile } from "./suites";
-export { useAgentHome, useAgentSummaries, useCandidates, useCandidateSummaries, useCandidateProgress, useCandidateLessons, useCreateCandidate } from "./agents";
+export { useCandidates, useCandidateSummaries, useCandidateProgress, useCandidateLessons, useCreateCandidate } from "./agents";
 export {
   useRuns,
   useRunSummaries,
@@ -24,9 +23,7 @@ export {
   useProofBundle,
   useAgentSpec,
   useAgentSpecDiff,
-  useAgentResearch,
   useDeployability,
-  useReviewers,
   useRunComparison,
   useRunLessonsApplied,
   useCreateRun,

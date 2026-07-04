@@ -3,12 +3,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "./CommandPalette";
-import type { ExamPackSummary, RunSummary } from "@/types/assay";
+import type { RunSummary } from "@/types/assay";
 
 const pushMock = vi.hoisted(() => vi.fn());
 const queryMocks = vi.hoisted(() => ({
-  useRunSummaries: vi.fn(() => ({ data: [] as RunSummary[] })),
-  useExamPackSummaries: vi.fn(() => ({ data: [] as ExamPackSummary[] }))
+  useRunSummaries: vi.fn(() => ({ data: [] as RunSummary[] }))
 }));
 
 vi.mock("next/navigation", () => ({
@@ -16,8 +15,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/queries", () => ({
-  useRunSummaries: queryMocks.useRunSummaries,
-  useExamPackSummaries: queryMocks.useExamPackSummaries
+  useRunSummaries: queryMocks.useRunSummaries
 }));
 
 function renderWithClient(ui: React.ReactElement) {
@@ -31,7 +29,6 @@ describe("CommandPalette", () => {
   afterEach(() => {
     pushMock.mockReset();
     queryMocks.useRunSummaries.mockClear();
-    queryMocks.useExamPackSummaries.mockClear();
   });
 
   it("opens with Ctrl-K, filters commands, and navigates on Enter", async () => {
@@ -39,23 +36,21 @@ describe("CommandPalette", () => {
 
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     const input = await screen.findByRole("textbox", { name: /command palette search/i });
-    fireEvent.change(input, { target: { value: "suites" } });
-    await screen.findByText("Suites");
+    fireEvent.change(input, { target: { value: "experiments" } });
+    await screen.findByText("Experiments");
     fireEvent.keyDown(input, { key: "Enter" });
 
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/suites"));
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/runs"));
   });
 
   it("defers dynamic index queries until the palette opens", async () => {
     renderWithClient(<CommandPalette />);
 
     expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: false });
-    expect(queryMocks.useExamPackSummaries).toHaveBeenLastCalledWith({ enabled: false });
 
     fireEvent(window, new Event("assay:open-cmdk"));
 
     await waitFor(() => expect(queryMocks.useRunSummaries).toHaveBeenLastCalledWith({ enabled: true }));
-    expect(queryMocks.useExamPackSummaries).toHaveBeenLastCalledWith({ enabled: true });
   });
 
   it("can lazy-mount already open while delegating the shortcut listener", async () => {

@@ -160,23 +160,22 @@ uploads those three artifacts.
 
 ## How a run flows
 
-`/` paste or upload `agent.md` → register candidate → stream the adversarial
-judging → verdict, with a ranked "what to fix" list → open the workspace at
-`/runs/[id]` for the verdict band, capability radar, run comparison, learning
-trend, diagnostics, reviewers, and the trace drawer.
+`/` paste or upload `agent.md` -> register candidate -> stream the adversarial
+judging -> verdict, with a ranked "what to fix" list -> open the read-only
+report at `/runs/[id]` for the verdict band, capability radar, run comparison,
+learning trend, diagnostics, and the trace drawer.
 
 ## Product Surface
 
 - The first screen is the agent intake front door; the routed workspace exposes
-  **Experiments** (`/runs`), **Suites** (`/suites`), and **Agents** (`/agents`),
-  with a `⌘K` command palette for jumping between them.
-- A free-text job scope can be turned into decision logic: role analysis
-  deterministically maps job-scope phrases to competencies, expected checks, and
-  recommended sub-agents with a traceable evidence chain, picks the exam pack, and
-  flags protected-attribute language as compliance notes only (never
-  requirements). Available via `POST /role-analysis`,
-  `GET /runs/{run_id}/role-analysis`, and embedded in the proof bundle; details
-  are in [docs/role-intelligence.md](docs/role-intelligence.md).
+  **Experiments** (`/runs`) and read-only run reports (`/runs/{run_id}`). The
+  retired `/agents` and `/suites` surfaces intentionally return 404.
+- A free-text job scope can be turned into decision logic during run creation:
+  role analysis deterministically maps job-scope phrases to competencies,
+  expected checks, and recommended sub-agents with a traceable evidence chain,
+  picks the exam pack, and flags protected-attribute language as compliance
+  notes only (never requirements). Details are in
+  [docs/role-intelligence.md](docs/role-intelligence.md).
 - HTTP candidates use the same examiner, scoring, persistence, and TraceRazor
   path as mock candidates.
 - The Agent Refinery turns each run into a refined `AGENTS.md` for the candidate
@@ -193,9 +192,8 @@ trend, diagnostics, reviewers, and the trace drawer.
   definition; `POST /runs/{run_id}/agent-spec/export-files` writes `AGENTS.md` plus
   one `.md` per recommended sub-agent; `GET /runs/{run_id}/proof-bundle` returns
   the portable proof bundle.
-- Suite import/export, role analysis, HTTP candidates, research, and server-only
-  connector surfaces are tracked in
-  [docs/backend-surfaces.md](docs/backend-surfaces.md).
+- HTTP candidates, research, proof bundles, and server-only internal analysis
+  surfaces are tracked in [docs/backend-surfaces.md](docs/backend-surfaces.md).
 
 ## MVP Boundaries
 
@@ -207,8 +205,8 @@ trend, diagnostics, reviewers, and the trace drawer.
   rescue evidence in scorecards.
 - Supabase is supported as the server database when server-only env vars are
   configured; SQLite remains the local fallback.
-- MCP, OpenAI-compatible, Hugging Face, Vercel agent-browser, and local-command
-  connectors are registry-ready, with active adapters added incrementally.
+- Browser automation and external connector probes are kept out of the public
+  product surface until they have a supported user workflow.
 
 ## Supabase Backend
 
@@ -225,11 +223,9 @@ $env:SUPABASE_SERVICE_ROLE_KEY="your-server-only-key"
 Do not put the service role key in any `NEXT_PUBLIC_*` variable. See
 [docs/supabase.md](docs/supabase.md) for schema and RLS notes.
 
-## Connectors & Research
+## Research Notes
 
-Assay exposes connector readiness through `GET /connectors` and the UI connector
-rail. Current connector notes are in [docs/connectors.md](docs/connectors.md), and
-product research notes for the AgentDojo-inspired exam shape, Hugging Face export
+Product research notes for the AgentDojo-inspired exam shape, Hugging Face export
 path, and Supabase boundary are in
 [docs/product-research.md](docs/product-research.md).
 

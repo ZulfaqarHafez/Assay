@@ -60,14 +60,12 @@ function markQueryStale(queryClient: QueryClient, queryKey: QueryKey) {
 function markCandidateListsStale(queryClient: QueryClient) {
   markQueryStale(queryClient, queryKeys.workspaceBoot());
   markQueryStale(queryClient, queryKeys.candidateSummaries());
-  markQueryStale(queryClient, queryKeys.agentSummaries());
 }
 
 function markRunListsStale(queryClient: QueryClient) {
   markQueryStale(queryClient, queryKeys.workspaceBoot());
   markQueryStale(queryClient, queryKeys.runs());
   markQueryStale(queryClient, queryKeys.runSummaries());
-  markQueryStale(queryClient, queryKeys.agentSummaries());
 }
 
 export type HomeClientProps = {
@@ -441,7 +439,6 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
           scorecard={scorecard}
           proofBundle={null}
           agentSpec={agentSpec}
-          agentResearch={null}
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
         />

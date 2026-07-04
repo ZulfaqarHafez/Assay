@@ -8,6 +8,7 @@ from fastapi import HTTPException, Request, status
 # Rate limiting is on by default with generous limits. Set
 # ASSAY_RATE_LIMIT_ENABLED=0/false/off to disable it for local troubleshooting.
 RATE_LIMIT_ENABLED_ENV = "ASSAY_RATE_LIMIT_ENABLED"
+TRUST_PROXY_HEADERS_ENV = "ASSAY_TRUST_PROXY_HEADERS"
 
 # Per-endpoint limits, each tunable via env. Defaults are generous so normal
 # interactive use is never throttled; they exist to blunt abuse/runaway clients.
@@ -34,6 +35,10 @@ def rate_limiting_enabled() -> bool:
     if _falsy(raw):
         return False
     return _truthy(raw)
+
+
+def trust_proxy_headers() -> bool:
+    return _truthy(os.environ.get(TRUST_PROXY_HEADERS_ENV))
 
 
 def limit_for(name: str) -> str:
@@ -73,7 +78,7 @@ _parsed_cache: dict[str, Any] = {}
 
 def _client_identifier(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    if forwarded:
+    if forwarded and trust_proxy_headers():
         return forwarded
     if request.client and request.client.host:
         return request.client.host

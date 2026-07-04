@@ -9,16 +9,13 @@ import BrandMark from "@/components/ui/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 /**
- * Persistent platform nav across the whole workspace: the front door ("Test an
- * agent") plus the experimentation surfaces (Experiments / Suites / Agents).
- * Rendered once in the root layout so every route shares it.
+ * Persistent platform nav: the guardrail test loop plus the read-only run
+ * history. Legacy agents/suites routes were cut from the supported web surface.
  */
 
 const LINKS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/", label: "Test an agent", exact: true },
-  { href: "/runs", label: "Experiments" },
-  { href: "/suites", label: "Suites" },
-  { href: "/agents", label: "Agents" }
+  { href: "/runs", label: "Experiments" }
 ];
 
 const CommandPalette = dynamic(

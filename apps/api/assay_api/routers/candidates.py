@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ..agent_formats import normalize_agent_definition
-from ..agent_refinery import agent_spec_payload
 from ..cache_headers import public_read_json_headers
 from ..agent_intake import detect_agent_facts
 from ..agent_research import resolve_openai_key
@@ -15,8 +14,6 @@ from ..database import (
     get_candidate,
     list_candidate_summaries,
     list_candidates,
-    list_run_summaries,
-    list_run_summaries_for_candidate,
     save_candidate,
 )
 from ..models import CandidateConfig
@@ -68,40 +65,6 @@ def candidates() -> list[dict]:
 def candidate_summaries() -> JSONResponse:
     return JSONResponse(
         content=list_candidate_summaries(),
-        headers=public_read_json_headers(),
-    )
-
-
-@router.get("/agents/summary")
-def agent_summaries() -> JSONResponse:
-    return JSONResponse(
-        content=_agent_rollups(list_candidate_summaries(), list_run_summaries()),
-        headers=public_read_json_headers(),
-    )
-
-
-@router.get("/agents/{candidate_id}/home")
-def agent_home(candidate_id: str, include_agent_markdown: bool = True) -> JSONResponse:
-    candidate = get_candidate(candidate_id)
-    if candidate is None:
-        raise HTTPException(status_code=404, detail="Candidate not found")
-    runs = list_run_summaries_for_candidate(candidate_id)
-    payload = {
-        "schema": "assay.agent_home.v1",
-        "candidate": {
-            "id": candidate.id,
-            "name": candidate.name,
-            "adapter_type": candidate.adapter_type,
-            "created_at": candidate.created_at.isoformat(),
-        },
-        "runs": _run_rows_for_candidate(runs, candidate),
-        # Older clients expect this field; the current web app asks for the fast
-        # summary form and fetches /runs/{id}/agent-spec only when the user tests
-        # the improved agent.
-        "latest_agent_markdown": _latest_agent_markdown(runs) if include_agent_markdown else None,
-    }
-    return JSONResponse(
-        content=payload,
         headers=public_read_json_headers(),
     )
 
@@ -192,85 +155,3 @@ def candidate_lessons(candidate_id: str, exam_pack_id: str | None = None) -> JSO
         content=[lesson.model_dump(mode="json") for lesson in lesson_library(candidate_id, exam_pack_id)],
         headers=public_read_json_headers(),
     )
-
-
-def _agent_rollups(candidates: list[dict], runs: list[dict]) -> list[dict[str, object]]:
-    id_to_name = {str(candidate["id"]): str(candidate["name"]) for candidate in candidates}
-    id_to_adapter = {str(candidate["id"]): str(candidate["adapter_type"]) for candidate in candidates}
-    rows: dict[str, dict[str, object]] = {}
-
-    # Seed from candidates so agents with zero runs still appear.
-    for candidate in candidates:
-        candidate_id = str(candidate.get("id") or "")
-        if not candidate_id:
-            continue
-        name = str(candidate["name"])
-        rows.setdefault(
-            candidate_id,
-            {
-                "name": name,
-                "candidate_id": candidate_id,
-                "adapter_type": candidate.get("adapter_type", "unknown"),
-                "run_count": 0,
-                "latest_run_id": None,
-                "verdict": None,
-                "score": None,
-            },
-        )
-
-    # Runs come newest-first; the first run per name is its latest verdict.
-    for run in runs:
-        candidate_id = str(run.get("candidate_id", ""))
-        name = id_to_name.get(candidate_id)
-        if not name:
-            continue
-        row = rows.setdefault(
-            candidate_id,
-            {
-                "name": name,
-                "candidate_id": candidate_id,
-                "adapter_type": id_to_adapter.get(candidate_id, "unknown"),
-                "run_count": 0,
-                "latest_run_id": None,
-                "verdict": None,
-                "score": None,
-            },
-        )
-        row["run_count"] = int(row["run_count"]) + 1
-        if row["latest_run_id"] is None:
-            row["latest_run_id"] = run.get("id")
-            if run.get("status") == "completed" and isinstance(run.get("certified"), bool):
-                row["verdict"] = "ship" if run["certified"] else "hold"
-                if isinstance(run.get("pass_count"), int) and isinstance(run.get("total_count"), int):
-                    row["score"] = f"{run['pass_count']}/{run['total_count']}"
-
-    return sorted(
-        rows.values(),
-        key=lambda row: (-int(row["run_count"]), str(row["name"]).lower(), str(row["candidate_id"])),
-    )
-
-
-def _run_rows_for_candidate(runs: list[dict], candidate: CandidateConfig) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
-    for run in runs:
-        row: dict[str, object] = dict(run)
-        row["candidate_name"] = candidate.name
-        row["candidate_adapter_type"] = candidate.adapter_type
-        rows.append(row)
-    return rows
-
-
-def _latest_agent_markdown(runs: list[dict]) -> str | None:
-    for run in runs:
-        if run.get("status") != "completed":
-            continue
-        run_id = run.get("id")
-        if not isinstance(run_id, str):
-            continue
-        try:
-            spec = agent_spec_payload(run_id)
-        except KeyError:
-            return None
-        if spec and isinstance(spec.get("agent_markdown"), str):
-            return spec["agent_markdown"]
-    return None

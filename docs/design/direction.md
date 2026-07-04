@@ -46,7 +46,7 @@ beautifully printed lab report crossed with measurement equipment, not a SaaS da
 
 ## Token deltas
 
-- `--font-mono`: IBM Plex Mono (next/font), new.
+- `--font-mono`: IBM Plex Mono first, with local/system mono fallbacks.
 - `--radius-sm/md/lg`: 6/8/12 → 3/5/8.
 - `--shadow-card`: 0 18px 55px → 0 2px 8px + hairline border does the separation.
 - New utilities: `.mono-label`, `.data`, `.stamp[.ship|.risky|.hold]`,
@@ -56,8 +56,8 @@ beautifully printed lab report crossed with measurement equipment, not a SaaS da
 
 - OG image + README hero: `canvas-design` skill (poster-grade PNG, this palette).
 - Favicon/brandmark: keep the existing Canva-generated mark.
-- Pixel sprites (ReviewCouncil): keep — at small scale they read as instrument
-  glyphs and are already a signature; do not multiply them.
+- Pixel sprites: retired with the old reviewer council surface; do not add new
+  decorative sprite systems without a product workflow.
 
 ## Sequencing
 

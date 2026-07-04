@@ -3,9 +3,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  FlaskConical, Layers, Bot, Beaker, Clock, MoonStar, CheckCircle2, AlertTriangle, CornerDownLeft
+  FlaskConical, Beaker, Clock, MoonStar, CheckCircle2, AlertTriangle, CornerDownLeft
 } from "lucide-react";
-import { useRunSummaries, useExamPackSummaries } from "@/lib/queries";
+import { useRunSummaries } from "@/lib/queries";
 
 type Item = {
   id: string;
@@ -22,9 +22,9 @@ export type CommandPaletteProps = {
 };
 
 /**
- * Keyboard-first command palette (Cmd-K / Ctrl-K). Jumps to any route, recent
- * run, suite, or agent, plus quick actions. Mounted once under the providers so
- * its data hooks share the workspace query cache.
+ * Keyboard-first command palette (Cmd-K / Ctrl-K). Jumps to supported routes,
+ * recent runs, and quick actions. Mounted once under the providers so its data
+ * hooks share the workspace query cache.
  */
 export function CommandPalette({
   initialOpen = false,
@@ -38,9 +38,7 @@ export function CommandPalette({
   const listRef = React.useRef<HTMLDivElement>(null);
 
   const runsQuery = useRunSummaries({ enabled: open });
-  const packsQuery = useExamPackSummaries({ enabled: open });
   const runs = React.useMemo(() => runsQuery.data ?? [], [runsQuery.data]);
-  const packs = React.useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
 
   const go = React.useCallback(
     (href: string) => {
@@ -64,9 +62,7 @@ export function CommandPalette({
   const items = React.useMemo<Item[]>(() => {
     const nav: Item[] = [
       { id: "nav-test", label: "Test an agent", sublabel: "Run a new litmus test", group: "Go to", icon: <FlaskConical size={15} />, run: () => go("/") },
-      { id: "nav-runs", label: "Experiments", sublabel: "All runs, scored", group: "Go to", icon: <Beaker size={15} />, run: () => go("/runs") },
-      { id: "nav-suites", label: "Suites", sublabel: "Adversarial test datasets", group: "Go to", icon: <Layers size={15} />, run: () => go("/suites") },
-      { id: "nav-agents", label: "Agents", sublabel: "Agents under test", group: "Go to", icon: <Bot size={15} />, run: () => go("/agents") }
+      { id: "nav-runs", label: "Experiments", sublabel: "All runs, scored", group: "Go to", icon: <Beaker size={15} />, run: () => go("/runs") }
     ];
     const actions: Item[] = [
       { id: "act-theme", label: "Toggle theme", sublabel: "Light / dark", group: "Actions", icon: <MoonStar size={15} />, run: toggleTheme }
@@ -82,16 +78,8 @@ export function CommandPalette({
         run: () => go(`/runs/${r.id}`)
       };
     });
-    const suiteItems: Item[] = packs.map((p) => ({
-      id: `suite-${p.id}`,
-      label: p.name,
-      sublabel: `${p.id} - ${p.item_count} probes`,
-      group: "Suites",
-      icon: <Layers size={15} />,
-      run: () => go("/suites")
-    }));
-    return [...nav, ...actions, ...runItems, ...suiteItems];
-  }, [runs, packs, go, toggleTheme]);
+    return [...nav, ...actions, ...runItems];
+  }, [runs, go, toggleTheme]);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -173,7 +161,7 @@ export function CommandPalette({
           <input
             ref={inputRef}
             className="cmdk-input"
-            placeholder="Jump to a run, suite, agent, or action..."
+            placeholder="Jump to a run or action..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}

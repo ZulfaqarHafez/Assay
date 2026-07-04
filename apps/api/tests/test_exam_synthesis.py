@@ -202,7 +202,7 @@ def test_tailored_run_registers_pack_and_marks_status(monkeypatch) -> None:
 
 def test_deterministic_brief_recorded_when_tailored_disabled(monkeypatch) -> None:
     """With the tailored stage off (the default), a grounded role brief is still
-    recorded so RoleBriefCard / waterfall / timeline populate while grading
+    recorded so the waterfall, timeline, and proof context populate while grading
     stays on the static pack (qualification_status 'deterministic')."""
     monkeypatch.delenv("ASSAY_TAILORED_EXAMS_ENABLED", raising=False)
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)

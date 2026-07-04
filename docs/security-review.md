@@ -1,20 +1,33 @@
 # Security Review - 2026-07-04
 
-Scope: Assay / Guardrail Prover handover verification for the current `main` deployment path.
+Scope: Assay / Guardrail Prover handover verification for the current deploy
+path.
 
 ## Summary
 
-Status: pass after one production-smoke fix, with one local infrastructure limitation and one external Supabase preview check requiring project access.
+Status: pass for code, dependency, browser, and production-build gates. The only
+local infrastructure limitation is Docker Desktop's Linux engine, which is not
+running in this Windows session.
 
-- No sandbox execution primitive was found in the simulated tool sandbox or sandboxed adapter.
-- SSRF protections reject loopback, localhost, link-local metadata, private RFC1918, and non-HTTP endpoints.
-- Tracked secret scan passed.
-- API auth, CORS, hardening, rate limiting, request ID, and safe error-envelope tests passed.
-- API and web test suites passed after tightening one stale web test fixture type.
-- Production live-run smoke initially found an OpenAI SDK compatibility failure; the adapter now retries without sampling params when the SDK rejects `seed`/`temperature` locally.
-- Python and production npm dependency audits reported no known vulnerabilities.
-- Docker container smoke could not run locally because Docker Desktop's Linux engine was not running.
-- GitHub's external Supabase Preview check failed because the remote project has migration history not present locally; this Codex session does not have permission on the failing Supabase preview project ref.
+- Removed stale public surfaces: `/agents`, `/suites`, `/connectors`,
+  `/connectors/probe`, standalone suite import/export routes, and standalone
+  role-analysis routes now return 404.
+- No sandbox execution primitive was found in the simulated tool sandbox or
+  sandboxed adapter.
+- SSRF protections and tests reject loopback, localhost, link-local metadata,
+  private RFC1918, and non-HTTP endpoints.
+- Secret scan passed.
+- Python and npm dependency audits reported no known vulnerabilities.
+- API tests, web unit tests, lint, type-check, production build, and Playwright
+  smoke all passed.
+- Production web builds no longer fetch remote Google fonts; font variables now
+  resolve to local/system fallback stacks.
+- Public browser mode in production now requires an explicit
+  `ASSAY_PUBLIC_BROWSER_API=1` when no API keys are configured.
+- HTTP candidate responses are streamed with a byte cap to reduce memory DoS
+  exposure.
+- Tenant-bound API keys, stricter tenant schema checks, and trusted-proxy-only
+  `X-Forwarded-For` handling were added.
 
 ## Evidence
 
@@ -23,80 +36,89 @@ Commands run on 2026-07-04:
 ```powershell
 rg -n "subprocess|os\.system|eval\(|exec\(|Popen|run\(" apps\api\assay_api\sandbox.py apps\api\assay_api\adapters\sandboxed.py
 powershell -ExecutionPolicy Bypass -File scripts\check-secrets.ps1
-python -m pytest apps/api/tests/test_security.py apps/api/tests/test_adapters.py -q
-python -m pip_audit -r apps/api/requirements.txt --timeout 60 --progress-spinner off
-npm --workspace apps/web audit --omit=dev
 python -m pytest apps/api/tests -q
+python -m pytest apps/api/tests/test_security.py apps/api/tests/test_agent_research.py apps/api/tests/test_role_qualification.py apps/api/tests/test_guardrail_e2e.py -q -x
+python -m pip_audit -r apps/api/requirements.txt --timeout 60 --progress-spinner off
+python -m pip_audit -r apps/api/requirements-dev.txt --timeout 60 --progress-spinner off
+npm --workspace apps/web audit --omit=dev
 npx eslint apps/web/src
-npx --workspace apps/web tsc --noEmit
-npm --workspace apps/web run test -- --run
+npx tsc --noEmit --pretty false
+npm --workspace apps/web run test -- --run --reporter=dot
 npm --workspace apps/web run build
-python -m pytest apps/api/tests/test_cli.py apps/api/tests/test_guardrail_e2e.py -q
-npm --workspace apps/web run test:e2e -- --workers=1
-docker build -t assay-api:ci apps/api
+npm --workspace apps/web run test:e2e
+docker version --format '{{.Server.Version}}'
 ```
 
 Results:
 
 - Sandbox static search: no matches.
 - Secret scan: `No tracked secret patterns found.`
-- Focused security/adapter tests: `47 passed`.
-- `pip-audit`: `No known vulnerabilities found`.
+- Full API tests: `214 passed`.
+- Focused security/guardrail API tests: `47 passed`.
+- `pip-audit` runtime requirements: `No known vulnerabilities found`.
+- `pip-audit` dev requirements: `No known vulnerabilities found`.
 - npm production audit: `found 0 vulnerabilities`.
-- Full API tests: `221 passed` after the production-smoke fix.
 - Web lint: passed.
 - Web type-check: passed.
-- Web unit tests: `87 passed`.
-- Production build: passed with `NEXT_PUBLIC_API_BASE_URL=https://assay-api-psi.vercel.app`.
-- CLI and guardrail e2e tests: `5 passed`.
-- Playwright production-build smoke: `8 passed` after rebuilding the local smoke artifact with `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8010`.
-- Docker build/container smoke: blocked locally by Docker engine availability: `open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified`.
-- Production API smoke before the fix: `POST /runs/{run_id}/start` returned a safe 500 envelope with request id `15166804123d478ba0a699075f7f0c99`.
-- Vercel runtime error for that request: `Responses.create() got an unexpected keyword argument 'seed'`.
-- Regression coverage added for both `PromptAgentAdapter` and `SandboxedAgentAdapter` SDK-side sampling rejection.
+- Web unit tests: `77 passed`.
+- Production build: passed; route list contains `/`, `/runs`, `/runs/[runId]`,
+  `/_not-found`, and `/icon.png` only.
+- Playwright smoke with local SQLite/mock API: `7 passed`, `1 skipped`
+  intentionally to avoid duplicating the full run on mobile.
+- Docker smoke: blocked locally because Docker Desktop's Linux engine pipe is
+  unavailable.
 
 ## Review Notes
 
 Sandbox execution:
 
-- `apps/api/assay_api/sandbox.py` only merges declared tools and returns scripted JSON/string outputs.
-- `apps/api/assay_api/adapters/sandboxed.py` sends tool schemas to the model, records requested tool calls, and routes every call through `ToolSandbox.simulate`.
-- No shell execution, subprocess launch, `eval`, or `exec` path is present in those sandbox files.
-
-SSRF:
-
-- `apps/api/assay_api/network_guard.py` blocks loopback, private RFC1918, link-local metadata (`169.254.0.0/16`), local IPv6, unique local IPv6, link-local IPv6, and non-global resolved IPs by default.
-- `ASSAY_HTTP_CANDIDATE_ALLOW_PRIVATE` is the explicit escape hatch for private endpoints.
-- Coverage now includes `127.0.0.1`, `localhost`, `169.254.169.254`, `10.0.0.5`, and `file:///etc/passwd`.
+- `apps/api/assay_api/sandbox.py` only merges declared tools and returns
+  scripted JSON/string outputs.
+- `apps/api/assay_api/adapters/sandboxed.py` sends tool schemas to the model,
+  records requested tool calls, and routes every call through
+  `ToolSandbox.simulate`.
+- No shell execution, subprocess launch, `eval`, or `exec` path is present in
+  those sandbox files.
 
 Secrets and client exposure:
 
-- API keys and OpenAI/Supabase server credentials are read from server-side environment variables in API code.
-- The web build uses only `NEXT_PUBLIC_API_BASE_URL` for browser-visible API routing.
-- The tracked-file secret scanner is wired in `.github/workflows/ci.yml` and passed locally.
+- API keys and OpenAI/Supabase server credentials are read from server-side
+  environment variables in API code.
+- The web build uses only `NEXT_PUBLIC_API_BASE_URL` for browser-visible API
+  routing; production browser builds fail fast if it is missing.
+- The tracked-file secret scanner remains wired in `.github/workflows/ci.yml`.
 
-CORS and public endpoints:
+SSRF and DoS:
 
-- Health routes and badge SVGs remain public by design.
-- Protected run routes reject missing API keys when `ASSAY_API_KEYS` is configured.
-- Production hardening tests cover locked CORS with browser-facing public API mode.
-
-Input caps and DoS:
-
-- HTTP candidate responses enforce connect/read timeouts.
-- HTTP candidate response size is capped by `ASSAY_HTTP_CANDIDATE_MAX_BYTES`.
-- Candidate payload shape tests reject oversized answer/reasoning fields, excessive tool calls, oversized tool parameters, invalid JSON shapes, and invalid token values.
+- `network_guard.validate_http_candidate_endpoint` blocks private, loopback,
+  link-local, localhost, and non-HTTP(S) candidate URLs unless
+  `ASSAY_HTTP_CANDIDATE_ALLOW_PRIVATE=1`.
+- HTTP candidate response reads enforce timeouts and
+  `ASSAY_HTTP_CANDIDATE_MAX_BYTES`.
+- Candidate payload shape tests reject oversized answers, reasoning, tool calls,
+  tool parameters, invalid JSON shapes, and invalid token values.
 - Sandboxed live model runs enforce max turns and max tool calls.
 
-OpenAI SDK compatibility:
+Auth, tenant, CORS, and rate limits:
 
-- Live prompt runs and sandboxed tool-call runs both pass per-trial sampling params for pass^k reliability.
-- Some OpenAI SDK/runtime combinations reject unsupported kwargs locally as `TypeError` instead of returning an API error.
-- Both adapters now treat SDK-side unsupported sampling errors the same way as API-side unsupported sampling errors: clear sampling params and retry once plainly.
-- The fallback is intentionally narrow and only triggers when the error mentions a current sampling key plus an unsupported/unexpected-keyword message.
+- Public paths remain limited to health, badge/card style reads, and explicitly
+  public report assets.
+- Production hardening now requires explicit public browser mode when API keys
+  are absent.
+- Tenant-bound API key configuration can scope a key to a tenant.
+- Tenant-required mode fails closed if a configured Supabase table is missing
+  `tenant_id`.
+- `X-Forwarded-For` is ignored unless `ASSAY_TRUST_PROXY_HEADERS=1`.
 
-## Remaining Non-Blocking Items
+Assets:
 
-- Docker Desktop's Linux engine must be started to rerun the container smoke locally.
-- The handover's web-cut task is still not complete: the production build still contains `/agents` and `/suites`. That is a product-surface cleanup item, not a newly introduced security regression in this review.
-- Supabase Preview is failing on project `ypihroslccijbkdigwkw` with `Remote migration versions not found in local migrations directory.` The authenticated Supabase connector has access to the older documented project `yeuvdqhwqjninzifqdgz`, but not to the failing preview project, so the exact remote migration versions could not be pulled in this session.
+- Verified bitmap assets in `apps/web/public/brand`, `apps/web/public/art`, and
+  `docs/images` exist and have readable dimensions.
+- The old `/public/sprites` sheet workflow is retired; `Sprite` now maps legacy
+  names to Lucide icons.
+
+## Remaining Non-Blocking Item
+
+- Start Docker Desktop's Linux engine to rerun `docker build -t assay-api
+  apps/api` and the container `/health` smoke locally. This does not block the
+  current Vercel deploy path.

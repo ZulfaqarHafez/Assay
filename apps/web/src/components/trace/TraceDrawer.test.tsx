@@ -82,7 +82,6 @@ function renderDrawer(open = true, onOpenChange = vi.fn()) {
         scorecard={scorecard}
         proofBundle={null}
         agentSpec={null}
-        agentResearch={null}
         open={open}
         onOpenChange={onOpenChange}
       />

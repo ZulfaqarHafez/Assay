@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import os
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
 
 from ..agent_diff import diff_payload
 from ..badge import agent_hash, badge_svg
 from ..cache_headers import public_read_json_headers
 from ..agent_refinery import agent_spec_payload
-from ..agent_research import research_agent_spec
-from ..connectors import connector_probes, connector_registry
 from ..database import (
     database_backend_name,
     database_health,
@@ -27,8 +26,7 @@ from ..database import (
     save_run,
 )
 from ..deployability import evaluate_scorecard, policy_for_run
-from ..exam_packs import get_exam_pack
-from ..exports import write_agent_spec_files
+from ..exam_packs import get_exam_pack, list_exam_pack_summaries, list_exam_packs
 from ..models import RunCreate, RunRecord
 from ..product_review import product_review_for_run
 from ..progress import candidate_progress, lesson_library, run_comparison
@@ -36,6 +34,29 @@ from ..rate_limit import rate_limit
 from ..role_intelligence import analyze_job_scope, role_analysis_for_run
 
 router = APIRouter()
+
+
+@router.get("/workspace/boot")
+def workspace_boot(
+    profile: Literal["full", "summary"] = "full",
+    candidate_limit: int = Query(50, ge=1, le=100),
+) -> JSONResponse:
+    from .health import health_payload
+
+    content: dict[str, object] = {
+        "schema": "assay.workspace_boot.v1",
+        "health": health_payload(),
+        "candidate_summaries": list_candidate_summaries(limit=candidate_limit),
+    }
+    if profile == "summary":
+        content["exam_pack_summaries"] = list_exam_pack_summaries()
+    else:
+        packs = list_exam_packs()
+        content["exam_packs"] = [pack.model_dump(mode="json") for pack in packs]
+    return JSONResponse(
+        content=content,
+        headers=public_read_json_headers(),
+    )
 
 
 @router.get("/runs")
@@ -141,29 +162,6 @@ def get_run_endpoint(run_id: str) -> dict:
     return run.model_dump(mode="json")
 
 
-@router.get("/runs/{run_id}/role-analysis")
-def run_role_analysis(run_id: str) -> dict:
-    payload = role_analysis_for_run(run_id)
-    if payload is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return payload
-
-
-@router.get("/runs/{run_id}/role-brief")
-def run_role_brief(run_id: str) -> dict:
-    """The role brief the judge was qualified with, if the run produced one.
-
-    Reads the persisted ``role_qualified`` event rather than re-running research,
-    so it is free and reflects exactly what graded this run.
-    """
-    if get_run(run_id) is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    for event in reversed(list_events(run_id)):
-        if event.event_type == "role_qualified":
-            return event.payload
-    raise HTTPException(status_code=404, detail="Role brief not found for this run")
-
-
 @router.get("/runs/{run_id}/events")
 def run_events(run_id: str, after: int | None = None) -> JSONResponse:
     run = get_run(run_id)
@@ -240,14 +238,6 @@ def run_verdict(run_id: str) -> JSONResponse:
         content=payload,
         headers=_run_json_cache_headers(run),
     )
-
-
-@router.get("/runs/{run_id}/reviewers")
-def run_reviewers(run_id: str) -> dict:
-    payload = product_review_for_run(run_id)
-    if payload is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return payload.model_dump(mode="json")
 
 
 @router.get("/runs/{run_id}/surfaces")
@@ -529,37 +519,6 @@ def run_agent_spec_diff(run_id: str) -> JSONResponse:
     )
 
 
-@router.post("/runs/{run_id}/agent-spec/export-files")
-def export_agent_spec_files(run_id: str) -> dict:
-    if get_run(run_id) is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    try:
-        export = write_agent_spec_files(run_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
-    if export is None:
-        raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
-    return export.model_dump(mode="json")
-
-
-@router.post(
-    "/runs/{run_id}/agent-spec/research",
-    dependencies=[Depends(rate_limit("agent_research"))],
-)
-def run_agent_research(run_id: str, mode: str = "fast") -> dict:
-    if mode not in ("fast", "deep"):
-        raise HTTPException(status_code=422, detail="mode must be 'fast' or 'deep'")
-    if get_run(run_id) is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    try:
-        research = research_agent_spec(run_id, mode)
-    except KeyError as exc:
-        raise HTTPException(status_code=409, detail="Run references an unregistered exam pack") from exc
-    if research is None:
-        raise HTTPException(status_code=409, detail="Run has no scorecard yet; start the run first")
-    return research.model_dump(mode="json")
-
-
 @router.get("/runs/{run_id}/proof-bundle")
 def run_proof_bundle(run_id: str) -> dict:
     bundle = proof_bundle(run_id)
@@ -588,8 +547,6 @@ def run_proof_bundle(run_id: str) -> dict:
         ]
     return bundle | {
         "database": db_health,
-        "connectors": connector_registry(),
-        "connector_probes": connector_probes(),
         "agent_spec": agent_spec,
         "role_analysis": role_analysis_bundle,
         "candidate_progress": progress_bundle,

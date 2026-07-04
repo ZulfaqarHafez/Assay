@@ -45,15 +45,7 @@ const TraceDrawer = dynamic(() => import("@/components/trace/TraceDrawer"), {
   loading: () => null
 });
 
-const AgentRunControls = dynamic(() => import("@/components/assay/AgentRunControls"), {
-  loading: () => <div className="agent-run-controls"><span className="ws-skeleton-row" aria-hidden="true" /></div>
-});
-
 const ImprovePanel = dynamic(() => import("@/components/assay/ImprovePanel"), {
-  loading: () => <LearningSurfaceSkeleton />
-});
-
-const ReviewCouncil = dynamic(() => import("@/components/assay/ReviewCouncil"), {
   loading: () => <LearningSurfaceSkeleton />
 });
 
@@ -127,7 +119,6 @@ export default function RunDetail({
   const deployability = verdict?.deployability ?? null;
   const comparisonFromVerdict = verdict?.comparison ?? undefined;
   const surfaces = surfacesQuery.data ?? null;
-  const reviewers = surfaces?.product_review ?? null;
   const events = React.useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
   const trace = React.useMemo(
     () => (drawerOpen ? { run_id: runId, events, scorecard } : null),
@@ -135,8 +126,6 @@ export default function RunDetail({
   );
   const agentSpec = surfaces?.agent_spec ?? null;
   const candidateName = verdict?.candidate?.name ?? agentSpec?.candidate_name ?? "Candidate";
-  // Rerun against the originally-requested pack (a tailored run repoints exam_pack_id at a gen-* id).
-  const rerunPackId = runRecord?.source_pack_id ?? runRecord?.exam_pack_id ?? agentSpec?.exam_pack_id ?? "hr-v1";
   // This run tested a refined agent when it carries a baseline; conversely a
   // later run pointing back here means this run's refinery output was validated.
   const baselineRunId = runRecord?.baseline_run_id ?? null;
@@ -202,13 +191,6 @@ export default function RunDetail({
           </p>
         </div>
         <div className="rd-actions">
-          <AgentRunControls
-            candidateId={candidateId}
-            agentName={candidateName}
-            examPackId={rerunPackId}
-            baselineRunId={runId}
-            refinedMarkdown={agentSpec?.agent_markdown}
-          />
           <button
             type="button"
             className="command-button"
@@ -299,12 +281,6 @@ export default function RunDetail({
         <p className="rd-error" role="alert">Could not export proof: {exportError}</p>
       ) : null}
 
-      {reviewers ? (
-        <ReviewCouncil review={reviewers} decision={deployability} />
-      ) : richSurfacesReady && surfacesQuery.isLoading ? (
-        <div className="ws-skeleton-card" />
-      ) : null}
-
       {agentSpec ? (
         <ImprovePanel
           agentSpec={agentSpec}
@@ -365,7 +341,6 @@ export default function RunDetail({
           scorecard={scorecard}
           proofBundle={null}
           agentSpec={agentSpec}
-          agentResearch={null}
           open={drawerOpen}
           onOpenChange={(open) => void setDrawer(open ? "trace" : null)}
         />

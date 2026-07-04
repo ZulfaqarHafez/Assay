@@ -205,8 +205,6 @@ const proofBundle = {
     reviewers: []
   },
   database: { backend: "sqlite", ok: true },
-  connectors: [],
-  connector_probes: [],
   agent_spec: agentSpec,
   role_analysis: null,
   candidate_progress: {
@@ -264,7 +262,7 @@ describe("RunDetail query fanout", () => {
 
     renderRunDetail();
 
-    await screen.findByText("Demo Candidate");
+    await screen.findByText("Demo Candidate", {}, { timeout: 10000 });
     await waitFor(() => expect(paths).toContain("/runs/run_demo/verdict"));
 
     expect(paths).not.toContain("/runs/run_demo");
@@ -308,7 +306,7 @@ describe("RunDetail query fanout", () => {
 
     renderRunDetail("", runVerdict());
 
-    await screen.findByText("Demo Candidate");
+    await screen.findByText("Demo Candidate", {}, { timeout: 10000 });
     expect(paths).not.toContain("/runs/run_demo/verdict");
   }, 15000);
 

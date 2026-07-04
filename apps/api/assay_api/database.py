@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import CandidateConfig, DiagnosticLesson, RunEvent, RunRecord, Scorecard, utc_now
-from .tenancy import current_tenant_id
+from .tenancy import current_tenant_id, tenant_required
 
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "assay.db"
@@ -861,11 +861,15 @@ class SupabaseStore(DataStore):
     def _with_tenant_filter(self, logical_table: str, query: Any) -> Any:
         if self._table_tenant_scoped(logical_table):
             query = query.eq("tenant_id", current_tenant_id())
+        elif tenant_required():
+            raise RuntimeError(f"Supabase table {self.tables[logical_table]} is not tenant-scoped")
         return query
 
     def _with_tenant(self, logical_table: str, row: dict[str, Any], tenant_id: str) -> dict[str, Any]:
         if self._table_tenant_scoped(logical_table):
             return {**row, "tenant_id": tenant_id}
+        if tenant_required():
+            raise RuntimeError(f"Supabase table {self.tables[logical_table]} is not tenant-scoped")
         return row
 
     def _ensure_schema(self) -> None:

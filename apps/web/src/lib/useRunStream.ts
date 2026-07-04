@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { assayApi } from "@/lib/api";
+import { apiBaseUrl, assayApi } from "@/lib/api";
 import type { RunEvent, Scorecard } from "@/types/assay";
 
 /**
@@ -67,23 +67,8 @@ export type RunEventSource = {
 
 const DEFAULT_POLL_MS = 1000;
 
-/**
- * Resolves the API base URL with the same rules as `lib/api.ts` (which does not
- * export its helper). Kept in sync deliberately so the abortable start request
- * below can carry an AbortSignal without touching the shared client.
- */
-function apiBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-  if (typeof window !== "undefined") {
-    const port = Number(window.location.port);
-    const isLocal = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
-    if (isLocal && Number.isFinite(port) && port >= 3000 && port < 4000) {
-      return `${window.location.protocol}//${window.location.hostname}:${port + 5000}`;
-    }
-  }
-  return "http://127.0.0.1:8000";
+function pathSegment(value: string) {
+  return encodeURIComponent(value);
 }
 
 /**
@@ -92,7 +77,7 @@ function apiBaseUrl(): string {
  * client intentionally stays signal-free.
  */
 async function startRunWithSignal(runId: string, signal: AbortSignal): Promise<Scorecard> {
-  const response = await fetch(`${apiBaseUrl()}/runs/${runId}/start`, {
+  const response = await fetch(`${apiBaseUrl()}/runs/${pathSegment(runId)}/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal
@@ -121,11 +106,11 @@ async function recoverRunResult(runId: string, signal: AbortSignal): Promise<Sco
   const deadline = Date.now() + RECOVERY_MAX_MS;
   while (Date.now() < deadline && !signal.aborted) {
     try {
-      const runResponse = await fetch(`${apiBaseUrl()}/runs/${runId}`, { signal });
+      const runResponse = await fetch(`${apiBaseUrl()}/runs/${pathSegment(runId)}`, { signal });
       if (runResponse.ok) {
         const record = (await runResponse.json()) as { status?: string };
         if (record.status === "completed") {
-          const scoreResponse = await fetch(`${apiBaseUrl()}/runs/${runId}/scorecard`, { signal });
+          const scoreResponse = await fetch(`${apiBaseUrl()}/runs/${pathSegment(runId)}/scorecard`, { signal });
           if (scoreResponse.ok) return (await scoreResponse.json()) as Scorecard;
         } else if (record.status === "failed") {
           return "failed";

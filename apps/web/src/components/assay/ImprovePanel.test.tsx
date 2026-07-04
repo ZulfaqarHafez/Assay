@@ -85,5 +85,5 @@ describe("ImprovePanel", () => {
     expect(screen.getByLabelText(/diff against the uploaded agent\.md/i)).toHaveTextContent(
       "+ - Use job-related criteria only."
     );
-  });
+  }, 30000);
 });

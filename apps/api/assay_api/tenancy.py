@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import Header, HTTPException, Request, status
 
-from .security import configured_api_keys, is_public_path
+from .security import API_KEY_HEADER, configured_tenant_api_keys, is_public_path, tenant_key_matches
 
 TENANT_HEADER = "X-Assay-Tenant"
 DEFAULT_TENANT_ENV = "ASSAY_DEFAULT_TENANT"
@@ -60,6 +60,7 @@ def validate_tenant_id(value: str) -> str:
 async def require_tenant(
     request: Request,
     x_assay_tenant: str | None = Header(default=None, alias=TENANT_HEADER),
+    x_api_key: str | None = Header(default=None, alias=API_KEY_HEADER),
 ) -> AsyncIterator[None]:
     """Bind the request to a tenant.
 
@@ -74,18 +75,25 @@ async def require_tenant(
         return
 
     if tenant_required():
-        if not configured_api_keys():
+        if not configured_tenant_api_keys():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Tenant mode requires ASSAY_API_KEYS to be configured",
+                detail="Tenant mode requires ASSAY_TENANT_API_KEYS to be configured",
             )
         if not x_assay_tenant:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Missing {TENANT_HEADER}",
             )
+        tenant_id = validate_tenant_id(x_assay_tenant)
+        if not tenant_key_matches(tenant_id, x_api_key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key is not authorized for this tenant",
+            )
+    else:
+        tenant_id = validate_tenant_id(x_assay_tenant) if x_assay_tenant else default_tenant_id()
 
-    tenant_id = validate_tenant_id(x_assay_tenant) if x_assay_tenant else default_tenant_id()
     request.state.tenant_id = tenant_id
     token = bind_tenant_id(tenant_id)
     try:

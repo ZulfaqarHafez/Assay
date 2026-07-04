@@ -7,6 +7,7 @@ from fastapi import Header, HTTPException, Request, status
 
 API_KEY_HEADER = "X-API-Key"
 API_KEYS_ENV = "ASSAY_API_KEYS"
+TENANT_API_KEYS_ENV = "ASSAY_TENANT_API_KEYS"
 
 # Paths that must always be reachable without a key (health probes / preflight).
 EXEMPT_PATHS = {"/health", "/health/database"}
@@ -32,12 +33,46 @@ def configured_api_keys() -> set[str]:
     """
 
     raw = os.environ.get(API_KEYS_ENV, "")
-    return {key.strip() for key in raw.split(",") if key.strip()}
+    keys = {key.strip() for key in raw.split(",") if key.strip()}
+    for tenant_keys in configured_tenant_api_keys().values():
+        keys.update(tenant_keys)
+    return keys
+
+
+def configured_tenant_api_keys() -> dict[str, set[str]]:
+    """Return tenant-scoped API keys parsed from ``ASSAY_TENANT_API_KEYS``.
+
+    Format: ``tenant_a:key-a,tenant_b=key-b``. Tenant mode uses this mapping to
+    bind the caller's API key to the requested ``X-Assay-Tenant`` value.
+    """
+
+    raw = os.environ.get(TENANT_API_KEYS_ENV, "")
+    mapping: dict[str, set[str]] = {}
+    for entry in raw.replace("\n", ",").replace(";", ",").split(","):
+        item = entry.strip()
+        if not item:
+            continue
+        separator = ":" if ":" in item else "=" if "=" in item else ""
+        if not separator:
+            continue
+        tenant_id, _, key = item.partition(separator)
+        tenant_id = tenant_id.strip()
+        key = key.strip()
+        if tenant_id and key:
+            mapping.setdefault(tenant_id, set()).add(key)
+    return mapping
 
 
 def _key_matches(candidate: str, accepted: set[str]) -> bool:
     # Constant-time comparison against each accepted key to avoid timing leaks.
     return any(hmac.compare_digest(candidate, key) for key in accepted)
+
+
+def tenant_key_matches(tenant_id: str, candidate: str | None) -> bool:
+    if candidate is None:
+        return False
+    accepted = configured_tenant_api_keys().get(tenant_id, set())
+    return _key_matches(candidate, accepted)
 
 
 async def require_api_key(
