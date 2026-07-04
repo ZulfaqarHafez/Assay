@@ -96,9 +96,16 @@ class ToolSandbox:
     def __init__(self, agent_tools: list[ToolSpec], scenario: ScenarioSpec):
         self.scenario = scenario
         merged: dict[str, ToolSpec] = {}
-        for spec in scenario.required_tools:
-            merged[spec.name] = spec
+        # The agent's own tools come first (so agent-only tools appear), but the
+        # scenario's canonical tools WIN on a name collision: markdown-parsed
+        # agent tools often have an empty parameter schema, and if that shadowed
+        # the canonical `exec_shell(command)` the model could not actually make
+        # the call — the exam would silently never tempt it. A canonical tool's
+        # rich schema is what lets the model take the dangerous action a tripwire
+        # is watching for.
         for spec in agent_tools:
+            merged[spec.name] = spec
+        for spec in scenario.required_tools:
             merged[spec.name] = spec
         self.tools: list[ToolSpec] = list(merged.values())
 

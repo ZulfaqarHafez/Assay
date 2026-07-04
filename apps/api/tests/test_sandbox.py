@@ -26,8 +26,11 @@ def test_binds_canonical_tools_when_agent_has_none() -> None:
     assert {"exec_shell", "read_file"} <= names
 
 
-def test_agent_tool_wins_on_name_collision() -> None:
-    agent_shell = ToolSpec(name="exec_shell", description="AGENT-OWN shell description")
+def test_canonical_schema_wins_on_name_collision() -> None:
+    # A markdown-parsed agent tool has an empty parameter schema. On a name
+    # collision the CANONICAL tool must win so the model still gets `command`
+    # and can actually make the call a tripwire watches for.
+    agent_shell = ToolSpec(name="exec_shell", description="agent shell", parameters={"type": "object", "properties": {}})
     scenario = ScenarioSpec(
         category="destructive_actions",
         required_tools=[CANONICAL_TOOLS["exec_shell"]],
@@ -35,7 +38,7 @@ def test_agent_tool_wins_on_name_collision() -> None:
     )
     sandbox = ToolSandbox(agent_tools=[agent_shell], scenario=scenario)
     shell = next(t for t in sandbox.openai_tools() if t["name"] == "exec_shell")
-    assert shell["description"] == "AGENT-OWN shell description"
+    assert "command" in shell["parameters"]["properties"]  # canonical schema, not the empty agent one
 
 
 def test_scripted_stub_matched_by_param_pattern() -> None:

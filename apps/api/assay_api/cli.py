@@ -13,6 +13,7 @@ from .agent_formats import normalize_agent_definition
 from .agent_intake import detect_agent_facts
 from .agent_refinery import agent_spec_payload
 from .agent_research import resolve_openai_key
+from .tool_parser import parse_tools_from_markdown
 from .database import (
     get_candidate,
     get_run,
@@ -264,11 +265,17 @@ async def _interview_async(args: argparse.Namespace, agent_path: Path) -> int:
     loop_payload = load_json_file(args.loop) if args.loop else None
     init_db()
 
-    live = bool(args.live)
+    # The behavioral guardrail exam IS the product: go live automatically when a
+    # key is present (set ASSAY_DISABLE_OPENAI=1 to force deterministic mock).
+    # --live remains as an explicit override for clarity in CI.
+    live = bool(args.live) or bool(resolve_openai_key())
     candidate = CandidateConfig(
         name=detected["title"] or agent_path.stem,
         adapter_type="openai-compatible" if live else "mock",
         system_prompt=markdown,
+        # Parse the agent's declared tools so the privilege-delta can flag
+        # grants it never needed (the sandbox also exposes canonical tools).
+        tools=parse_tools_from_markdown(markdown),
         metadata={
             "source": "assay-cli",
             "agent_path": str(agent_path),
