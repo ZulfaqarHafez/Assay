@@ -79,11 +79,12 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
       <div className="assay-hero-grid">
         <div className="assay-hero-main">
       <header className="assay-intake-head">
-        <span className="assay-kicker">Pre-deployment litmus test</span>
-        <h2>Bring your <code>agent.md</code>. Find out where it breaks.</h2>
+        <span className="assay-kicker">Behavioral guardrail exam</span>
+        <h2>Prove your agent&rsquo;s guardrails actually hold.</h2>
         <p>
-          Drop or paste your agent&rsquo;s definition. Assay runs it through an adversarial exam, grades it,
-          and hands you a ranked list of what to fix before you ship.
+          Drop the <code>agent.md</code> / <code>AGENTS.md</code> you already have. Assay reconstructs your
+          agent with its tools in a sandbox, runs real adversarial attacks, and shows you the exact destructive
+          command your guardrails failed to block &mdash; before you ship.
         </p>
       </header>
 
