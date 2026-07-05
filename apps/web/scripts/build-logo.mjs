@@ -7,9 +7,11 @@
 //
 // Produces, from one vector source (crisp at every size, correct on light + dark):
 //   public/brand/assay-mark.png        bare light mark, transparent (source of truth)
-//   public/brand/assay-icon.png        ivory rounded tile + ink mark   (nav / favicon)
+//   public/brand/assay-icon.png        ivory rounded tile + ink mark   (nav on light)
 //   public/brand/assay-icon-dark.png   navy  rounded tile + gilded mark (dark surfaces)
-//   src/app/icon.png                   ivory tile (Next.js favicon)
+//   src/app/icon.png                   navy tile (Next.js favicon — reads at 16px in a tab;
+//                                       an ivory tile with a thin navy A greyed out to a blob)
+//   src/app/apple-icon.png             navy tile (iOS home-screen / apple-touch-icon)
 //
 // Does NOT touch assay-og.png. Run: node scripts/build-logo.mjs
 import { chromium } from '@playwright/test';
@@ -52,7 +54,10 @@ const targets = [
   { file: join(brand, 'assay-mark.png'),      svg: svg(INK, JEWEL, GOLD, null),          size: 1024 },
   { file: join(brand, 'assay-icon.png'),      svg: svg(INK, JEWEL, GOLD, BONE),          size: 512 },
   { file: join(brand, 'assay-icon-dark.png'), svg: svg(IVORY_A, ORCHID, GOLD_LT, NAVY),  size: 512 },
-  { file: join(appDir, 'icon.png'),           svg: svg(INK, JEWEL, GOLD, BONE),          size: 512 },
+  // The tab favicon and apple-touch icon use the NAVY tile: a light glyph on a
+  // dark ground stays legible at 16px, where the ivory tile washed out.
+  { file: join(appDir, 'icon.png'),           svg: svg(IVORY_A, ORCHID, GOLD_LT, NAVY),  size: 512 },
+  { file: join(appDir, 'apple-icon.png'),     svg: svg(IVORY_A, ORCHID, GOLD_LT, NAVY),  size: 512 },
 ];
 
 const browser = await chromium.launch();

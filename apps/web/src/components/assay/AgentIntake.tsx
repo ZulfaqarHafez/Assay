@@ -80,7 +80,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <div className="assay-hero-main">
       <header className="assay-intake-head">
         <span className="assay-kicker">Behavioral guardrail exam</span>
-        <h2>Prove your agent&rsquo;s guardrails actually hold.</h2>
+        <h1>Prove your agent&rsquo;s guardrails actually hold.</h1>
         <p>
           Drop the <code>agent.md</code> / <code>AGENTS.md</code> you already have. Assay reconstructs your
           agent with its tools in a sandbox, runs real adversarial attacks, and shows you the exact destructive
@@ -169,18 +169,36 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
       )}
 
       <div className="assay-intake-actions">
-        <button
-          type="button"
-          className="assay-run-button"
-          onClick={() => onRun(markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 }, filename)}
-          disabled={!hasContent || submitting}
-        >
-          <FlaskConical size={18} />
-          {submitting
-            ? liveMode ? "Running the litmus test…" : "Running the demo…"
-            : liveMode ? "Run the litmus test" : "Run demo litmus test"}
-        </button>
-        {sampleTemplate && (
+        {hasContent ? (
+          <button
+            type="button"
+            className="assay-run-button"
+            onClick={() => onRun(markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 }, filename)}
+            disabled={submitting}
+          >
+            <FlaskConical size={18} />
+            {submitting
+              ? liveMode ? "Running the guardrail test…" : "Running the demo…"
+              : liveMode ? "Run the guardrail test" : "Run demo guardrail test"}
+          </button>
+        ) : (
+          sampleTemplate && (
+            // Cold load: the ONE bright button is always live — it runs a real
+            // sample end-to-end, so the hero's focal control is never disabled.
+            <button
+              type="button"
+              className="assay-run-button"
+              disabled={submitting}
+              onClick={() =>
+                onRun(sampleTemplate.markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 })
+              }
+            >
+              <Zap size={18} />
+              {submitting ? "Running the sample…" : "See a sample verdict (~20s)"}
+            </button>
+          )
+        )}
+        {hasContent && sampleTemplate && (
           <button
             type="button"
             className="assay-ghost-button"
@@ -189,29 +207,23 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
               onRun(sampleTemplate.markdown, roleScopeText, { name: policyName, competencyThreshold: thresholdPct / 100 })
             }
           >
-            <Zap size={16} /> Run the sample agent
+            <Zap size={16} /> Run the sample instead
           </button>
         )}
         <button
           type="button"
           className="assay-text-button"
           onClick={() =>
-            document.querySelector('[aria-label="How it works"]')?.scrollIntoView({ behavior: "smooth", block: "start" })
+            document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth", block: "start" })
           }
         >
           See how it works
         </button>
-        <span className={`assay-mode ${liveMode ? "live" : "demo"}`}>
-          {liveMode ? (
-            <>
-              <Zap size={13} /> Live &middot; runs against {examPackName}
-            </>
-          ) : (
-            <>
-              <Sparkles size={13} /> Demo mode &middot; add an OpenAI key to test your real agent
-            </>
-          )}
-        </span>
+        {liveMode && (
+          <span className="assay-mode live">
+            <Zap size={13} /> Live &middot; runs against {examPackName}
+          </span>
+        )}
       </div>
 
       <details className="assay-advanced">

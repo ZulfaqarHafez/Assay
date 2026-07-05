@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Assay">
+  <rect width="512" height="512" rx="112" fill="#0a2342"/>
+  <!-- Bold, dot-free "Specimen A": maximum stroke weight so it stays legible
+       downscaled to a 16px browser tab, where the full serif mark muds. -->
+  <path fill="#f0e7d4" fill-rule="evenodd"
+    d="M256 96 L404 416 L334 416 L306 352 L206 352 L178 416 L108 416 Z M232 296 L280 296 L256 206 Z"/>
+</svg>

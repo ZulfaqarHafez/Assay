@@ -379,7 +379,9 @@ describe("Assay page", () => {
     const { container } = renderHome();
     // Brand now lives in the global TopNav (layout); the page leads with the hero.
     await screen.findByRole("heading", { name: /prove your agent/i });
-    expect(screen.getByRole("button", { name: /run.*litmus test/i })).toBeDisabled();
+    // Cold load: the one bright primary is the live sample run, never a disabled button (D3).
+    expect(screen.getByRole("button", { name: /see a sample verdict/i })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /run.*guardrail test/i })).toBeNull();
     expect(screen.getByText(/runs real adversarial attacks/i)).toBeInTheDocument();
     // A starter template is offered as the fallback.
     expect(screen.getByText(/HR screener \(hardened\)/i)).toBeInTheDocument();
@@ -391,9 +393,9 @@ describe("Assay page", () => {
     expect(accept).toContain(".toml");
     // With no OpenAI key the demo framing is honest up front (not a post-run reveal).
     expect(screen.getByText(/runs a/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /run demo litmus test/i })).toBeInTheDocument();
-    // Zero-input path: a one-click sample run is offered on the hero.
-    expect(screen.getByRole("button", { name: /run the sample agent/i })).toBeInTheDocument();
+    expect(screen.getByText(/deterministic demo/i)).toBeInTheDocument();
+    // Zero-input path: a one-click sample verdict + a "see how it works" jump are offered.
+    expect(screen.getByRole("button", { name: /see how it works/i })).toBeInTheDocument();
     expect(workspaceBootFetches).toBe(0);
     // The intake path should not fetch historical runs until a workspace route needs them.
     expect(runListFetches).toBe(0);
@@ -409,7 +411,7 @@ describe("Assay page", () => {
     renderHome();
     const template = await screen.findByText(/HR screener \(hardened\)/i);
     await user.click(template);
-    const runButton = screen.getByRole("button", { name: /run.*litmus test/i });
+    const runButton = screen.getByRole("button", { name: /run.*guardrail test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
     await user.click(runButton);
     // Lands on the verdict hero with the ranked "what to fix" list.
@@ -443,7 +445,7 @@ describe("Assay page", () => {
     renderHome();
     const template = await screen.findByText(/HR screener \(hardened\)/i);
     await user.click(template);
-    const runButton = screen.getByRole("button", { name: /run.*litmus test/i });
+    const runButton = screen.getByRole("button", { name: /run.*guardrail test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
     await user.click(runButton);
     await screen.findByText("What to fix", undefined, { timeout: 10000 });
