@@ -1,7 +1,7 @@
 // Renders the Assay Open Graph / social card (1200x630) to public/brand/assay-og.png
 // and a copy to docs/images/hero-banner.png (the README hero). Identity matches
 // the live site: the Specimen A monogram + a Fraunces wordmark, deep navy and
-// antique gold, and the one story the product tells — the exact destructive tool
+// antique gold, and the one story the product tells: the exact destructive tool
 // call the guardrails let through.
 // Run: node scripts/build-og.mjs   (from apps/web)
 import { chromium } from '@playwright/test';

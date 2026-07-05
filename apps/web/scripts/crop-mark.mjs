@@ -21,7 +21,7 @@ for (let y = 0; y < QY; y++) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
     const sat = max - min;
-    // saturated colour OR dark ink (the flask outline) — but skip bone
+    // saturated colour OR dark ink (the flask outline), but skip bone
     const isInk = max < 70;
     const isVivid = sat > 70 && max > 120;
     if (isInk || isVivid) {

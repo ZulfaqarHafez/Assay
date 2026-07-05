@@ -1,15 +1,15 @@
-// Canonical generator for the Assay mark — the "Specimen A":
-//   a bespoke high-contrast serif A (drawn, not typed — a hairline left stroke
+// Canonical generator for the Assay mark: the "Specimen A":
+//   a bespoke high-contrast serif A (drawn, not typed, with a hairline left stroke
 //   against a weighted right, fine bracketed serifs, a sharp apex), with the
 //   specimen worn beside it as a discreet maker's mark: a jewel (the sample) and
-//   a smaller gold point (its reading). Deep navy and antique gold — the register
+//   a smaller gold point (its reading). Deep navy and antique gold: the register
 //   of a private-equity house crossed with a hallmark of certified purity.
 //
 // Produces, from one vector source (crisp at every size, correct on light + dark):
 //   public/brand/assay-mark.png        bare light mark, transparent (source of truth)
 //   public/brand/assay-icon.png        ivory rounded tile + ink mark   (nav on light)
 //   public/brand/assay-icon-dark.png   navy  rounded tile + gilded mark (dark surfaces)
-//   src/app/icon.png                   navy tile (Next.js favicon — reads at 16px in a tab;
+//   src/app/icon.png                   navy tile (Next.js favicon, reads at 16px in a tab;
 //                                       an ivory tile with a thin navy A greyed out to a blob)
 //   src/app/apple-icon.png             navy tile (iOS home-screen / apple-touch-icon)
 //
@@ -25,7 +25,7 @@ const appDir = join(here, '..', 'src', 'app');
 
 // palette
 const BONE = '#f4ead6';       // ivory tile
-const INK = '#0a2342';        // deep navy — the A on ivory
+const INK = '#0a2342';        // deep navy, the A on ivory
 const JEWEL = '#5a1a4f';      // aubergine specimen
 const GOLD = '#9c7a35';       // antique gold reading
 const NAVY = '#0a2342';       // dark tile ground
