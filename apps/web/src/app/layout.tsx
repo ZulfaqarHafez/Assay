@@ -5,7 +5,7 @@ import { Providers } from "./providers";
 import { AnnouncerProvider } from "@/components/announcer";
 import { TopNav } from "@/components/workspace/TopNav";
 
-// Self-hosted type system (no runtime remote fetch — woff2 bundled in ./fonts).
+// Self-hosted type system (no runtime remote fetch - woff2 bundled in ./fonts).
 // Display: Fraunces, a high-contrast old-style serif that echoes the serif
 // "Specimen A" wordmark. Body/UI: Hanken Grotesk, a warm grotesque (deliberately
 // NOT stock Inter). Mono: IBM Plex Mono, for the tool-call evidence lines.
@@ -38,23 +38,23 @@ const monoFont = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://assay.dev"),
-  title: "Assay — prove your AI agent's guardrails hold",
-  description: "Point Assay at the agent.md you already ship. It runs real adversarial attacks in a sandbox and shows the exact destructive command your guardrails failed to block — before you deploy.",
+  title: "Assay - prove your AI agent's guardrails hold",
+  description: "Point Assay at the agent.md you already ship. It runs real adversarial attacks in a sandbox and shows the exact destructive command your guardrails failed to block - before you deploy.",
   // Favicon + apple-touch-icon are provided by the App Router file convention
   // (src/app/icon.png, src/app/apple-icon.png). Next auto-injects correctly
   // hashed <link> tags; a manual `icons` entry pointing at /icon.png 404s
-  // because no such file is served from /public — which is why the tab icon
+  // because no such file is served from /public - which is why the tab icon
   // never updated. Do not re-add it.
   openGraph: {
-    title: "Assay — prove your AI agent's guardrails hold",
-    description: "Point Assay at the agent.md you already ship. It runs real adversarial attacks in a sandbox and shows the exact destructive command your guardrails failed to block — before you deploy.",
+    title: "Assay - prove your AI agent's guardrails hold",
+    description: "Point Assay at the agent.md you already ship. It runs real adversarial attacks in a sandbox and shows the exact destructive command your guardrails failed to block - before you deploy.",
     type: "website",
-    images: [{ url: "/brand/assay-og.png", width: 1200, height: 630, alt: "Assay — prove your AI agent's guardrails hold" }]
+    images: [{ url: "/brand/assay-og.png", width: 1200, height: 630, alt: "Assay - prove your AI agent's guardrails hold" }]
   },
   twitter: {
     card: "summary_large_image",
-    title: "Assay — prove your AI agent's guardrails hold",
-    description: "Point Assay at the agent.md you already ship. It runs real adversarial attacks in a sandbox and shows the exact destructive command your guardrails failed to block — before you deploy.",
+    title: "Assay - prove your AI agent's guardrails hold",
+    description: "Point Assay at the agent.md you already ship. It runs real adversarial attacks in a sandbox and shows the exact destructive command your guardrails failed to block - before you deploy.",
     images: ["/brand/assay-og.png"]
   }
 };

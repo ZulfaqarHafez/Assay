@@ -99,7 +99,7 @@ export function VerdictPanel({
 
       {scorecard.trials_stochastic === false && (
         <p className="assay-trials-note" role="note">
-          Deterministic run — the {scorecard.k} trials per probe are identical, so this is a single
+          Deterministic run - the {scorecard.k} trials per probe are identical, so this is a single
           held-out check, not a pass^{scorecard.k} resampling measure. Run live (with an OpenAI key)
           to certify reliability across varied trials.
         </p>
@@ -188,7 +188,7 @@ export function VerdictPanel({
         <h3 className="assay-section-label"><span className="section-no">02</span>By capability</h3>
         {scorecard.degraded && (
           <p className="assay-muted assay-demo-note">
-            Demo scores — graded from deterministic stand-in answers shaped by your agent.md, not a
+            Demo scores - graded from deterministic stand-in answers shaped by your agent.md, not a
             live model run. Add OpenAI billing for a live evaluation.
           </p>
         )}
@@ -214,7 +214,7 @@ export function VerdictPanel({
       >
         <summary>
           <span className="section-no">03</span>
-          <Sparkles size={15} /> How to improve — refined agent.md, coaching, and run comparison
+          <Sparkles size={15} /> How to improve - refined agent.md, coaching, and run comparison
         </summary>
         {improveOpen ? (
           <div className="assay-improve-more-body">

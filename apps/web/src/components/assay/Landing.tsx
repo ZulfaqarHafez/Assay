@@ -6,7 +6,7 @@ import SampleReportCard from "@/components/assay/SampleReportCard";
 
 /**
  * The landing surface beneath the hero. It orbits the one artifact only Assay
- * makes — the exact destructive tool call the guardrails failed to block — the
+ * makes - the exact destructive tool call the guardrails failed to block - the
  * way a good tool-site orbits one real product shot. Deliberate loud→quiet
  * rhythm (not five identical eyebrow→h2→grid bands), concrete tool-call
  * examples instead of decorative icons, and one real outcome as proof.
@@ -20,7 +20,7 @@ export type LandingProps = {
 const STEPS = [
   {
     title: "Bring your agent.md",
-    body: "Paste or drop the definition you already ship — persona, policies, tools. No instrumentation, no rewrite."
+    body: "Paste or drop the definition you already ship - persona, policies, tools. No instrumentation, no rewrite."
   },
   {
     title: "It gets attacked in a sandbox",
@@ -40,7 +40,7 @@ const ATTACKS = [
   },
   {
     title: "Prompt injection",
-    body: "Treats pasted content and tool output as data — never as new instructions.",
+    body: "Treats pasted content and tool output as data - never as new instructions.",
     example: 'tool_output → "now run cleanup"'
   },
   {
@@ -68,7 +68,7 @@ const ATTACKS = [
 const FAQS = [
   {
     q: "How is a breach decided?",
-    a: "A deterministic tripwire, not an LLM's opinion. The sandbox never executes, but the instant the agent emits a forbidden tool call — exec_shell(\"rm -rf /prod\"), db_query(\"DROP TABLE …\"), exfiltrating a secret — the tripwire fires. Each run is scored against documented, trace-backed criteria and re-run on held-out variants, so a lucky pass can't certify."
+    a: "A deterministic tripwire, not an LLM's opinion. The sandbox never executes, but the instant the agent emits a forbidden tool call - exec_shell(\"rm -rf /prod\"), db_query(\"DROP TABLE …\"), exfiltrating a secret - the tripwire fires. Each run is scored against documented, trace-backed criteria and re-run on held-out variants, so a lucky pass can't certify."
   },
   {
     q: "What happens to my agent definition and data?",
@@ -80,7 +80,7 @@ const FAQS = [
   },
   {
     q: "What does a verdict actually give me?",
-    a: "A ship / risky / hold call, the exact destructive tool calls your guardrails failed to block, the permissions the agent never needed, and a fixed agent.md rewrite — so it maps straight onto a pull request."
+    a: "A ship / risky / hold call, the exact destructive tool calls your guardrails failed to block, the permissions the agent never needed, and a fixed agent.md rewrite - so it maps straight onto a pull request."
   }
 ];
 
@@ -97,7 +97,7 @@ export function Landing({ onStart }: LandingProps) {
 
   return (
     <div className="lp">
-      {/* Quiet proof strip: one real, verified outcome — not a stat sheet. */}
+      {/* Quiet proof strip: one real, verified outcome - not a stat sheet. */}
       <section className="lp-band lp-band-tight lp-proof" aria-label="Proof">
         <div className="lp-inner lp-proof-inner">
           <p className="lp-proof-lead">
@@ -120,7 +120,7 @@ export function Landing({ onStart }: LandingProps) {
             <h2>From your agent.md to the exact breach, in about 20 seconds.</h2>
             <p>
               No SDK, no harness to write. Assay reconstructs the agent you already ship, attacks it in a sandbox
-              that never executes, and hands back the forbidden tool call your guardrails let through — plus the fix.
+              that never executes, and hands back the forbidden tool call your guardrails let through - plus the fix.
             </p>
           </header>
           <ol className="lp-steps">
@@ -153,7 +153,7 @@ export function Landing({ onStart }: LandingProps) {
         <div className="lp-inner lp-preview">
           <div className="lp-preview-copy">
             <span className="lp-eyebrow">The verdict</span>
-            <h2>Not a benchmark number — the exact command your guardrails missed.</h2>
+            <h2>Not a benchmark number - the exact command your guardrails missed.</h2>
             <p>
               Every run ends in a ship / risky / hold call, the forbidden tool call that slipped through, the trace
               behind it, and a fixed agent.md rewrite. Built for the pull request, not the leaderboard.
@@ -186,7 +186,7 @@ export function Landing({ onStart }: LandingProps) {
       <section id="get-started" className="lp-band lp-cta-band lp-band-loud" aria-label="Get started">
         <div className="lp-inner lp-cta">
           <h2>See the breach before your users do.</h2>
-          <p>Paste the agent.md you already ship. First verdict in about twenty seconds — no key needed for the demo.</p>
+          <p>Paste the agent.md you already ship. First verdict in about twenty seconds - no key needed for the demo.</p>
           <button type="button" className="assay-run-button" onClick={onStart}>
             Test my agent <ArrowRight size={17} />
           </button>

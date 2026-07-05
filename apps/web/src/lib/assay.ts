@@ -66,7 +66,7 @@ export function deriveVerdict(
   const passedChecks = passValues.filter(Boolean).length;
   const totalChecks = passValues.length;
 
-  // Prefer the backend policy decision — it is the same gate the CLI and the
+  // Prefer the backend policy decision - it is the same gate the CLI and the
   // proof bundle report, so the hero verdict never disagrees with them.
   if (decision) {
     const verdict = bandFromDecision(decision.verdict);
@@ -265,7 +265,7 @@ export function deriveCategoryScores(scorecard: Scorecard): CategoryScore[] {
 }
 
 /**
- * Human microcopy for a live run event — the words that make the wait feel
+ * Human microcopy for a live run event - the words that make the wait feel
  * informative ("Probing for bias…") rather than a dead spinner.
  */
 export type LiveStep = {

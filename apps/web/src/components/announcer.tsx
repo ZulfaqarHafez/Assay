@@ -55,7 +55,7 @@ export function AnnouncerProvider({ children }: { children: React.ReactNode }) {
 
 /**
  * Returns the `announce(message, { assertive? })` function. Safe to call when no
- * provider is mounted (e.g. in unit tests) — it becomes a no-op.
+ * provider is mounted (e.g. in unit tests) - it becomes a no-op.
  */
 export function useAnnouncer(): AnnouncerContextValue {
   const ctx = useContext(AnnouncerContext);

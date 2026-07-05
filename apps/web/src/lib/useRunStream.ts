@@ -73,7 +73,7 @@ function pathSegment(value: string) {
 
 /**
  * Start a run with an abortable request. Mirrors `assayApi.startRun` but
- * threads an `AbortSignal` so `cancel()` aborts the in-flight POST — the shared
+ * threads an `AbortSignal` so `cancel()` aborts the in-flight POST - the shared
  * client intentionally stays signal-free.
  */
 async function startRunWithSignal(runId: string, signal: AbortSignal): Promise<Scorecard> {
@@ -98,7 +98,7 @@ async function startRunWithSignal(runId: string, signal: AbortSignal): Promise<S
  */
 // A live run fires k × items × 2 OpenAI calls inside one /start request; on a
 // free-tier ~3 RPM key a 10-item pack is ~20 min. The old 3-min cap declared
-// such runs "failed" while the orchestrator was still completing them — so the
+// such runs "failed" while the orchestrator was still completing them - so the
 // recovery poller now waits up to 20 min for the run to actually settle.
 const RECOVERY_MAX_MS = 20 * 60_000;
 
@@ -280,7 +280,7 @@ export function useRunStream(source?: RunEventSource): UseRunStream {
             // Aborts are surfaced through cancel(), not here.
             return;
           }
-          // The /start connection dropped — but the run may still be completing
+          // The /start connection dropped - but the run may still be completing
           // server-side. Try to recover its result before declaring failure.
           const recovered = await recoverRunResult(runId, controller.signal);
           if (!mountedRef.current || controller.signal.aborted) return;

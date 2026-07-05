@@ -13,7 +13,7 @@ import { ACTOR_META } from "./spanMeta";
  *
  * The headline feature: when the event is `response_graded` we render the
  * grader's reasoning as a readable "judge verdict" card (score / passed /
- * matched / missed / forbidden / feedback) — the Braintrust pattern where the
+ * matched / missed / forbidden / feedback) - the Braintrust pattern where the
  * scoring span surfaces *why* a judgment was made, not a raw JSON dump. Every
  * other span gets a clean key/value summary plus a collapsible payload.
  */

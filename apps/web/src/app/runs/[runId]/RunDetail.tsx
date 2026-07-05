@@ -403,7 +403,7 @@ function DeployabilityMeter({
       {traceFixCount > 0 && (
         <p className="rd-meter-tracefixes">
           <Activity size={13} /> {traceFixCount} TraceRazor fix{traceFixCount === 1 ? "" : "es"} available
-          {typeof tokensSaved === "number" && tokensSaved > 0 ? ` (~${tokensSaved.toLocaleString()} tokens/run)` : ""} — see &ldquo;How to improve&rdquo;.
+          {typeof tokensSaved === "number" && tokensSaved > 0 ? ` (~${tokensSaved.toLocaleString()} tokens/run)` : ""} - see &ldquo;How to improve&rdquo;.
         </p>
       )}
     </section>

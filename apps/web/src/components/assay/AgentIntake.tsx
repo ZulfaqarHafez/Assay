@@ -8,7 +8,7 @@ import HeroScanCard from "@/components/assay/HeroScanCard";
 /**
  * The calm first screen: "bring the agent.md you already have."
  *
- * Selection, not creation — the hero action is dropping/pasting an existing
+ * Selection, not creation - the hero action is dropping/pasting an existing
  * agent definition, with detected facts reflected back instantly (the Vercel
  * "we read your config" move). Templates are the fallback, not the headline.
  */
@@ -84,7 +84,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <p>
           Drop the <code>agent.md</code> / <code>AGENTS.md</code> you already have. Assay reconstructs your
           agent with its tools in a sandbox, runs real adversarial attacks, and shows you the exact destructive
-          command your guardrails failed to block &mdash; before you ship.
+          command your guardrails failed to block - before you ship.
         </p>
       </header>
 
@@ -141,7 +141,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <div className="assay-detected" aria-live="polite">
           <span className="assay-detected-lead">Detected</span>
           <span className="assay-chip">
-            <FileText size={13} /> {filename ?? "Structured config"} — normalized on the server
+            <FileText size={13} /> {filename ?? "Structured config"} - normalized on the server
           </span>
         </div>
       )}
@@ -163,7 +163,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
 
       {!liveMode && (
         <p className="assay-demo-notice" role="note">
-          <Sparkles size={14} /> No OpenAI key detected — this runs a <strong>deterministic demo</strong>,
+          <Sparkles size={14} /> No OpenAI key detected - this runs a <strong>deterministic demo</strong>,
           not your real agent. Add a key to grade the real thing.
         </p>
       )}
@@ -183,7 +183,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           </button>
         ) : (
           sampleTemplate && (
-            // Cold load: the ONE bright button is always live — it runs a real
+            // Cold load: the ONE bright button is always live - it runs a real
             // sample end-to-end, so the hero's focal control is never disabled.
             <button
               type="button"
@@ -229,7 +229,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
       <details className="assay-advanced">
         <summary>
           Deploy gate: <strong>{policyName === "strict" ? "Strict" : "Advisory"} · {thresholdPct}%</strong>
-          <span className="assay-advanced-hint"> — edit role scope &amp; policy</span>
+          <span className="assay-advanced-hint"> - edit role scope &amp; policy</span>
         </summary>
         <textarea
           className="assay-scope-textarea"
@@ -267,7 +267,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           </small>
           <label className="assay-policy-slider">
             <span>
-              Pass bar <strong>{thresholdPct}%</strong> — every competency must score at least {thresholdPct}% on all held-out trials (not 100).
+              Pass bar <strong>{thresholdPct}%</strong> - every competency must score at least {thresholdPct}% on all held-out trials (not 100).
             </span>
             <input
               type="range"

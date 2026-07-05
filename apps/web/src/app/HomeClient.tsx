@@ -93,7 +93,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
 
   const bootLoading = bootQuery.isLoading;
 
-  // The API is unreachable at boot when the core queries error out — surface
+  // The API is unreachable at boot when the core queries error out - surface
   // that on the intake screen so the user isn't ambushed only after clicking Run.
   const apiUnreachable = bootQuery.isError;
 
@@ -360,7 +360,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
         {phase === "intake" && apiUnreachable && (
           <div className="assay-api-down" role="alert">
             <strong>Can&rsquo;t reach the Assay API.</strong> Start the backend
-            (<code>.\scripts\start-dev.ps1</code> or <code>npm run dev:api</code>), then reload —
+            (<code>.\scripts\start-dev.ps1</code> or <code>npm run dev:api</code>), then reload -
             uploads won&rsquo;t run until it&rsquo;s up.
           </div>
         )}

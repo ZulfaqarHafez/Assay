@@ -1,7 +1,7 @@
 /**
  * The single source of truth for Assay's three-band verdict lexicon.
  *
- * The one opinionated call Assay makes — ship / don't-ship — used to be spelled
+ * The one opinionated call Assay makes - ship / don't-ship - used to be spelled
  * six different ways across the README, landing, runs table, run detail, the
  * deployability meter, and the sample card. Every user-facing surface now
  * renders the verdict through these constants so the words can never drift

@@ -23,7 +23,7 @@ const baseProps = (size: number, className?: string) => ({
   "aria-hidden": true as const
 });
 
-/** A dial gauge with the needle at rest — "no measurements yet". Echoes the
+/** A dial gauge with the needle at rest - "no measurements yet". Echoes the
  * hero verdict meter, so the empty Experiments table reads as an instrument
  * waiting for its first reading. */
 export function GaugeArt({ size = 96, className }: ArtProps) {
@@ -52,7 +52,7 @@ export function GaugeArt({ size = 96, className }: ArtProps) {
   );
 }
 
-/** Empty assay vial with a single plum droplet — "no experiments yet". */
+/** Empty assay vial with a single plum droplet - "no experiments yet". */
 export function VialArt({ size = 96, className }: ArtProps) {
   return (
     <svg {...baseProps(size, className)}>
@@ -75,7 +75,7 @@ export function VialArt({ size = 96, className }: ArtProps) {
   );
 }
 
-/** A plate of probe wells, two active — "no suites yet". */
+/** A plate of probe wells, two active - "no suites yet". */
 export function ProbeArrayArt({ size = 96, className }: ArtProps) {
   const cols = [33, 53, 73, 93];
   const rows = [46, 66, 86];
@@ -105,7 +105,7 @@ export function ProbeArrayArt({ size = 96, className }: ArtProps) {
   );
 }
 
-/** A minimal agent specimen on a baseline — "no agents yet". */
+/** A minimal agent specimen on a baseline - "no agents yet". */
 export function AgentArt({ size = 96, className }: ArtProps) {
   return (
     <svg {...baseProps(size, className)}>

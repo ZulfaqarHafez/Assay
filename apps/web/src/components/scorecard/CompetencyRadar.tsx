@@ -33,7 +33,7 @@ function pct(value: number) {
 /**
  * Competency radar/spider chart as the scorecard hero, with a per-competency
  * breakdown list below. Drop-in replacement for the zero-filled bar list in
- * page.tsx — shows a real empty state when there are no scores instead of
+ * page.tsx - shows a real empty state when there are no scores instead of
  * rendering a flat zero ring.
  */
 export function CompetencyRadar({ scorecard, competencyScores, threshold, className }: CompetencyRadarProps) {

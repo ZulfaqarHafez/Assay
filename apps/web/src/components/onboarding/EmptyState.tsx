@@ -15,7 +15,7 @@ import type { RunRecord, Scorecard } from "@/types/assay";
  * First-run experience shown when there are no runs yet.
  *
  * - "Load demo exam + run demo candidate": creates a mock candidate (if none
- *   exist), creates a run on `hr-v1`, and starts it — the one-click demo path.
+ *   exist), creates a run on `hr-v1`, and starts it - the one-click demo path.
  * - "Quick run": the same fast happy path, framed as a minimal pass (k=1).
  * - A copy-paste HTTP-candidate snippet documents the adapter contract so a real
  *   agent can be wired up: POST {context, question} -> {answer, reasoning,

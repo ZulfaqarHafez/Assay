@@ -7,8 +7,8 @@ import { useAgentSpecDiff } from "@/lib/queries";
 import type { AgentSpec, TraceAuditSummary, TraceRazorFix } from "@/types/assay";
 
 /**
- * The "act on the verdict" panel. Surfaces the Agent Refinery's coaching output —
- * what to improve, what already works, recommended helpers — and the full refined
+ * The "act on the verdict" panel. Surfaces the Agent Refinery's coaching output -
+ * what to improve, what already works, recommended helpers - and the full refined
  * agent.md the user can copy/download and re-test via "Test improved version".
  */
 
@@ -72,7 +72,7 @@ export function ImprovePanel({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      /* clipboard blocked — Download remains available */
+      /* clipboard blocked - Download remains available */
     }
   }
 
@@ -92,12 +92,12 @@ export function ImprovePanel({
         <span className="assay-improve-badges">
           {validation?.state === "validated" && (
             <a className="assay-improve-validation pass" href={`/runs/${validation.runId}`}>
-              <BadgeCheck size={13} /> Validated — tested as run {validation.runId}
+              <BadgeCheck size={13} /> Validated - tested as run {validation.runId}
             </a>
           )}
           {validation?.state === "pending" && (
             <span className="assay-improve-validation warn">
-              <FlaskConical size={13} /> Not yet validated — run &ldquo;Test improved version&rdquo; to prove the delta
+              <FlaskConical size={13} /> Not yet validated - run &ldquo;Test improved version&rdquo; to prove the delta
             </span>
           )}
           <span className={`assay-improve-readiness ${readiness.tone}`}>{readiness.label}</span>
@@ -196,7 +196,7 @@ export function ImprovePanel({
           ) : null}
           {serverDiff && !serverDiff.original_available && (
             <p className="assay-muted">
-              No original agent.md is on file for this candidate — showing the full refined document as additions.
+              No original agent.md is on file for this candidate - showing the full refined document as additions.
             </p>
           )}
           {serverDiff ? (

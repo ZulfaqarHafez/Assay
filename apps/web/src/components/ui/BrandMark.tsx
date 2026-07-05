@@ -3,9 +3,9 @@
 import * as React from "react";
 
 /**
- * The Assay mark — the "Specimen A": a bespoke high-contrast serif A (hairline
+ * The Assay mark - the "Specimen A": a bespoke high-contrast serif A (hairline
  * left stroke, weighted right, fine bracketed serifs, sharp apex) with the
- * specimen worn beside it as a discreet maker's mark — a jewel sample and a
+ * specimen worn beside it as a discreet maker's mark - a jewel sample and a
  * smaller gold reading. Generated as a rounded tile (ivory or navy) by
  * scripts/build-logo.mjs and rendered as an <img> so the real brand asset is
  * used verbatim rather than re-drawn. The tile is self-contained, so it reads

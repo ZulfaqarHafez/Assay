@@ -11,7 +11,7 @@ import type { RunStreamStatus } from "@/lib/useRunStream";
  * The "show the work" surface: an adversarial exam, animated as a live
  * chain-of-thought waterfall. Each probe enters with a slide+fade, the active
  * probe pulses, and it resolves to a held-up / broke verdict. The wait is the
- * product demo — Perplexity found users tolerate longer waits when the steps
+ * product demo - Perplexity found users tolerate longer waits when the steps
  * are visible and labeled. Honors prefers-reduced-motion via CSS.
  */
 
@@ -78,7 +78,7 @@ export function JudgingWaterfall({
         </span>
         <div className="assay-judging-meta">
           {demoMode && (
-            <span className="assay-judging-demo" title="No OpenAI key — grading with deterministic stand-ins">
+            <span className="assay-judging-demo" title="No OpenAI key - grading with deterministic stand-ins">
               Demo mode
             </span>
           )}
