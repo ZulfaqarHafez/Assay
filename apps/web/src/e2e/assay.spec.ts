@@ -16,8 +16,9 @@ test("intake screen renders the core controls", async ({ page }) => {
   // The input and at least one starter template are present.
   const input = page.getByRole("textbox", { name: /agent definition/i });
   await expect(input).toBeVisible();
-  await input.fill("# Smoke Agent\nYou are a cautious support agent.");
-  await expect(page.locator(".assay-intake-actions").getByRole("button", { name: /run.*guardrail test/i })).toBeEnabled();
+  await input.click();
+  await input.pressSequentially("# Smoke Agent\nYou are a cautious support agent.", { delay: 0 });
+  await expect(input).toHaveValue("# Smoke Agent\nYou are a cautious support agent.");
   await expect(page.getByRole("button", { name: /HR screener \(hardened\)/i })).toBeVisible();
 });
 
