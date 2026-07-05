@@ -9,12 +9,15 @@ test("intake screen renders the core controls", async ({ page }) => {
   // Brand lives in the persistent top nav; value prop leads the page.
   await expect(page.getByRole("link", { name: /Assay home/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /prove your agent/i })).toBeVisible();
-  // The primary action exists and is disabled until there's an agent definition.
-  const run = page.locator(".assay-intake-actions").getByRole("button", { name: /litmus test/i });
-  await expect(run).toBeVisible();
-  await expect(run).toBeDisabled();
+  // Cold load keeps the primary action useful: run a sample until the user
+  // provides their own agent definition.
+  await expect(page.locator(".assay-intake-actions").getByRole("button", { name: /sample verdict/i })).toBeVisible();
+  await expect(page.locator(".assay-intake-actions").getByRole("button", { name: /run.*guardrail test/i })).toHaveCount(0);
   // The input and at least one starter template are present.
-  await expect(page.getByRole("textbox", { name: /agent definition/i })).toBeVisible();
+  const input = page.getByRole("textbox", { name: /agent definition/i });
+  await expect(input).toBeVisible();
+  await input.fill("# Smoke Agent\nYou are a cautious support agent.");
+  await expect(page.locator(".assay-intake-actions").getByRole("button", { name: /run.*guardrail test/i })).toBeEnabled();
   await expect(page.getByRole("button", { name: /HR screener \(hardened\)/i })).toBeVisible();
 });
 
@@ -73,7 +76,7 @@ test("runs an agent.md through to a verdict", async ({ page }, testInfo) => {
     { delay: 0 }
   );
 
-  const run = page.locator(".assay-intake-actions").getByRole("button", { name: /litmus test/i });
+  const run = page.locator(".assay-intake-actions").getByRole("button", { name: /run.*guardrail test/i });
   await expect(run).toBeEnabled({ timeout: 10_000 });
   await run.click();
 
