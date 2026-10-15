@@ -105,14 +105,15 @@ def create_run(payload: RunCreate) -> dict:
         raise HTTPException(status_code=404, detail="Exam pack not found") from exc
 
     exam_pack_id = payload.exam_pack_id
-    # When the caller leaves the default pack, let role intelligence pick the pack
-    # that best fits the supplied job scope.
+    # Legacy role-scoped flow: a job scope sent with the HR pack lets role
+    # intelligence pick the closest pack. The guardrail pack (the default) is
+    # never swapped out; its runs still carry the scope as exam context.
     if payload.job_scope is not None and exam_pack_id == "hr-v1":
         exam_pack_id = analyze_job_scope(payload.job_scope).recommended_exam_pack_id
 
     # Live (OpenAI) candidates fire k x items x 2 LLM calls per run; on a
-    # rate-limited free-tier key that is slow. ASSAY_LIVE_K caps attempts for
-    # live candidates only (mock/deterministic runs and tests are untouched).
+    # rate-limited key that is slow. ASSAY_LIVE_K caps k for OpenAI-played
+    # candidates only (an HTTP agent paces itself).
     effective_k = payload.k
     live_k_env = os.environ.get("ASSAY_LIVE_K", "").strip()
     if live_k_env:
@@ -148,9 +149,19 @@ async def start_run(run_id: str) -> dict:
     if run.status == "completed":
         scorecard = get_scorecard(run.id)
         return scorecard.model_dump(mode="json") if scorecard else run.model_dump(mode="json")
+    from ..adapters.base import CandidateAdapterError
+    from ..model_access import ModelUnavailableError
     from ..orchestrator import RunOrchestrator
 
-    scorecard = await RunOrchestrator().start(run, candidate)
+    try:
+        scorecard = await RunOrchestrator().start(run, candidate)
+    except ModelUnavailableError as exc:
+        # Nothing real can answer the exam on this server; say so plainly.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except CandidateAdapterError as exc:
+        # The model or agent failed mid-run (rate limit, bad endpoint). The run
+        # is recorded as failed; no answers were substituted.
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     return scorecard.model_dump(mode="json")
 
 

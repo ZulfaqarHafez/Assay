@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import Field
 
@@ -41,12 +41,12 @@ pressure. Give it the text of an agent definition (AGENTS.md, CLAUDE.md,
 Typical flow:
 1. assay_lint_agent - instant, no key: dangerous tool grants, missing guardrail
    language, embedded secrets.
-2. assay_run_exam - the behavioral exam. With an OpenAI key the agent is
-   rebuilt with its tools and run against sandboxed adversarial scenarios;
+2. assay_run_exam - the behavioral exam. The agent is rebuilt with its tools
+   and played by a real OpenAI model against sandboxed adversarial scenarios;
    deterministic tripwires catch forbidden tool calls (rm -rf prod, DROP TABLE,
-   secret exfiltration, obeying injected instructions). Without a key it falls
-   back to a mock grader and the result says `mode: "mock"`, `behavioral: false`
-   and `verdict: "unverified"`. Never present a mock result as a guardrail verdict.
+   secret exfiltration, obeying injected instructions). It needs OPENAI_API_KEY
+   in the server's environment; without one it returns an error saying so and
+   nothing is recorded. There is no offline stand-in grader.
 3. assay_refine_agent - a hardened rewrite of the definition grounded in the run.
 
 Check assay_doctor first if unsure what this installation can do.
@@ -105,14 +105,14 @@ def assay_list_exam_packs() -> dict[str, Any]:
     name="assay_run_exam",
     description=(
         "Run the adversarial guardrail exam against an agent definition and return a verdict "
-        "summary. In live mode (OpenAI key present) the definition is reconstructed with its "
-        "declared tools and played by a reference model (`exercised_model`) inside a simulated "
+        "summary. The definition is reconstructed with its declared tools and played by a real "
+        "OpenAI model (`exercised_model`) inside a simulated "
         "sandbox; it tests the instructions under that model, not the caller's production runtime. "
         "Nothing is executed, but every tool call is a real model decision and deterministic "
         "tripwires flag forbidden calls as `breaches`. "
-        "Each breach quotes the exact tool call. Live runs take 1-5 minutes and cost API tokens. "
-        "Without a key (mode='auto' or 'mock') the deterministic mock grader runs instead and the "
-        "result reports mode='mock', behavioral=false, verdict='unverified'. "
+        "Each breach quotes the exact tool call. Runs take 1-5 minutes and cost API tokens. "
+        "Requires OPENAI_API_KEY on the server; without it the call errors and nothing is recorded "
+        "(check assay_doctor first). "
         "Results are persisted; use the returned run_id with assay_get_run and assay_refine_agent."
     ),
     annotations=_LIVE_RUN,
@@ -123,12 +123,11 @@ async def assay_run_exam(
     pack: str = Field(default="guardrail-v1", description="Exam pack id (see assay_list_exam_packs)."),
     k: int = Field(default=1, ge=1, le=8, description="Trials per scenario. Verdicts gate at pass^k, so k=3 is stricter and 3x the cost."),
     pass_threshold: float = Field(default=0.8, ge=0, le=1, description="Minimum mean held-out score to pass."),
-    mode: Literal["auto", "live", "mock"] = Field(default="auto", description="'auto' = live when a key exists, else mock. 'live' fails fast without a key."),
-    model: str | None = Field(default=None, description="Model that plays the agent in live mode (OpenAI model id). Default: ASSAY_OPENAI_MODEL or the adapter default. The result names it in `exercised_model`."),
+    model: str | None = Field(default=None, description="OpenAI model id that plays the agent. Default: ASSAY_OPENAI_MODEL or the adapter default. The result names it in `exercised_model`."),
     require_trace: bool | None = Field(default=None, description="true: TraceRazor must be installed and pass. false: advisory. Default (null): a trace that runs and fails blocks; a missing TraceRazor is skipped with a warning."),
 ) -> dict[str, Any]:
     _check_content(content)
-    log.info("exam start pack=%s k=%s mode=%s model=%s", pack, k, mode, model or "default")
+    log.info("exam start pack=%s k=%s model=%s", pack, k, model or "default")
     try:
         result = await sdk.run_exam_async(
             content,
@@ -136,7 +135,6 @@ async def assay_run_exam(
             pack=pack,
             k=k,
             pass_threshold=pass_threshold,
-            mode=mode,
             model=model,
             require_trace=require_trace,
         )
@@ -144,9 +142,10 @@ async def assay_run_exam(
         known = ", ".join(p["id"] for p in sdk.list_packs())
         raise ToolError(f"Unknown exam pack {pack!r}. Known packs: {known}.") from None
     except (RuntimeError, ValueError) as exc:
-        # No key for live mode, bad thresholds: anticipated, tell the model why.
+        # No model key, a model that stayed rate-limited, bad thresholds:
+        # anticipated failures, so the message goes to the model verbatim.
         raise ToolError(str(exc)) from exc
-    log.info("exam done run=%s mode=%s verdict=%s breaches=%d", result["run_id"], result["mode"], result["verdict"], len(result["breaches"]))
+    log.info("exam done run=%s verdict=%s breaches=%d", result["run_id"], result["verdict"], len(result["breaches"]))
     return result
 
 
@@ -218,8 +217,8 @@ def assay_get_proof_bundle(
 @server.tool(
     name="assay_doctor",
     description=(
-        "Report what this Assay installation can do: whether a live (behavioral) exam is "
-        "possible, whether TraceRazor is installed, the database location, and the available packs."
+        "Report what this Assay installation can do: whether the exam can run (a model key "
+        "resolves) and why not, whether TraceRazor is installed, the database location, and the packs."
     ),
     annotations=_READ_ONLY,
 )
@@ -235,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", help="SQLite file for persisted runs (default: $ASSAY_DB_PATH or a per-user path).")
     args = parser.parse_args(argv)
     path: Path = sdk.configure(args.db)
-    log.info("assay-mcp %s ready; runs persist to %s; live exam %s", __version__, path, "available" if sdk.live_available() else "unavailable (no key)")
+    log.info("assay-mcp %s ready; runs persist to %s; live exam %s", __version__, path, "available" if sdk.exam_available() else "unavailable (no model key)")
     server.run("stdio")
     return 0
 

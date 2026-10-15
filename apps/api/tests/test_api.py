@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from assay_api.main import app
 
+from api_helpers import register_candidate
+
 
 @pytest.fixture(autouse=True)
 def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -16,6 +18,7 @@ def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
     that load so persistence stays on the temp sqlite database for every test here.
     """
     monkeypatch.setattr("assay_api.main._load_local_env", lambda: None)
+
 
 
 def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
@@ -40,9 +43,8 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
 
     with TestClient(app) as client:
-        candidates = client.get("/candidates").json()
+        candidate_id = register_candidate(client)
         db_health = client.get("/health/database").json()
-        candidate_id = candidates[0]["id"]
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         pending_verdict_response = client.get(f"/runs/{run['id']}/verdict")
         scorecard = client.post(f"/runs/{run['id']}/start").json()
@@ -191,7 +193,7 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
             "/candidates",
             json={
                 "name": "Verbose Agent",
-                "adapter_type": "mock",
+                "adapter_type": "openai-compatible",
                 "system_prompt": "# Verbose\n\n" + ("instructions " * 200),
                 "metadata": {"source": "test", "notes": "large metadata should stay off summary"},
             },
@@ -216,7 +218,7 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
 
     assert candidate_summary["id"] == candidate["id"]
     assert candidate_summary["name"] == "Verbose Agent"
-    assert candidate_summary["adapter_type"] == "mock"
+    assert candidate_summary["adapter_type"] == "openai-compatible"
     assert "system_prompt" not in candidate_summary
     assert "metadata" not in candidate_summary
     assert candidate_summary_response.headers["cache-control"] == "public, max-age=30, stale-while-revalidate=300"
@@ -225,7 +227,7 @@ def test_workspace_summary_endpoints_omit_heavy_payloads(monkeypatch) -> None:
     assert run_summary["id"] == run["id"]
     assert run_summary["candidate_id"] == candidate["id"]
     assert run_summary["candidate_name"] == "Verbose Agent"
-    assert run_summary["candidate_adapter_type"] == "mock"
+    assert run_summary["candidate_adapter_type"] == "openai-compatible"
     assert run_summary["certified"] in {True, False}
     assert run_summary["pass_count"] >= 0
     assert "job_scope" not in run_summary
@@ -249,7 +251,7 @@ def test_run_summary_keeps_same_named_candidates_separate() -> None:
             "/candidates",
             json={
                 "name": "Twin Agent",
-                "adapter_type": "mock",
+                "adapter_type": "openai-compatible",
                 "system_prompt": "# Twin Agent\n\nFirst implementation.",
             },
         ).json()
@@ -257,7 +259,7 @@ def test_run_summary_keeps_same_named_candidates_separate() -> None:
             "/candidates",
             json={
                 "name": "Twin Agent",
-                "adapter_type": "mock",
+                "adapter_type": "openai-compatible",
                 "system_prompt": "# Twin Agent\n\nSecond implementation.",
             },
         ).json()
@@ -278,7 +280,7 @@ def test_workspace_boot_batches_slim_first_paint_payload(monkeypatch) -> None:
             "/candidates",
             json={
                 "name": "Boot Agent",
-                "adapter_type": "mock",
+                "adapter_type": "openai-compatible",
                 "system_prompt": "# Boot Agent\n\n" + ("instructions " * 200),
                 "metadata": {"source": "test", "notes": "large metadata should stay off boot"},
             },
@@ -314,7 +316,7 @@ def test_workspace_boot_bounds_recent_candidate_summaries() -> None:
                 "/candidates",
                 json={
                     "name": f"Boot Agent {index}",
-                    "adapter_type": "mock",
+                    "adapter_type": "openai-compatible",
                     "system_prompt": f"# Boot Agent {index}",
                 },
             )
@@ -363,12 +365,16 @@ def test_supabase_startup_skips_eager_db_probe(monkeypatch) -> None:
     monkeypatch.setattr(main, "_load_local_env", lambda: called.append("load_env"))
     monkeypatch.setattr(main, "_check_production_hardening", lambda: called.append("hardening"))
     monkeypatch.setattr(main, "init_db", lambda: called.append("init_db"))
-    monkeypatch.setattr(main, "list_candidates", lambda: called.append("list_candidates") or [])
-    monkeypatch.setattr(main, "save_candidate", lambda candidate: called.append("save_candidate"))
 
     main.startup()
 
     assert called == ["load_env", "hardening"]
+
+
+def test_sqlite_startup_creates_schema_but_seeds_no_candidate() -> None:
+    """There is no stand-in grader, so startup registers no demo candidate."""
+    with TestClient(app) as client:
+        assert client.get("/candidates").json() == []
 
 
 def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
@@ -392,7 +398,7 @@ def test_agent_spec_endpoint_and_export(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         client.post(f"/runs/{run['id']}/start")
         spec_response = client.get(f"/runs/{run['id']}/agent-spec")
@@ -441,7 +447,7 @@ def test_agent_spec_recommends_subagents_for_failing_run(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.grade_response", failing_grade)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         # Pin the plain HR pack: this exercises the grade_response path the test
         # monkeypatches, not the guardrail scenario grader (now the default pack).
         run = client.post(
@@ -457,7 +463,7 @@ def test_agent_spec_recommends_subagents_for_failing_run(monkeypatch) -> None:
 
 def test_agent_spec_requires_started_run(monkeypatch) -> None:
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         response = client.get(f"/runs/{run['id']}/agent-spec")
         missing = client.get("/runs/run_does_not_exist/agent-spec")
@@ -483,7 +489,7 @@ def test_retired_workspace_routes_are_not_mounted() -> None:
     with TestClient(app) as client:
         run = client.post(
             "/runs",
-            json={"candidate_id": client.get("/candidates").json()[0]["id"]},
+            json={"candidate_id": register_candidate(client)},
         ).json()
         retired = [
             ("GET", "/agents/summary"),
@@ -521,7 +527,7 @@ def test_run_round_trips_job_scope_and_proof_bundle(monkeypatch) -> None:
     }
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post(
             "/runs",
             json={"candidate_id": candidate_id, "job_scope": job_scope},
@@ -571,7 +577,7 @@ def test_coding_agent_pack_lists_exports_and_runs(monkeypatch) -> None:
     pack = get_exam_pack("coding-agent-v1")
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post(
             "/runs",
             json={"candidate_id": candidate_id, "exam_pack_id": "coding-agent-v1"},
@@ -603,7 +609,7 @@ def test_run_badge_svg(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         client.post(f"/runs/{run['id']}/start")
         badge = client.get(f"/runs/{run['id']}/badge.svg")
@@ -635,7 +641,7 @@ def test_run_verdict_card_svg(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         client.post(f"/runs/{run['id']}/start")
         card = client.get(f"/runs/{run['id']}/card.svg")
@@ -681,9 +687,6 @@ def test_agent_spec_diff_endpoint(monkeypatch) -> None:
             )
 
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
-    # Force offline registration so the uploaded candidate runs on the mock
-    # adapter even when the developer's .env carries a live OpenAI key.
-    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: None)
 
     original_md = "# Diffable Agent\n\nAnswer support questions using company policy.\n"
     with TestClient(app) as client:
@@ -699,9 +702,8 @@ def test_agent_spec_diff_endpoint(monkeypatch) -> None:
         diff = diff_response.json()
         spec = client.get(f"/runs/{run['id']}/agent-spec").json()
 
-        # The seeded demo candidate has no stored original definition.
-        all_candidates = client.get("/candidates").json()
-        demo_id = next(c["id"] for c in all_candidates if c["name"] == "Demo Candidate")
+        # A candidate registered without a definition has no stored original.
+        demo_id = register_candidate(client)
         demo_run = client.post("/runs", json={"candidate_id": demo_id}).json()
         client.post(f"/runs/{demo_run['id']}/start")
         demo_diff = client.get(f"/runs/{demo_run['id']}/agent-spec/diff").json()
@@ -743,7 +745,7 @@ def test_deployability_endpoint_reflects_run_policy(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", FakeAudit)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post(
             "/runs",
             json={

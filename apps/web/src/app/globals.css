@@ -5292,7 +5292,7 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
 }
 .reviewer-next-step strong { font-weight: 700; }
 
-/* Honest demo mode + zero-input sample run (P1-3/P1-4). */
+/* No-model-key notice + zero-input sample run (P1-3/P1-4). */
 .assay-demo-notice {
   display: flex;
   align-items: center;
@@ -5306,14 +5306,6 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
   border-radius: var(--radius-md);
 }
 .assay-demo-notice strong { font-weight: 700; }
-.assay-judging-demo {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-accent);
-  background: var(--color-accent-subtle);
-  border-radius: var(--radius-pill);
-  padding: 3px 9px;
-}
 
 /* Honesty note when pass^k trials are deterministic (P0-1). */
 .assay-trials-note {
@@ -5432,6 +5424,17 @@ a.ws-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(
 .assay-failcard-head { display: flex; align-items: center; gap: 10px; font-weight: 700; }
 .assay-failcard-msg { margin: 0; font-size: 13px; color: var(--color-fg); }
 .assay-failcard-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* No model key on the server: the definition was linted, the exam did not run. */
+.assay-lint-only {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px;
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
+  border-radius: var(--radius-lg);
+}
+.assay-lint-only-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--color-fg); }
 
 /* Inline deploy-gate value in the intake disclosure summary (P2-3). */
 .assay-advanced > summary strong { color: var(--color-fg); font-weight: 700; }

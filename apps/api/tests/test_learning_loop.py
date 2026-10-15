@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from assay_api.main import app
 
+from api_helpers import register_candidate
+
 
 @pytest.fixture(autouse=True)
 def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,7 +67,7 @@ def test_lessons_persist_and_apply_across_runs(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr("assay_api.orchestrator.grade_response", _failing_grade)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
 
         # Run A: every competency fails, so the diagnostic library is seeded.
         run_a = _start_run(client, candidate_id)
@@ -104,7 +106,7 @@ def test_progress_tracks_competency_trend(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
 
         # Run A fails the competencies (creates lessons with a low origin score).
         monkeypatch.setattr("assay_api.orchestrator.grade_response", _failing_grade)
@@ -169,7 +171,7 @@ def test_explicit_baseline_compares_improved_candidate_to_source_run(
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         baseline_run = client.post(
             "/runs", json={"candidate_id": candidate_id, "exam_pack_id": "hr-v1"}
         ).json()
@@ -177,7 +179,7 @@ def test_explicit_baseline_compares_improved_candidate_to_source_run(
 
         improved_candidate = client.post(
             "/candidates",
-            json={"name": "Improved Candidate", "adapter_type": "mock"},
+            json={"name": "Improved Candidate", "adapter_type": "openai-compatible"},
         ).json()
         improved_run = client.post(
             "/runs",

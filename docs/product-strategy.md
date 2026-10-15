@@ -51,7 +51,7 @@ front-end UI, DB tables, and API routes:
 ### 1. Exam Engine — intake + adversarial run (the core flow)
 - **Backend:** `apps/api/assay_api/orchestrator.py`, `exam_synthesis.py`,
   `scoring.py`, `agent_intake.py`, `tool_parser.py`, `adapters/` (`base.py`,
-  `factory.py`, `http.py`, `mock.py`, `prompt.py`)
+  `factory.py`, `http.py`, `prompt.py`, `sandboxed.py`; the `mock.py` stand-in was removed 2026-10)
 - **Front-end:** `apps/web/src/app/page.tsx`, `components/assay/*`
   (`AgentIntake.tsx`, `Landing.tsx`, `JudgingWaterfall.tsx`, `VerdictPanel.tsx`,
   `ImprovePanel.tsx`, `HeroScanCard.tsx`, `RoleBriefCard.tsx`,

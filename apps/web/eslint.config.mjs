@@ -1,29 +1,29 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname
-});
-
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+// eslint-config-next 16 ships native flat configs, so no FlatCompat shim.
+const eslintConfig = defineConfig([
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   {
     rules: {
-      "@next/next/no-html-link-for-pages": "off"
-    },
-    ignores: [
-      ".next/**",
-      "node_modules/**",
-      "src/e2e/**",
-      "next-env.d.ts",
-      "*.config.ts",
-      "*.config.mjs"
-    ]
-  }
-];
+      "@next/next/no-html-link-for-pages": "off",
+      // React Compiler rules new in eslint-config-next 16. The existing code
+      // predates them (setState in effects, a hoisted helper used by an earlier
+      // effect); they stay visible as warnings until those spots are refactored.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn"
+    }
+  },
+  globalIgnores([
+    ".next/**",
+    "node_modules/**",
+    "src/e2e/**",
+    "next-env.d.ts",
+    "*.config.ts",
+    "*.config.mjs"
+  ])
+]);
 
 export default eslintConfig;

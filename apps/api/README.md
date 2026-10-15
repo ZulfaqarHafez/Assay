@@ -17,12 +17,12 @@ pip install "assay[mcp,trace]"    # plus the TraceRazor trace audit
 from assay_api import sdk
 
 report = sdk.lint_agent(open("AGENTS.md").read(), filename="AGENTS.md")   # no key needed
-result = sdk.run_exam(open("AGENTS.md").read(), "AGENTS.md", k=1)         # live with OPENAI_API_KEY
-print(result["mode"], result["verdict"], result["breaches"])
+result = sdk.run_exam(open("AGENTS.md").read(), "AGENTS.md", k=1)         # needs OPENAI_API_KEY
+print(result["exercised_model"], result["verdict"], result["breaches"])
 ```
 
-`result["mode"]` is `"live"` or `"mock"`. A mock result is demo plumbing, not a
-guardrail verdict, and says so (`behavioral: false`, `verdict: "demo-only"`).
+Every exam runs a real model; there is no offline stand-in. Without
+`OPENAI_API_KEY`, `run_exam` raises `ModelUnavailableError` and records nothing.
 
 ## CLI
 

@@ -73,9 +73,9 @@ export function VerdictPanel({
         <div className="assay-demo-banner" role="status">
           <AlertTriangle size={16} />
           <span>
-            <strong>Demo run, not a verdict.</strong> No OpenAI key was configured, so Assay graded
-            deterministic stand-in answers. No model made a tool call, so no guardrail was exercised.
-            Add a key and rerun to get a real verdict.
+            <strong>Legacy demo run, not a verdict.</strong> This run was graded by the stand-in grader
+            Assay no longer ships, so no model made a tool call and no guardrail was exercised. Rerun the
+            agent to get a real verdict.
           </span>
         </div>
       )}
@@ -83,9 +83,8 @@ export function VerdictPanel({
         <div className="assay-demo-banner" role="status">
           <AlertTriangle size={16} />
           <span>
-            <strong>Demo result.</strong> Your OpenAI key hit its rate limit (free tier is ~3 requests/min), so
-            Assay graded with deterministic stand-in answers. Add billing to your OpenAI account for a live
-            evaluation of your real agent.
+            <strong>Legacy demo result.</strong> This run predates the current exam: when its OpenAI key hit a
+            rate limit it fell back to stand-in answers. Rerun the agent to get a real verdict.
           </span>
         </div>
       )}
@@ -199,8 +198,7 @@ export function VerdictPanel({
         <h3 className="assay-section-label"><span className="section-no">02</span>By capability</h3>
         {scorecard.degraded && (
           <p className="assay-muted assay-demo-note">
-            Demo scores - graded from deterministic stand-in answers shaped by your agent.md, not a
-            live model run. Add OpenAI billing for a live evaluation.
+            Legacy demo scores - graded from stand-in answers, not a model run. Rerun for real scores.
           </p>
         )}
         <div className="assay-category-grid">

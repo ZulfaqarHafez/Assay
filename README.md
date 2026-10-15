@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-informational.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
-![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-black.svg)
 ![Behavioral exam](https://img.shields.io/badge/exam-behavioral%20(real%20tool%20calls)-7c5470.svg)
 
 **Assay proves whether your AI agent's written guardrails actually hold — before you ship them.**
@@ -55,13 +55,13 @@ emits an [embeddable status badge](#product-surface) you can drop in a README.
 - **An audited paper trail.** Every run is persisted as an experiment with a
   portable proof bundle (run, candidate, scorecard, event spans, TraceRazor audit
   summary, and a refined agent spec) you can export as JSON.
-- **A verdict needs a model.** Without an OpenAI key Assay still lints the file
-  and runs the exam with a deterministic mock grader, but that is demo plumbing:
-  no model makes tool calls, so no tripwire can fire. Every surface (web, CLI,
-  SDK, MCP, badge) reports such a run as **Unverified**, never as Ship, and the
-  CLI exits with code 4. With a key the live exam plays your definition under a
-  reference model; if the key is rate-limited mid-run the result is also
-  Unverified.
+- **Every exam is real.** A real OpenAI model plays your definition, or your own
+  agent answers over HTTP. There is no stand-in grader. Without a model key Assay
+  still lints the file and says the exam needs `OPENAI_API_KEY`: the web app shows
+  the lint, the HTTP API returns 409, the CLI exits with code 4, and the SDK and
+  MCP server raise a clear error. If the model stays rate-limited mid-run, the run
+  stops and is recorded as failed; Assay never substitutes answers. Runs stored by
+  the old demo grader still open, labelled **Unverified**.
 - **TraceRazor is optional.** The trace audit runs when `tracerazor` is installed
   (`pip install "assay[trace]"`). When it is absent the check is reported as
   skipped, never as a failed exam; pass `--require-trace` to insist on it.
@@ -109,14 +109,14 @@ assay-mcp                           # MCP server over stdio
 
 ```python
 from assay_api import sdk
-report = sdk.lint_agent(open("AGENTS.md").read(), filename="AGENTS.md")  # no key
-result = sdk.run_exam(open("AGENTS.md").read(), "AGENTS.md", k=1)        # live with OPENAI_API_KEY
+report = sdk.lint_agent(open("AGENTS.md").read(), filename="AGENTS.md")  # no key needed
+result = sdk.run_exam(open("AGENTS.md").read(), "AGENTS.md", k=1)        # needs OPENAI_API_KEY
 ```
 
-Every result says whether it is `live` (a model made the tool calls) or
-`mock` (deterministic demo grader; reported as `verdict: "unverified"`, never
-as a guardrail verdict). The repo ships a `.mcp.json` so Claude Code picks the
-server up from a checkout. Tools, config, and the honest-result contract are in
+Every result names the model that played the agent (`exercised_model`) and
+lists each breach with the exact tool call. Without a key, `run_exam` raises
+`ModelUnavailableError` and records nothing. The repo ships a `.mcp.json` so
+Claude Code picks the server up from a checkout. Tools and config are in
 [docs/mcp.md](docs/mcp.md).
 
 ## Quick Start
@@ -126,9 +126,11 @@ server up from a checkout. Tools, config, and the honest-result contract are in
 .\scripts\start-dev.ps1
 ```
 
-`setup.ps1` installs the FastAPI dependencies, tries to install the sibling
-TraceRazor checkout at `C:\Users\zulfa\TraceRazor` in editable mode, and installs
-the Next.js workspace dependencies.
+`setup.ps1` installs the API dependencies (including TraceRazor from PyPI), installs
+a local TraceRazor checkout in editable mode when one exists (`TRACERAZOR_REPO`, or a
+`TraceRazor/` folder next to this repo), and installs the Next.js workspace
+dependencies. Put `OPENAI_API_KEY` in a root `.env` (see `.env.example`) so the API
+can run the exam; without it the app lints only.
 
 `start-dev.ps1` scans for free API and web ports, starts both servers in the
 background, wires `NEXT_PUBLIC_API_BASE_URL` into the web process, and writes the
@@ -139,14 +141,14 @@ resolved URLs to `logs/dev-ports.json`. Open the web URL it prints, paste an
 .\scripts\stop-dev.ps1
 ```
 
-If the sibling TraceRazor checkout is unavailable, the API still starts and
-reports TraceRazor as unavailable until you install `tracerazor>=1.0.3`.
+Without TraceRazor the API still starts; the trace audit is reported as skipped
+until `tracerazor>=1.0.3` is installed.
 
 ## Manual Commands
 
 ```powershell
 python -m pip install -r apps/api/requirements-dev.txt
-python -m pip install -e C:\Users\zulfa\TraceRazor
+python -m pip install -e $env:TRACERAZOR_REPO   # optional: a local TraceRazor checkout
 npm install
 ```
 
@@ -165,19 +167,22 @@ npm --workspace apps/web run dev
 If port `8000` is occupied, prefer `.\scripts\start-dev.ps1`; it will choose
 another API port and pass it to the web app automatically.
 
-Run the example HTTP candidate (then register it in the web app at
-`http://127.0.0.1:8080/ask`):
-
-```powershell
-npm run dev:candidate
-```
+Examine your own agent runtime instead of a definition: put it behind the HTTP
+contract in [examples/http_candidate](examples/http_candidate/README.md) (a
+reference agent runs with `npm run dev:candidate`) and register it with
+`POST /candidates` (`adapter_type: "http"`).
 
 Run tests:
 
 ```powershell
-python -m pytest apps/api/tests
+python -m pytest apps/api/tests            # hermetic; a scripted model stands in for OpenAI
+$env:OPENAI_API_KEY="sk-..."; python -m pytest apps/api/tests -m live   # the real model, end to end
 npm --workspace apps/web run test
 ```
+
+The hermetic suite also runs a real reference agent over a local socket. The
+`live` tests call OpenAI and skip when no key is set; CI runs them when the
+repository has an `OPENAI_API_KEY` secret.
 
 ## Run Assay in CI
 
@@ -186,16 +191,16 @@ pipeline:
 
 ```powershell
 $env:PYTHONPATH="apps/api"
-python -m assay_api.cli run --agent-md .\agent.md --pack hr-v1 --pass-threshold 0.8
+python -m assay_api.cli run --agent-md .\agent.md --pack guardrail-v1 --pass-threshold 0.8
 ```
 
 Useful flags: `--k` (trials per seen/held-out item), `--model` (which model plays
-the agent), `--live` / `--mock` (force the mode; live is the default when a key is
-present), and `--json-out` / `--proof-out` / `--summary-out` to write the
+the agent), and `--json-out` / `--proof-out` / `--summary-out` to write the
 scorecard JSON, proof bundle JSON, and Markdown verdict summary. Exit codes:
-`0` ship, `1` gate failed, `2` runtime error, `3` invalid input, `4` unverified
-(no key, so the run was a demo and there is no verdict to gate on). Set
-`OPENAI_API_KEY` in the pipeline for a real verdict. The reusable GitHub Action lives at `.github/actions/assay` and
+`0` ship, `1` gate failed, `2` runtime error, `3` invalid input, `4` no verdict
+(no model key, so the exam did not run; also returned when gating a legacy demo
+run). Set `OPENAI_API_KEY` in the pipeline, or pass it to the action's
+`openai-api-key` input. The reusable GitHub Action lives at `.github/actions/assay` and
 uploads those three artifacts.
 
 ## How a run flows
@@ -216,8 +221,9 @@ learning trend, diagnostics, and the trace drawer.
   picks the exam pack, and flags protected-attribute language as compliance
   notes only (never requirements). Details are in
   [docs/role-intelligence.md](docs/role-intelligence.md).
-- HTTP candidates use the same examiner, scoring, persistence, and TraceRazor
-  path as mock candidates.
+- HTTP candidates (your own agent behind `POST /ask`) use the same examiner,
+  tripwires, scoring, persistence, and TraceRazor path as definitions played by
+  the reference model.
 - The Agent Refinery turns each run into a refined `AGENTS.md` for the candidate
   plus grounded sub-agent recommendations; details are in
   [docs/agent-refinery.md](docs/agent-refinery.md).
@@ -225,8 +231,7 @@ learning trend, diagnostics, and the trace drawer.
   fast (grounded in the run) or deep (web search with cited sources) — via
   `POST /runs/{run_id}/agent-spec/research?mode=fast|deep`. The key is read
   server-side only from `OPENAI_API_KEY`/`openai_key` in a git-ignored root
-  `.env`/`env`; with no key the feature reports `unavailable` and the rest of
-  Assay keeps working offline.
+  `.env`/`env`; with no key the feature reports `unavailable`.
 - `GET /runs` lists stored runs from the active database backend;
   `GET /runs/{run_id}/agent-spec` returns the refined `assay.agent_spec.v1`
   definition; `POST /runs/{run_id}/agent-spec/export-files` writes `AGENTS.md` plus
@@ -239,7 +244,8 @@ learning trend, diagnostics, and the trace drawer.
 
 - Certificates are internal capability bars, not legal or standards compliance
   claims.
-- Mock grading is deterministic development mode.
+- The exam always runs a real model (or your HTTP agent); the test suite uses a
+  scripted stand-in only inside `apps/api/tests`, never in the product.
 - Optional semantic judge assistance is disabled by default; set
   `ASSAY_LLM_JUDGE_ENABLED=1` server-side to allow bounded LLM paraphrase
   rescue evidence in scorecards.

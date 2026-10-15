@@ -12,6 +12,7 @@ import {
 import { useRunStream } from "@/lib/useRunStream";
 import { errorMessage, type LoadState } from "@/lib/derive";
 import AgentIntake, { type IntakePolicy } from "@/components/assay/AgentIntake";
+import StaticLintPanel from "@/components/assay/StaticLintPanel";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
   AgentSpec,
@@ -98,7 +99,8 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
   const apiUnreachable = bootQuery.isError;
 
   // Run-scoped state set imperatively once a run resolves.
-  const [selectedExamPackId, setSelectedExamPackId] = useState("hr-v1");
+  // The guardrail exam is the product; other packs stay available via the API.
+  const [selectedExamPackId, setSelectedExamPackId] = useState("guardrail-v1");
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [extraCandidates, setExtraCandidates] = useState<CandidateSummary[]>([]);
   const [run, setRun] = useState<RunRecord | null>(null);
@@ -108,6 +110,8 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
   const [agentSpec, setAgentSpec] = useState<AgentSpec | null>(null);
   const [deployability, setDeployability] = useState<DeployabilityDecision | null>(null);
   const [staticLint, setStaticLint] = useState<StaticLintReport | null>(null);
+  // Set when the server has no model key: the definition was linted, the exam did not run.
+  const [lintOnly, setLintOnly] = useState<{ name: string; reason: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [intakeSubmitting, setIntakeSubmitting] = useState(false);
@@ -134,7 +138,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
       const match = allCandidates.find((item) => item.id === selectedCandidateId);
       if (match) return match;
     }
-    return allCandidates.find((item) => item.adapter_type === "mock") ?? allCandidates[0] ?? null;
+    return null;
   }, [selectedCandidateId, allCandidates]);
 
   // Map run-stream lifecycle onto the LoadState used to drive the phase.
@@ -187,6 +191,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
     setAgentSpec(null);
     setDeployability(null);
     setStaticLint(null);
+    setLintOnly(null);
   }
 
   async function hydrateRunArtifacts(runId: string) {
@@ -203,8 +208,9 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
   }
 
   // Assay primary flow: take an uploaded/authored agent.md, register it as the
-  // candidate under test (live LLM when a key is set, deterministic demo when
-  // not), then immediately run the adversarial exam and stream the judging.
+  // candidate under test, then run the adversarial exam (a real model plays the
+  // agent) and stream the judging. With no model key on the server the intake
+  // still lints the file, and the screen says the exam needs a key.
   async function runAgentMarkdown(markdown: string, roleScopeText?: string, policy?: IntakePolicy, filename?: string) {
     if (!markdown.trim()) return;
     setError(null);
@@ -221,7 +227,11 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
       markCandidateListsStale(queryClient);
-      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
+      if (intake.exam_available === false) {
+        setLintOnly({ name: created.name, reason: intake.exam_unavailable_reason ?? "The guardrail exam needs a model key on the Assay server." });
+        return;
+      }
+      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "guardrail-v1";
       const jobScope = roleScopeText?.trim()
         ? {
             raw_text: roleScopeText.trim(),
@@ -271,7 +281,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
     runStream.reset();
     setRun(null);
     try {
-      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
+      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "guardrail-v1";
       const createdRun = await assayApi.createRun(candidateId, packId, null, null, {
         policyName: runPolicy?.name,
         competencyThreshold: runPolicy?.competencyThreshold
@@ -310,7 +320,11 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
       setExtraCandidates((current) => [created, ...current.filter((item) => item.id !== created.id)]);
       setSelectedCandidateId(created.id);
       markCandidateListsStale(queryClient);
-      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "hr-v1";
+      if (intake.exam_available === false) {
+        setLintOnly({ name: created.name, reason: intake.exam_unavailable_reason ?? "The guardrail exam needs a model key on the Assay server." });
+        return;
+      }
+      const packId = selectedExamPack?.id ?? selectedExamPackId ?? "guardrail-v1";
       const createdRun = await assayApi.createRun(created.id, packId, null, baselineRunId, {
         policyName: runPolicy?.name,
         competencyThreshold: runPolicy?.competencyThreshold
@@ -346,13 +360,16 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
     setDrawerOpen(true);
   }
 
-  // Phase drives the calm, single-focus primary surface: intake → judging → verdict.
+  // Phase drives the calm, single-focus primary surface: intake → judging → verdict
+  // (or intake → lint-only when the server cannot run the exam).
   const runEnded = runStream.status === "failed" || runStream.status === "canceled";
-  const phase: "intake" | "running" | "verdict" = scorecard
+  const phase: "intake" | "running" | "verdict" | "lint" = scorecard
     ? "verdict"
     : isRunning || runEnded
       ? "running"
-      : "intake";
+      : lintOnly
+        ? "lint"
+        : "intake";
 
   return (
     <main className="assay-shell">
@@ -390,7 +407,6 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
             totalExpected={runStream.totalExpected}
             progress={runStream.progress}
             agentName={candidate?.name ?? "your agent"}
-            demoMode={!health?.openai_configured}
             onCancel={cancelRun}
           />
         )}
@@ -412,6 +428,27 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
               </button>
             </div>
           </div>
+        )}
+        {phase === "lint" && lintOnly && (
+          <section className="assay-lint-only" aria-label="Static lint result">
+            <div className="assay-demo-banner" role="status">
+              <AlertTriangle size={16} />
+              <span>
+                <strong>Lint only - the guardrail exam did not run.</strong> {lintOnly.reason}
+              </span>
+            </div>
+            <h2 className="assay-lint-only-title">{lintOnly.name}</h2>
+            {staticLint && staticLint.findings.length > 0 ? (
+              <StaticLintPanel report={staticLint} />
+            ) : (
+              <p className="assay-muted">No static findings: dangerous grants, guardrail language, and secrets all check out.</p>
+            )}
+            <div className="assay-failcard-actions">
+              <button type="button" className="assay-ghost-button" onClick={testAnother}>
+                Back to start
+              </button>
+            </div>
+          </section>
         )}
         {phase === "verdict" && scorecard && (
           <VerdictPanel

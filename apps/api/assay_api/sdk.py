@@ -1,14 +1,13 @@
 """Programmatic entry points for Assay.
 
 This is the surface the MCP server, notebooks, and other Python callers use.
-It wraps the same engine the CLI and HTTP API drive, with one difference in
-emphasis: every result says plainly whether it came from the live behavioral
-exam (a real model making real tool calls inside the sandbox) or from the
-deterministic mock grader. Mock results are useful for demos and plumbing
-checks; they are never a guardrail verdict, and the payload says so.
+It wraps the same engine the CLI and HTTP API drive.
 
-All functions are importable without a server, a database file in the repo,
-or an OpenAI key. Only ``run_exam`` in live mode needs a key.
+Every exam is answered by a real model: the agent definition is reconstructed
+with its declared tools and played by an OpenAI model inside the simulated
+sandbox. There is no stand-in grader. Without a key, ``run_exam`` raises
+:class:`ModelUnavailableError` before anything is recorded, and the no-key
+functions (lint, packs, stored runs, refine, proof bundle, doctor) keep working.
 """
 
 from __future__ import annotations
@@ -16,12 +15,11 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from .agent_formats import normalize_agent_definition
 from .agent_intake import detect_agent_facts
 from .agent_refinery import agent_spec_payload
-from .agent_research import resolve_openai_key
 from .database import (
     get_candidate,
     get_run,
@@ -41,19 +39,13 @@ from .deployability import (
     policy_for_run,
 )
 from .exam_packs import get_exam_pack, list_exam_packs
+from .model_access import ModelUnavailableError, exam_unavailable_reason, require_exam_model
 from .models import CandidateConfig, RunRecord, Scorecard
 from .orchestrator import RunOrchestrator
 from .static_lint import static_lint
 from .tool_parser import parse_tools_from_markdown
 from .trace_audit import tracerazor_doctor
 
-ExamMode = Literal["auto", "live", "mock"]
-
-MOCK_WARNING = (
-    "Mock mode: the deterministic demo grader scored this run. No model made "
-    "tool calls, so no tripwire could fire and the verdict is NOT a behavioral "
-    "guardrail result. Set OPENAI_API_KEY (or pass mode='live') for the real exam."
-)
 TRACE_WARNING = (
     "TraceRazor is not installed, so the trace-audit gate was skipped. Install "
     "the 'trace' extra (pip install 'assay[trace]') to enable it."
@@ -103,9 +95,9 @@ def _ensure_db(db_path: str | Path | None) -> None:
         init_db()
 
 
-def live_available() -> bool:
-    """True when a model key is resolvable and live mode is not disabled."""
-    return bool(resolve_openai_key())
+def exam_available() -> bool:
+    """True when this process can run the exam (a model key resolves)."""
+    return exam_unavailable_reason() is None
 
 
 def trace_available() -> bool:
@@ -175,20 +167,6 @@ def list_packs() -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 
 
-def _resolve_mode(mode: ExamMode) -> tuple[str, str | None]:
-    """Return (effective_mode, error). ``auto`` picks live when a key exists."""
-    if mode == "live":
-        if not live_available():
-            return "live", (
-                "Live mode requested but no OpenAI key was found. Set OPENAI_API_KEY "
-                "(or add it to a root .env), and make sure ASSAY_DISABLE_OPENAI is not set."
-            )
-        return "live", None
-    if mode == "mock":
-        return "mock", None
-    return ("live" if live_available() else "mock"), None
-
-
 def _policy(
     *,
     k: int,
@@ -251,18 +229,18 @@ def _summarise(
     scorecard: Scorecard,
     decision: DeployabilityDecision,
     *,
-    mode: str,
     warnings: list[str],
 ) -> dict[str, Any]:
     privilege = scorecard.privilege_delta.model_dump(mode="json") if scorecard.privilege_delta else None
-    behavioral = mode == "live"
+    behavioral = scorecard.behavioral
     return {
         "schema": "assay.sdk.exam_result.v1",
         "run_id": run.id,
         "candidate_id": candidate.id,
         "candidate_name": candidate.name,
         "exam_pack_id": run.exam_pack_id,
-        "mode": mode,
+        # True for every new run. False only for runs stored by the removed demo
+        # grader, which the gate reports as "unverified".
         "behavioral": behavioral,
         # What was actually exercised: the definition, played by this model,
         # with the tools it declares. Not the caller's production runtime.
@@ -271,10 +249,8 @@ def _summarise(
             "the agent definition, reconstructed with its declared tools and played by "
             f"{scorecard.simulator_model} inside a simulated sandbox"
             if behavioral
-            else "nothing behavioral: the deterministic mock grader scored canned answers"
+            else "nothing: a legacy demo run from the removed stand-in grader"
         ),
-        # The gate itself returns "unverified" for a non-behavioral run, so the
-        # SDK no longer needs its own label: every surface says the same thing.
         "verdict": decision.verdict,
         "label": decision.label,
         "deployable": decision.deployable,
@@ -306,7 +282,6 @@ async def run_exam_async(
     pack: str = "guardrail-v1",
     k: int = 1,
     pass_threshold: float = 0.8,
-    mode: ExamMode = "auto",
     model: str | None = None,
     require_trace: bool | None = None,
     policy: str | None = None,
@@ -320,9 +295,8 @@ async def run_exam_async(
     adapter default) inside the simulated sandbox. The result names that model
     in ``exercised_model``. It is not a test of the caller's production runtime.
 
-    ``mode="auto"`` runs live when an OpenAI key is available and falls back to
-    the mock grader otherwise. ``mode="live"`` fails fast without a key.
-    ``require_trace``: ``True`` means TraceRazor must be installed and pass;
+    Raises :class:`ModelUnavailableError` when no model key resolves; nothing is
+    recorded in that case. ``require_trace``: ``True`` means TraceRazor must be installed and pass;
     ``False`` makes it advisory; ``None`` (default) blocks only on a trace that
     ran and failed, and skips with a warning when TraceRazor is not installed.
     """
@@ -330,9 +304,7 @@ async def run_exam_async(
         raise ValueError("k must be between 1 and 8")
     if not 0 <= pass_threshold <= 1:
         raise ValueError("pass_threshold must be between 0 and 1")
-    effective_mode, error = _resolve_mode(mode)
-    if error:
-        raise RuntimeError(error)
+    require_exam_model()
 
     _ensure_db(db_path)
     exam_pack = get_exam_pack(pack)  # raises KeyError for unknown packs
@@ -344,7 +316,7 @@ async def run_exam_async(
     candidate = save_candidate(
         CandidateConfig(
             name=agent_name or facts.get("title") or (Path(filename).stem if filename else "agent"),
-            adapter_type="openai-compatible" if effective_mode == "live" else "mock",
+            adapter_type="openai-compatible",
             model=model or None,
             system_prompt=markdown,
             tools=parse_tools_from_markdown(markdown),
@@ -371,13 +343,9 @@ async def run_exam_async(
     decision = evaluate_scorecard(scorecard, policy_obj)
 
     warnings: list[str] = []
-    if effective_mode == "mock":
-        warnings.append(MOCK_WARNING)
     if not trace_available():
         warnings.append(TRACE_WARNING)
-    if scorecard.degraded and scorecard.degraded_reason:
-        warnings.append(f"Degraded run: {scorecard.degraded_reason}")
-    return _summarise(run, candidate, scorecard, decision, mode=effective_mode, warnings=warnings)
+    return _summarise(run, candidate, scorecard, decision, warnings=warnings)
 
 
 def run_exam(content: str, filename: str | None = None, **kwargs: Any) -> dict[str, Any]:
@@ -407,9 +375,7 @@ def get_run_result(run_id: str, *, db_path: str | Path | None = None) -> dict[st
             "summary": "Run has no scorecard yet.",
         }
     decision = evaluate_scorecard(scorecard, policy_for_run(run))
-    mode = "mock" if candidate.adapter_type == "mock" else "live"
-    warnings = [MOCK_WARNING] if mode == "mock" else []
-    return _summarise(run, candidate, scorecard, decision, mode=mode, warnings=warnings)
+    return _summarise(run, candidate, scorecard, decision, warnings=[])
 
 
 def list_runs(limit: int = 20, offset: int = 0, *, db_path: str | Path | None = None) -> dict[str, Any]:
@@ -449,7 +415,8 @@ def doctor(*, db_path: str | Path | None = None) -> dict[str, Any]:
     trace = trace_available()
     return {
         "schema": "assay.sdk.doctor.v1",
-        "live_exam_available": live_available(),
+        "exam_available": exam_unavailable_reason() is None,
+        "exam_unavailable_reason": exam_unavailable_reason(),
         "openai_disabled": os.environ.get("ASSAY_DISABLE_OPENAI", "0").strip() == "1",
         "tracerazor_installed": trace,
         "tracerazor": tracerazor_doctor() if trace else {"status": "unavailable"},
@@ -460,7 +427,7 @@ def doctor(*, db_path: str | Path | None = None) -> dict[str, Any]:
 
 
 __all__ = [
-    "MOCK_WARNING",
+    "ModelUnavailableError",
     "TRACE_WARNING",
     "configure",
     "default_db_path",
@@ -470,7 +437,7 @@ __all__ = [
     "lint_agent",
     "list_packs",
     "list_runs",
-    "live_available",
+    "exam_available",
     "refine_agent",
     "run_exam",
     "run_exam_async",

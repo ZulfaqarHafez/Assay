@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import time
 from typing import Any
 
@@ -10,7 +11,16 @@ from ..models import CandidateResponse, TokenCounts, ToolCall
 from ..models.scenario import ScenarioSpec
 from ..sandbox import ToolSandbox
 from .base import CandidateAdapterError
-from .prompt import PromptAgentAdapter, _RateLimited, _is_unsupported_sampling_error, _output_text
+from .prompt import (
+    PromptAgentAdapter,
+    _is_unsupported_sampling_error,
+    _output_text,
+    _RateLimited,
+    _retry_after_seconds,
+    api_status_failure,
+    rate_limit_failure,
+    retry_budget,
+)
 
 # Hard caps so a looping agent cannot run away with the exam or the bill.
 _MAX_TURNS = 6
@@ -27,11 +37,6 @@ class SandboxedAgentAdapter(PromptAgentAdapter):
     async def ask_scenario(
         self, context: str, question: str, scenario: ScenarioSpec, trial: int = 1
     ) -> CandidateResponse:
-        if self.degraded:
-            from .mock import MockCandidateAdapter
-
-            return await MockCandidateAdapter(self.config).ask(context=context, question=question, trial=trial)
-
         from ..agent_research import resolve_openai_key
 
         key = resolve_openai_key()
@@ -54,11 +59,7 @@ class SandboxedAgentAdapter(PromptAgentAdapter):
                 self._run_tool_loop, key, user_message, trial, sandbox
             )
         except _RateLimited as exc:
-            self.degraded = True
-            self.degraded_reason = str(exc)
-            from .mock import MockCandidateAdapter
-
-            return await MockCandidateAdapter(self.config).ask(context=context, question=question, trial=trial)
+            raise rate_limit_failure(str(exc)) from exc
 
         latency_ms = max(1, int((time.perf_counter() - started) * 1000))
         return CandidateResponse(
@@ -126,6 +127,35 @@ class SandboxedAgentAdapter(PromptAgentAdapter):
     ) -> Any:
         from openai import APIStatusError, RateLimitError
 
+        max_attempts, max_wait = retry_budget()
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return self._responses_create_once(client, conversation, tools, sampling)
+            except RateLimitError as exc:
+                if attempt >= max_attempts:
+                    raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
+                wait = _retry_after_seconds(exc)
+                if wait is None:
+                    wait = 2.0 ** attempt
+                time.sleep(min(max_wait, wait) + random.uniform(0.2, 0.8))
+            except APIStatusError as exc:
+                status = getattr(exc, "status_code", None)
+                if status == 429:
+                    raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
+                if status is not None and 500 <= status < 600 and attempt < max_attempts:
+                    time.sleep(min(max_wait, 2.0 ** attempt) + random.uniform(0.2, 0.8))
+                    continue
+                failure = api_status_failure(status, str(getattr(exc, "message", None) or exc), self.model)
+                if failure is not None:
+                    raise failure from exc
+                raise
+        raise _RateLimited("retry budget exhausted")  # pragma: no cover - loop always returns or raises
+
+    def _responses_create_once(
+        self, client: Any, conversation: list[dict[str, Any]], tools: list[dict[str, Any]], sampling: dict[str, Any]
+    ) -> Any:
+        from openai import APIStatusError
+
         try:
             return client.responses.create(
                 model=self.model,
@@ -133,21 +163,19 @@ class SandboxedAgentAdapter(PromptAgentAdapter):
                 tools=tools,
                 **sampling,
             )
-        except RateLimitError as exc:  # pragma: no cover - passthrough mapping
-            raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
         except APIStatusError as exc:
             status = getattr(exc, "status_code", None)
             if status == 429:
-                raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
+                raise
             message = str(getattr(exc, "message", None) or exc).lower()
             if status == 400 and _is_unsupported_sampling_error(message, sampling):
                 sampling.clear()
-                return self._responses_create(client, conversation, tools, sampling)
+                return self._responses_create_once(client, conversation, tools, sampling)
             raise
         except TypeError as exc:
             if _is_unsupported_sampling_error(str(exc), sampling):
                 sampling.clear()
-                return self._responses_create(client, conversation, tools, sampling)
+                return self._responses_create_once(client, conversation, tools, sampling)
             raise
 
 

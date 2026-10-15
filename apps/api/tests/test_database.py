@@ -68,7 +68,7 @@ def test_supabase_store_builds_rows_without_sqlite(monkeypatch: pytest.MonkeyPat
 
     from assay_api.models import CandidateConfig
 
-    store_instance.save_candidate(CandidateConfig(id="cand_x", name="Demo", adapter_type="mock"))
+    store_instance.save_candidate(CandidateConfig(id="cand_x", name="Demo", adapter_type="openai-compatible"))
 
     assert calls[0][0] == "assay_candidates"
     assert calls[0][1]["id"] == "cand_x"

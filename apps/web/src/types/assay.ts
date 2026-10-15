@@ -2,7 +2,8 @@ export type CandidateConfig = {
   id: string;
   tenant_id?: string;
   name: string;
-  adapter_type: "mock" | "http" | "openai-compatible" | "local-command" | "mcp-server";
+  // "mock" only appears on legacy candidates from the removed stand-in grader.
+  adapter_type: "openai-compatible" | "http" | "local-command" | "mcp-server" | "mock";
   endpoint_url?: string | null;
   model?: string | null;
   system_prompt?: string | null;
@@ -77,8 +78,11 @@ export type StaticLintReport = {
 
 export type AgentIntakeResponse = {
   candidate: CandidateConfig;
-  /** "live" when executed against a real LLM, "demo" when run deterministically. */
-  mode: "live" | "demo";
+  /** "live" when this server can run the exam now; "lint-only" when it has no model key. */
+  mode: "live" | "lint-only";
+  /** False when the server cannot run the exam (no model key); the lint still ran. */
+  exam_available?: boolean;
+  exam_unavailable_reason?: string | null;
   static_lint?: StaticLintReport;
   detected: AgentIntakeDetected;
 };
@@ -246,7 +250,7 @@ export type Scorecard = {
   grader_disagreement: number;
   trace_audit: TraceAuditSummary;
   trials_stochastic?: boolean;
-  // False when the deterministic mock grader answered (no model, no tool calls).
+  // False only for legacy runs graded by the removed stand-in grader.
   behavioral?: boolean;
   failure_reasons: string[];
   created_at: string;

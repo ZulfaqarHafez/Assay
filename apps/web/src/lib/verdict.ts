@@ -7,8 +7,9 @@
  * renders the verdict through these constants so the words can never drift
  * screen to screen again. Canonical bands, verb-first: SHIP · RISKY · HOLD.
  *
- * A fourth state, UNVERIFIED, is not a band on the scale: it is what a demo run
- * (mock grader, no model, no tool calls) gets instead of a verdict.
+ * A fourth state, UNVERIFIED, is not a band on the scale: it is what a legacy
+ * demo run (graded by the removed stand-in grader, no tool calls) gets instead
+ * of a verdict. New runs always have a real model behind them.
  */
 
 export type VerdictBand = "ship" | "risky" | "hold" | "unverified";

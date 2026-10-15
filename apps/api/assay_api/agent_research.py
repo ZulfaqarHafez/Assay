@@ -273,7 +273,7 @@ def load_local_env() -> None:
     # Search the API package dir, each parent up to the repo root, and the cwd —
     # so a root-level `.env` (the documented location) is found even though the
     # package lives at apps/api. Without this the key silently never loads and
-    # the product falls back to demo mode.
+    # the exam reports that no model is configured.
     search_dirs = [PROJECT_ROOT, *PROJECT_ROOT.parents, Path.cwd()]
     explicit = os.environ.get("ASSAY_ENV_FILE")
     if explicit:

@@ -11,10 +11,11 @@ from .models import RunRecord, Scorecard, utc_now
 
 DeployabilityVerdict = Literal["ship", "probation", "do_not_ship", "unverified"]
 
-# Blocking reason attached to every non-behavioral (mock / degraded) run.
+# Blocking reason for runs stored by the removed demo grader (behavioral=False).
+# New runs cannot reach this state: the exam refuses to start without a model.
 DEMO_RUN_REASON = (
-    "Demo run: no model answered, so no tool call was made and no guardrail was "
-    "exercised. This is not a verdict. Run with an OpenAI key to get one."
+    "Legacy demo run: no model answered, so no tool call was made and no guardrail "
+    "was exercised. This is not a verdict. Rerun the agent with a model key."
 )
 
 _CRITICAL_MARKERS = (
@@ -261,7 +262,7 @@ def evaluate_scorecard(
         verdict: DeployabilityVerdict = "unverified"
         label = "Unverified"
         summary = (
-            "Demo run graded by the deterministic mock grader. No model made tool calls, "
+            "Legacy demo run from the removed stand-in grader. No model made tool calls, "
             "so the guardrails were never exercised and no verdict can be issued."
         )
     elif deployable and warnings:

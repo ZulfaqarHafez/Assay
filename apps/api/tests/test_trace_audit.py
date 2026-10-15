@@ -14,7 +14,7 @@ from assay_api.trace_audit import (
 
 def test_trace_audit_reports_insufficient_steps() -> None:
     service = TraceAuditService(threshold=70)
-    candidate = CandidateConfig(name="Demo", adapter_type="mock")
+    candidate = CandidateConfig(name="Demo", adapter_type="openai-compatible")
 
     summary = service.analyse(candidate, trace_steps=[{"id": 1}], task_value_score=1.0)
 
@@ -48,7 +48,7 @@ def test_trace_audit_accepts_fake_client(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.trace_audit._load_tracerazor_client", lambda: FakeClient)
 
     service = TraceAuditService(threshold=70)
-    candidate = CandidateConfig(name="Demo", adapter_type="mock")
+    candidate = CandidateConfig(name="Demo", adapter_type="openai-compatible")
     steps = [{"id": index + 1, "type": "reasoning", "content": "x", "tokens": 1} for index in range(5)]
 
     summary = service.analyse(candidate, trace_steps=steps, task_value_score=0.9)
@@ -85,7 +85,7 @@ def test_trace_audit_caps_large_repeated_traces(monkeypatch) -> None:
     monkeypatch.setattr("assay_api.trace_audit._load_tracerazor_client", lambda: FakeClient)
 
     service = TraceAuditService(threshold=70)
-    candidate = CandidateConfig(name="Demo", adapter_type="mock")
+    candidate = CandidateConfig(name="Demo", adapter_type="openai-compatible")
     steps = [
         {
             "id": index + 1,
@@ -126,7 +126,7 @@ def test_trace_audit_times_out_slow_real_client(monkeypatch) -> None:
     monkeypatch.setenv("ASSAY_TRACERAZOR_TIMEOUT_S", "0.2")
 
     service = TraceAuditService(threshold=70)
-    candidate = CandidateConfig(name="Demo", adapter_type="mock")
+    candidate = CandidateConfig(name="Demo", adapter_type="openai-compatible")
     steps = [{"id": index + 1, "type": "reasoning", "content": "x", "tokens": 1} for index in range(5)]
 
     summary = service.analyse(candidate, trace_steps=steps, task_value_score=0.9)
@@ -162,7 +162,7 @@ def test_trace_audit_passes_timeout_to_real_client(monkeypatch) -> None:
     monkeypatch.setenv("ASSAY_TRACERAZOR_TIMEOUT_S", "7")
 
     service = TraceAuditService(threshold=70)
-    candidate = CandidateConfig(name="Demo", adapter_type="mock")
+    candidate = CandidateConfig(name="Demo", adapter_type="openai-compatible")
     steps = [{"id": index + 1, "type": "reasoning", "content": "x", "tokens": 1} for index in range(5)]
 
     summary = service.analyse(candidate, trace_steps=steps, task_value_score=0.9)
@@ -239,3 +239,47 @@ def test_tracerazor_doctor_runs_synthetic_smoke(monkeypatch) -> None:
     assert payload["installed"] is True
     assert payload["status"] == "passed"
     assert payload["summary"]["tas_score"] == 93.0
+
+
+def test_make_client_passes_the_timeout_under_each_client_signature() -> None:
+    from assay_api.trace_audit import _make_client
+
+    class Current:  # tracerazor >= 1.1
+        def __init__(self, threshold: float, timeout_s: float = 60.0):
+            self.timeout = timeout_s
+
+    class Legacy:  # tracerazor 1.0.4
+        def __init__(self, threshold: float, timeout: float = 60.0):
+            self.timeout = timeout
+
+    class Unbounded:  # older clients
+        def __init__(self, threshold: float):
+            self.timeout = None
+
+    current, current_bounded = _make_client(Current, 70, 12.5)
+    legacy, legacy_bounded = _make_client(Legacy, 70, 12.5)
+    unbounded, unbounded_bounded = _make_client(Unbounded, 70, 12.5)
+
+    assert (current.timeout, current_bounded) == (12.5, True)
+    assert (legacy.timeout, legacy_bounded) == (12.5, True)
+    assert (unbounded.timeout, unbounded_bounded) == (None, False)
+
+
+def test_installed_tracerazor_client_receives_the_timeout() -> None:
+    import pytest
+
+    tracerazor = pytest.importorskip("tracerazor")
+    from assay_api.trace_audit import _make_client
+
+    client, bounded = _make_client(tracerazor.TraceRazorClient, 70, 9.0)
+    assert bounded is True
+    assert getattr(client, "_timeout_s", 9.0) == 9.0
+
+
+def test_local_checkout_path_has_no_hardcoded_personal_default(monkeypatch) -> None:
+    from assay_api import trace_audit
+
+    monkeypatch.setenv("TRACERAZOR_REPO", "/opt/tracerazor")
+    assert trace_audit._local_tracerazor_checkout() == "/opt/tracerazor"
+    monkeypatch.delenv("TRACERAZOR_REPO")
+    assert "zulfa" not in trace_audit._local_tracerazor_checkout()

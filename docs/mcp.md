@@ -13,22 +13,23 @@ pip install -e "apps/api[mcp,dev]"  # from a checkout
 
 The import name is `assay_api` for now; the distribution name is `assay`.
 
-## What is honest about the results
+## Every exam is real
 
-Every exam result carries three fields you should read before anything else:
+There is no stand-in grader. A real OpenAI model plays the agent definition
+with its declared tools inside the sandbox, so every tool call is a genuine
+model decision and the tripwires judge real behavior. Read these fields first:
 
 | Field | Meaning |
 | --- | --- |
-| `mode` | `live` (a real model made the tool calls inside the sandbox) or `mock` (deterministic demo grader, no model) |
-| `behavioral` | `true` only in live mode |
-| `verdict` | `ship`, `probation`, `do_not_ship` in live mode; always `unverified` in mock mode |
+| `exercised_model` | The model that played the agent, e.g. `openai:gpt-4.1` |
+| `verdict` | `ship`, `probation`, or `do_not_ship` |
+| `breaches` | Each tripwire hit, with the exact tool call quoted |
+| `behavioral` | Always `true` for new runs; `false` only on legacy demo runs, which read as `unverified` |
 
-A mock run is useful to check plumbing, packs, and persistence. It cannot
-catch a guardrail breach because no tool call is ever made, so the gate itself
-returns `unverified` with `deployable: false` and a "Demo run" blocking reason,
-and the SDK attaches a warning explaining why. The web app, CLI (exit code 4),
-badge, and card all show the same Unverified state. Live mode needs `OPENAI_API_KEY` in the environment
-or a root `.env`.
+Without a model key the exam does not run at all: the SDK raises
+`ModelUnavailableError`, the MCP tool returns an error with setup instructions,
+and nothing is recorded. Lint, packs, stored runs, refine, proof bundles, and
+doctor all work without a key.
 
 ## Python SDK
 
@@ -41,9 +42,9 @@ text = open("AGENTS.md").read()
 report = sdk.lint_agent(text, filename="AGENTS.md")
 print(report["finding_counts"], report["dangerous_tools"])
 
-# 2. The behavioral exam (live when a key exists, else mock).
+# 2. The behavioral exam: a real model plays the agent (needs OPENAI_API_KEY).
 result = sdk.run_exam(text, "AGENTS.md", pack="guardrail-v1", k=1, pass_threshold=0.8)
-print(result["mode"], result["verdict"])
+print(result["exercised_model"], result["verdict"])
 for breach in result["breaches"]:
     print(breach["competency"], breach["tripwire"], breach["tool_call"])
 
@@ -52,8 +53,8 @@ spec = sdk.refine_agent(result["run_id"])          # hardened AGENTS.md rewrite
 bundle = sdk.get_proof_bundle(result["run_id"])    # portable proof bundle
 ```
 
-`run_exam_async` is the coroutine form. `mode="live"` fails fast without a
-key; `mode="mock"` forces the demo grader.
+`run_exam_async` is the coroutine form. Without a key both raise
+`ModelUnavailableError` before recording anything.
 
 **What a live run tests.** The definition, reconstructed with its declared
 tools and played by a reference model inside the sandbox. Pick the model with
@@ -100,19 +101,19 @@ Without a packaged install, use `python -m assay_api.mcp_server` with
 | --- | --- | --- |
 | `assay_lint_agent` | no | Static lint: dangerous tool grants, missing guardrail language per category, embedded secrets |
 | `assay_list_exam_packs` | no | Packs and their competencies; the behavioral default is `guardrail-v1` |
-| `assay_run_exam` | for live | Runs the adversarial exam; returns verdict, breaches with the exact tool call, privilege delta, scores |
+| `assay_run_exam` | yes | Runs the adversarial exam; returns verdict, breaches with the exact tool call, privilege delta, scores |
 | `assay_get_run` | no | Re-reads a stored run's verdict summary |
 | `assay_list_runs` | no | Paginated run history |
 | `assay_refine_agent` | no | Hardened rewrite of the agent definition grounded in a run |
 | `assay_get_proof_bundle` | no | Portable proof bundle; `include_events` adds every span |
-| `assay_doctor` | no | What this install can do: live exam, TraceRazor, database path, packs |
+| `assay_doctor` | no | Whether the exam can run and why not, TraceRazor, database path, packs |
 
-Live exams take one to five minutes and spend model tokens. `k` multiplies
+Exams take one to five minutes and spend model tokens. `k` multiplies
 both. The server logs to stderr only.
 
 ### Suggested agent workflow
 
-1. `assay_doctor` once, to learn whether a live exam is possible.
+1. `assay_doctor` once, to learn whether the exam can run here.
 2. `assay_lint_agent` on every draft; fix the high findings first.
 3. `assay_run_exam` when the draft is stable; read `breaches` and
    `privilege_delta.removable` (tools the agent was granted but never needed).

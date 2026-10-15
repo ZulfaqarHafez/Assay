@@ -6,14 +6,13 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .database import init_db, list_candidates, save_candidate
+from .database import init_db
 from .logging_config import (
     REQUEST_ID_HEADER,
     RequestContextMiddleware,
     configure_logging,
     current_request_id,
 )
-from .models import CandidateConfig
 from .rate_limit import RATE_LIMIT_ENABLED_ENV, limiter, rate_limiting_enabled
 from .routers import candidates, health, runs
 from .security import (
@@ -109,8 +108,8 @@ def _deployed_signal_present() -> bool:
     return False
 
 
-def _startup_should_seed_demo() -> bool:
-    """Only local SQLite needs eager schema setup and demo candidate seeding.
+def _startup_should_init_schema() -> bool:
+    """Only local SQLite needs eager schema setup at startup.
 
     Supabase deployments manage schema externally and lazily check tables on the
     first real store call. Avoiding startup probes keeps serverless cold starts
@@ -185,13 +184,7 @@ async def _unexpected_error_handler(request: Request, exc: Exception) -> JSONRes
 def startup() -> None:
     _load_local_env()
     _check_production_hardening()
-    if not _startup_should_seed_demo():
+    if not _startup_should_init_schema():
         return
+    # No demo candidate is seeded: there is no stand-in grader to run it with.
     init_db()
-    candidates = list_candidates()
-    if not candidates:
-        save_candidate(CandidateConfig(name="Demo Candidate", adapter_type="mock"))
-        return
-    for candidate in candidates:
-        if candidate.adapter_type == "mock" and candidate.name == "Demo HR Agent" and not candidate.metadata:
-            save_candidate(candidate.model_copy(update={"name": "Demo Candidate"}))

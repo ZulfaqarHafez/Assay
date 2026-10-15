@@ -13,7 +13,7 @@ AI agents. This guide covers how to get set up and what we expect in a change.
 The two apps are siblings in the monorepo:
 
 - `apps/api` — Python FastAPI backend (package `assay_api`)
-- `apps/web` — Next.js 15 / React 19 front end
+- `apps/web` — Next.js 16 / React 19 front end
 
 ## Before you open a PR
 

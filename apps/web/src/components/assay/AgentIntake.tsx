@@ -163,8 +163,8 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
 
       {!liveMode && (
         <p className="assay-demo-notice" role="note">
-          <Sparkles size={14} /> No OpenAI key detected - this runs a <strong>deterministic demo</strong>,
-          not your real agent. Add a key to grade the real thing.
+          <Sparkles size={14} /> The Assay server has no model key, so this <strong>lints the definition only</strong>.
+          The guardrail exam needs <code>OPENAI_API_KEY</code> set on the API server.
         </p>
       )}
 
@@ -178,8 +178,8 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           >
             <FlaskConical size={18} />
             {submitting
-              ? liveMode ? "Running the guardrail test…" : "Running the demo…"
-              : liveMode ? "Run the guardrail test" : "Run demo guardrail test"}
+              ? liveMode ? "Running the guardrail test…" : "Linting…"
+              : liveMode ? "Run the guardrail test" : "Lint the definition"}
           </button>
         ) : (
           sampleTemplate && (
@@ -194,7 +194,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
               }
             >
               <Zap size={18} />
-              {submitting ? "Running the sample…" : "See a sample verdict (~20s)"}
+              {submitting ? "Running the sample…" : liveMode ? "See a sample verdict" : "Lint the sample agent"}
             </button>
           )
         )}
@@ -262,8 +262,8 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           </div>
           <small className="assay-policy-hint">
             {policyName === "strict"
-              ? "Strict: trace-audit and degraded-mode findings block the verdict."
-              : "Advisory: trace-audit and degraded-mode findings warn instead of block."}
+              ? "Strict: a failed trace audit blocks the verdict."
+              : "Advisory: a failed trace audit warns instead of blocking."}
           </small>
           <label className="assay-policy-slider">
             <span>

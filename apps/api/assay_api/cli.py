@@ -12,7 +12,7 @@ from .agent_diff import unified_diff_text
 from .agent_formats import normalize_agent_definition
 from .agent_intake import detect_agent_facts
 from .agent_refinery import agent_spec_payload
-from .agent_research import resolve_openai_key
+from .model_access import exam_unavailable_reason
 from .tool_parser import parse_tools_from_markdown
 from .database import (
     get_candidate,
@@ -49,10 +49,11 @@ EXIT_DEPLOYABLE = 0
 EXIT_GATE_FAILED = 1
 EXIT_RUNTIME_ERROR = 2
 EXIT_INVALID_INPUT = 3
-# The run completed but nothing behavioral happened (mock grader / degraded), so
-# there is no verdict to gate on. Distinct from a failed gate so CI can tell
-# "the agent failed" from "you forgot the key".
+# No verdict is possible: no model is configured (the exam refuses to start), or
+# the gated run is a legacy demo run. Distinct from a failed gate so CI can tell
+# "the agent failed" from "the pipeline has no model key".
 EXIT_UNVERIFIED = 4
+EXIT_NO_MODEL = EXIT_UNVERIFIED
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -168,8 +169,8 @@ def _add_run_args(parser: argparse.ArgumentParser, *, agent_flag: str) -> None:
     parser.add_argument("--proof-out", help="Proof bundle JSON output path")
     parser.add_argument("--summary-out", help="Markdown summary output path")
     parser.add_argument("--tenant", default="local", help="Tenant id to stamp on persisted artifacts")
-    parser.add_argument("--live", action="store_true", help="Force live mode (errors if no OpenAI key); live is the default when a key is present")
-    parser.add_argument("--mock", action="store_true", help="Force deterministic mock mode even when an OpenAI key is available (CI reproducibility)")
+    # Accepted for older scripts; every exam is live now, so it changes nothing.
+    parser.add_argument("--live", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--baseline", dest="baseline_run_id", help="Baseline run id for improvement comparisons")
     parser.add_argument(
         "--model",
@@ -237,15 +238,13 @@ def _interview_command(args: argparse.Namespace) -> int:
 
     _configure_db(args.db_path)
 
-    # The behavioral guardrail exam IS the product: go live whenever a key is
-    # available. Force deterministic mock only when the user opts out explicitly
-    # (`--mock` or ASSAY_DISABLE_OPENAI=1). `--live` still errors loudly if it was
-    # asked for but no key is configured.
-    if getattr(args, "mock", False):
-        os.environ["ASSAY_DISABLE_OPENAI"] = "1"
-    elif args.live and not resolve_openai_key():
-        print("--live requires OPENAI_API_KEY (or openai_key) to be configured", file=sys.stderr)
-        return EXIT_INVALID_INPUT
+    # The exam is always answered by a real model; refuse before any run is
+    # recorded when none is configured, with the same message every surface uses.
+    unavailable = exam_unavailable_reason()
+    if unavailable is not None:
+        print(f"assay: {unavailable}", file=sys.stderr)
+        print("Static lint needs no key: assay scan --agent <file>", file=sys.stderr)
+        return EXIT_NO_MODEL
 
     try:
         token = bind_tenant_id(args.tenant)
@@ -281,13 +280,9 @@ async def _interview_async(args: argparse.Namespace, agent_path: Path) -> int:
     loop_payload = load_json_file(args.loop) if args.loop else None
     init_db()
 
-    # The behavioral guardrail exam IS the product: go live automatically when a
-    # key is present (set ASSAY_DISABLE_OPENAI=1 to force deterministic mock).
-    # --live remains as an explicit override for clarity in CI.
-    live = bool(args.live) or bool(resolve_openai_key())
     candidate = CandidateConfig(
         name=detected["title"] or agent_path.stem,
-        adapter_type="openai-compatible" if live else "mock",
+        adapter_type="openai-compatible",
         model=getattr(args, "model", None) or None,
         system_prompt=markdown,
         # Parse the agent's declared tools so the privilege-delta can flag

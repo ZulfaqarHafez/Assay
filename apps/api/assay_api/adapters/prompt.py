@@ -16,8 +16,48 @@ _MAX_SYSTEM_PROMPT_CHARS = 20000
 
 
 class _RateLimited(Exception):
-    """Raised internally when the OpenAI key is rate-limited / out of quota so the
-    adapter can degrade to a deterministic demo answer instead of failing the run."""
+    """Raised internally when the OpenAI key stays rate-limited / out of quota
+    after the retry budget; mapped to :func:`rate_limit_failure`."""
+
+
+def rate_limit_failure(detail: str) -> CandidateAdapterError:
+    """The error a run fails with when the model cannot be reached.
+
+    Assay never substitutes canned answers for a model it could not call: the
+    run stops, is recorded as failed, and says how to recover.
+    """
+    return CandidateAdapterError(
+        "OpenAI rate limit or quota exhausted, so the exam stopped (Assay never "
+        "substitutes answers for a model it could not reach). Add billing or raise "
+        "the key's limits, lower k (ASSAY_LIVE_K), or raise ASSAY_OPENAI_MAX_RETRIES / "
+        f"ASSAY_OPENAI_MAX_RETRY_WAIT_S. Detail: {detail}"
+    )
+
+
+def api_status_failure(status: int | None, detail: str, model: str) -> CandidateAdapterError | None:
+    """A clear run failure for OpenAI errors no retry can fix, else ``None``."""
+    if status in (401, 403):
+        return CandidateAdapterError(
+            f"OpenAI rejected the API key ({status}), so the exam stopped. Check OPENAI_API_KEY "
+            f"and that the key's project can use the model. Detail: {detail}"
+        )
+    if status == 404:
+        return CandidateAdapterError(
+            f"OpenAI model {model!r} was not found or is not available to this key, so the exam "
+            f"stopped. Set ASSAY_OPENAI_MODEL (or --model) to a model the key can use. Detail: {detail}"
+        )
+    return None
+
+
+def retry_budget() -> tuple[int, float]:
+    """(max attempts, max single wait in seconds) for rate-limited calls.
+
+    Generous by default because there is no fallback: a transient 429 burst
+    should slow a run down, not kill it.
+    """
+    attempts = max(1, int(os.environ.get("ASSAY_OPENAI_MAX_RETRIES", "5")))
+    max_wait = float(os.environ.get("ASSAY_OPENAI_MAX_RETRY_WAIT_S", "20"))
+    return attempts, max_wait
 
 
 def _retry_after_seconds(exc: Any) -> float | None:
@@ -47,10 +87,9 @@ class PromptAgentAdapter(CandidateAdapter):
 
     The agent's own markdown drives behaviour: it is sent as the developer/system
     message so the agent's persona, operating principles, and tools take
-    precedence over the generic HR-screening preamble Assay adds to every
-    ``context``. The endpoint that constructs this adapter only does so in live
-    mode (an OpenAI key is present); with no key it falls back to the deterministic
-    mock, so this adapter raises if it cannot resolve a key.
+    precedence over the generic exam framing Assay adds to every ``context``.
+    The adapter factory only builds it when an OpenAI key resolves, and it still
+    raises if the key disappears mid-run. There is no stand-in answer path.
 
     Each of the k trials is run at a nonzero temperature with a distinct per-trial
     seed, so repeated asks of the same question genuinely vary — that is what makes
@@ -70,20 +109,8 @@ class PromptAgentAdapter(CandidateAdapter):
         # Defensive size cap before the markdown reaches an LLM call.
         self.system_prompt = system_prompt[:_MAX_SYSTEM_PROMPT_CHARS]
         self.model = config.model or DEFAULT_FAST_MODEL
-        # Set true if a call falls back to deterministic answers because the key
-        # was rate-limited / out of quota. The orchestrator surfaces this so the
-        # verdict is clearly labelled a demo result rather than a live evaluation.
-        self.degraded = False
-        self.degraded_reason: str | None = None
 
     async def ask(self, context: str, question: str, trial: int = 1) -> CandidateResponse:
-        # Once this run has been rate-limited, don't keep hammering the dead key on
-        # every subsequent probe — answer the rest deterministically right away.
-        if self.degraded:
-            from .mock import MockCandidateAdapter
-
-            return await MockCandidateAdapter(self.config).ask(context=context, question=question, trial=trial)
-
         key = resolve_openai_key()
         if not key:
             raise CandidateAdapterError(
@@ -104,15 +131,7 @@ class PromptAgentAdapter(CandidateAdapter):
         try:
             response = await asyncio.to_thread(self._call_openai, key, user_message, trial)
         except _RateLimited as exc:
-            # The key is unusable (free-tier 3/min, exhausted quota, etc). Rather
-            # than failing the whole run, answer this probe deterministically so
-            # the user still reaches a verdict — flagged as a demo result.
-            self.degraded = True
-            self.degraded_reason = str(exc)
-            from .mock import MockCandidateAdapter
-
-            fallback = MockCandidateAdapter(self.config)
-            return await fallback.ask(context=context, question=question, trial=trial)
+            raise rate_limit_failure(str(exc)) from exc
 
         latency_ms = max(1, int((time.perf_counter() - started) * 1000))
 
@@ -148,13 +167,10 @@ class PromptAgentAdapter(CandidateAdapter):
         timeout_s = float(os.environ.get("ASSAY_OPENAI_TIMEOUT_S", "90"))
         client = OpenAI(api_key=key, timeout=timeout_s)
         sampling = self._sampling_params(trial)
-        # A few quick retries absorb a transient 429 on a healthy key. But on a
-        # crippled key (free tier ~3/min, where rejected calls themselves keep the
-        # window saturated, or an exhausted quota) more retries are futile and just
-        # stall the run — so after a short budget we raise _RateLimited and the
-        # caller falls back to a deterministic demo answer.
-        max_attempts = max(1, int(os.environ.get("ASSAY_OPENAI_MAX_RETRIES", "2")))
-        max_wait = float(os.environ.get("ASSAY_OPENAI_MAX_RETRY_WAIT_S", "5"))
+        # Retries with backoff absorb transient 429s. When the budget runs out
+        # (exhausted quota, a key far below the run's request rate) we raise
+        # _RateLimited and the run fails with an explanation; nothing is faked.
+        max_attempts, max_wait = retry_budget()
         if sampling:
             max_attempts = max(max_attempts, 2)
         for attempt in range(1, max_attempts + 1):
@@ -177,7 +193,7 @@ class PromptAgentAdapter(CandidateAdapter):
             except APIStatusError as exc:
                 status = getattr(exc, "status_code", None)
                 message = str(getattr(exc, "message", None) or exc).lower()
-                # 429 (quota/limit) -> degrade to demo; transient 5xx -> brief retry.
+                # 429 outside RateLimitError (quota) -> fail the run; 5xx -> retry.
                 if status == 429:
                     raise _RateLimited(str(getattr(exc, "message", None) or exc)) from exc
                 # A model that rejects temperature/seed (some reasoning models):
@@ -188,6 +204,9 @@ class PromptAgentAdapter(CandidateAdapter):
                 if status is not None and 500 <= status < 600 and attempt < max_attempts:
                     time.sleep(min(max_wait, 2.0 ** attempt) + random.uniform(0.2, 0.8))
                     continue
+                failure = api_status_failure(status, str(getattr(exc, "message", None) or exc), self.model)
+                if failure is not None:
+                    raise failure from exc
                 raise
             except TypeError as exc:
                 # Some OpenAI SDK versions reject unsupported kwargs locally

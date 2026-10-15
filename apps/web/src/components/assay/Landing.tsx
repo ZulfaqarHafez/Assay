@@ -186,7 +186,7 @@ export function Landing({ onStart }: LandingProps) {
       <section id="get-started" className="lp-band lp-cta-band lp-band-loud" aria-label="Get started">
         <div className="lp-inner lp-cta">
           <h2>See the breach before your users do.</h2>
-          <p>Paste the agent.md you already ship. First verdict in about twenty seconds - no key needed for the demo.</p>
+          <p>Paste the agent.md you already ship. Lint findings are instant; the guardrail exam runs a real model against it.</p>
           <button type="button" className="assay-run-button" onClick={onStart}>
             Test my agent <ArrowRight size={17} />
           </button>

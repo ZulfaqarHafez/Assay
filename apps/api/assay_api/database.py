@@ -1189,7 +1189,7 @@ def _candidate_summary_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": payload.get("id"),
         "name": payload.get("name") or "Agent",
-        "adapter_type": payload.get("adapter_type") or "mock",
+        "adapter_type": payload.get("adapter_type") or "openai-compatible",
         "created_at": payload.get("created_at"),
     }
 
