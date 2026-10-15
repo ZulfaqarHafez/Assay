@@ -74,7 +74,7 @@ async function loadRuns(): Promise<{ runs: RunSummary[]; error: string | null }>
 function RunRow({ run }: { run: RunSummary }) {
   // Scorecard summary is attached to GET /runs/summary (no per-row fetch).
   const scored = run.status === "completed" && typeof run.certified === "boolean";
-  const verdict = scored ? (run.certified ? "ship" : "hold") : null;
+  const verdict = scored ? (run.behavioral === false ? "unverified" : run.certified ? "ship" : "hold") : null;
   const passCount = run.pass_count ?? 0;
   const total = run.total_count ?? 0;
   const agentName = run.candidate_name ?? run.candidate_id;
@@ -97,6 +97,8 @@ function RunRow({ run }: { run: RunSummary }) {
           <span className="ws-verdict ship"><CheckCircle2 size={13} /> {VERDICT_LABEL.ship}</span>
         ) : verdict === "hold" ? (
           <span className="ws-verdict hold"><AlertTriangle size={13} /> {VERDICT_LABEL.hold}</span>
+        ) : verdict === "unverified" ? (
+          <span className="ws-verdict unverified">{VERDICT_LABEL.unverified}</span>
         ) : (
           <span className="ws-verdict idle">-</span>
         )}

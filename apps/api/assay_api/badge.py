@@ -15,6 +15,7 @@ _BAND = {
     "ship": ("ship", "#3fa45b"),
     "probation": ("risky", "#d9a441"),
     "do_not_ship": ("hold", "#d1493f"),
+    "unverified": ("unverified", "#8a8a8a"),
 }
 _UNKNOWN = ("pending", "#8a8a8a")
 

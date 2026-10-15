@@ -55,11 +55,13 @@ emits an [embeddable status badge](#product-surface) you can drop in a README.
 - **An audited paper trail.** Every run is persisted as an experiment with a
   portable proof bundle (run, candidate, scorecard, event spans, TraceRazor audit
   summary, and a refined agent spec) you can export as JSON.
-- **Runs offline by default.** Mock grading is deterministic and needs no keys,
-  but it is demo plumbing: no model makes tool calls, so no tripwire can fire.
-  With an OpenAI key the live exam plays your definition under a reference model,
-  and degrades to the demo grader (with a banner) if the key is missing or
-  rate-limited. The SDK and MCP server label mock results `demo-only`.
+- **A verdict needs a model.** Without an OpenAI key Assay still lints the file
+  and runs the exam with a deterministic mock grader, but that is demo plumbing:
+  no model makes tool calls, so no tripwire can fire. Every surface (web, CLI,
+  SDK, MCP, badge) reports such a run as **Unverified**, never as Ship, and the
+  CLI exits with code 4. With a key the live exam plays your definition under a
+  reference model; if the key is rate-limited mid-run the result is also
+  Unverified.
 - **TraceRazor is optional.** The trace audit runs when `tracerazor` is installed
   (`pip install "assay[trace]"`). When it is absent the check is reported as
   skipped, never as a failed exam; pass `--require-trace` to insist on it.
@@ -112,7 +114,7 @@ result = sdk.run_exam(open("AGENTS.md").read(), "AGENTS.md", k=1)        # live 
 ```
 
 Every result says whether it is `live` (a model made the tool calls) or
-`mock` (deterministic demo grader; reported as `verdict: "demo-only"`, never
+`mock` (deterministic demo grader; reported as `verdict: "unverified"`, never
 as a guardrail verdict). The repo ships a `.mcp.json` so Claude Code picks the
 server up from a checkout. Tools, config, and the honest-result contract are in
 [docs/mcp.md](docs/mcp.md).
@@ -187,10 +189,13 @@ $env:PYTHONPATH="apps/api"
 python -m assay_api.cli run --agent-md .\agent.md --pack hr-v1 --pass-threshold 0.8
 ```
 
-Useful flags: `--k` (trials per seen/held-out item), `--live` (evaluate the agent
-with OpenAI instead of mock mode), and `--json-out` / `--proof-out` /
-`--summary-out` to write the scorecard JSON, proof bundle JSON, and Markdown
-verdict summary. The reusable GitHub Action lives at `.github/actions/assay` and
+Useful flags: `--k` (trials per seen/held-out item), `--model` (which model plays
+the agent), `--live` / `--mock` (force the mode; live is the default when a key is
+present), and `--json-out` / `--proof-out` / `--summary-out` to write the
+scorecard JSON, proof bundle JSON, and Markdown verdict summary. Exit codes:
+`0` ship, `1` gate failed, `2` runtime error, `3` invalid input, `4` unverified
+(no key, so the run was a demo and there is no verdict to gate on). Set
+`OPENAI_API_KEY` in the pipeline for a real verdict. The reusable GitHub Action lives at `.github/actions/assay` and
 uploads those three artifacts.
 
 ## How a run flows

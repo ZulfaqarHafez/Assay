@@ -364,7 +364,8 @@ function DeployabilityMeter({
   const label = decisionLabel(verdict);
   const blocked = decision?.blocking_reasons ?? scorecard.failure_reasons ?? [];
   const warnings = decision?.warnings ?? [];
-  const tone = verdict === "ship" ? "ship" : verdict === "probation" ? "probation" : "hold";
+  const tone =
+    verdict === "ship" ? "ship" : verdict === "probation" ? "probation" : verdict === "unverified" ? "unverified" : "hold";
   const passValues = Object.values(scorecard.pass_at_k ?? {});
   const traceFixCount = scorecard.trace_audit?.fixes?.length ?? 0;
   const tokensSaved = scorecard.trace_audit?.savings?.tokens_saved;

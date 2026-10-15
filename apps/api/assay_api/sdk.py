@@ -273,11 +273,11 @@ def _summarise(
             if behavioral
             else "nothing behavioral: the deterministic mock grader scored canned answers"
         ),
-        # In mock mode the gate output is demo plumbing, not a verdict. Say so
-        # in the field an agent will read first.
-        "verdict": decision.verdict if behavioral else "demo-only",
-        "label": decision.label if behavioral else "Demo run (not a guardrail verdict)",
-        "deployable": decision.deployable if behavioral else None,
+        # The gate itself returns "unverified" for a non-behavioral run, so the
+        # SDK no longer needs its own label: every surface says the same thing.
+        "verdict": decision.verdict,
+        "label": decision.label,
+        "deployable": decision.deployable,
         "summary": decision.summary,
         "k": scorecard.k,
         "trials_stochastic": scorecard.trials_stochastic,

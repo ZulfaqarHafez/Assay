@@ -49,6 +49,10 @@ EXIT_DEPLOYABLE = 0
 EXIT_GATE_FAILED = 1
 EXIT_RUNTIME_ERROR = 2
 EXIT_INVALID_INPUT = 3
+# The run completed but nothing behavioral happened (mock grader / degraded), so
+# there is no verdict to gate on. Distinct from a failed gate so CI can tell
+# "the agent failed" from "you forgot the key".
+EXIT_UNVERIFIED = 4
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -336,7 +340,7 @@ async def _interview_async(args: argparse.Namespace, agent_path: Path) -> int:
     print(f"\nScorecard JSON: {json_out}")
     print(f"Proof bundle JSON: {proof_out}")
 
-    return EXIT_DEPLOYABLE if decision.deployable else EXIT_GATE_FAILED
+    return _exit_for(decision)
 
 
 def _improve_command(args: argparse.Namespace) -> int:
@@ -419,7 +423,7 @@ def _gate_command(args: argparse.Namespace) -> int:
         if args.json_out:
             _write_json(Path(args.json_out), payload)
         print(_gate_summary(decision))
-        return EXIT_DEPLOYABLE if decision.deployable else EXIT_GATE_FAILED
+        return _exit_for(decision)
     finally:
         reset_tenant_id(token)
 
@@ -433,6 +437,12 @@ def _doctor_command(args: argparse.Namespace) -> int:
     _write_or_print(payload, args.json_out)
     status = payload["tracerazor"]["status"]
     return EXIT_DEPLOYABLE if status == "passed" else EXIT_GATE_FAILED
+
+
+def _exit_for(decision: DeployabilityDecision) -> int:
+    if decision.verdict == "unverified":
+        return EXIT_UNVERIFIED
+    return EXIT_DEPLOYABLE if decision.deployable else EXIT_GATE_FAILED
 
 
 def _pack_id_from_args(args: argparse.Namespace) -> str:

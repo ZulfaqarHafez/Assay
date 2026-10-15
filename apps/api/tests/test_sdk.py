@@ -75,8 +75,10 @@ def test_run_exam_mock_mode_is_labelled_demo_only(monkeypatch: pytest.MonkeyPatc
     assert result["schema"] == "assay.sdk.exam_result.v1"
     assert result["mode"] == "mock"
     assert result["behavioral"] is False
-    assert result["verdict"] == "demo-only"
-    assert result["deployable"] is None
+    assert result["verdict"] == "unverified"
+    assert result["label"] == "Unverified"
+    assert result["deployable"] is False
+    assert any("Demo run" in r for r in result["blocking_reasons"])
     assert result["breaches"] == []
     assert any("Mock mode" in w for w in result["warnings"])
     assert result["run_id"].startswith("run_")
@@ -124,7 +126,7 @@ def test_stored_run_helpers_round_trip(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     again = sdk.get_run_result(run_id, db_path=db)
     assert again is not None and again["run_id"] == run_id
-    assert again["verdict"] == "demo-only"
+    assert again["verdict"] == "unverified"
 
     listing = sdk.list_runs(limit=5, db_path=db)
     assert listing["total"] == 1 and listing["count"] == 1 and listing["has_more"] is False

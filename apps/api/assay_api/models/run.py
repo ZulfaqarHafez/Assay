@@ -92,6 +92,10 @@ class Scorecard(BaseModel):
     # run that degraded), so the k trials are identical and pass^k is a single
     # held-out check rather than a reliability-under-resampling measure.
     trials_stochastic: bool = True
+    # True when a real model answered (live adapter, not degraded). False for the
+    # deterministic mock grader: no model made tool calls, no tripwire could fire,
+    # so the run exercised nothing and can only ever be "unverified".
+    behavioral: bool = True
     failure_reasons: list[str] = Field(default_factory=list)
     lessons_applied: list[str] = Field(default_factory=list)
     prior_run_id: str | None = None

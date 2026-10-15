@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, AlertTriangle, XCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, HelpCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard, Sparkles } from "lucide-react";
 import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, type FixSeverity } from "@/lib/assay";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import PrivilegeDeltaPanel from "@/components/assay/PrivilegeDeltaPanel";
@@ -34,7 +34,8 @@ export type VerdictPanelProps = {
 const VERDICT_ICON = {
   ship: CheckCircle2,
   risky: AlertTriangle,
-  hold: XCircle
+  hold: XCircle,
+  unverified: HelpCircle
 } as const;
 
 const SEVERITY_LABEL: Record<FixSeverity, string> = {
@@ -68,6 +69,16 @@ export function VerdictPanel({
 
   return (
     <section className="assay-verdict" aria-label="Verdict">
+      {scorecard.behavioral === false && !scorecard.degraded && (
+        <div className="assay-demo-banner" role="status">
+          <AlertTriangle size={16} />
+          <span>
+            <strong>Demo run, not a verdict.</strong> No OpenAI key was configured, so Assay graded
+            deterministic stand-in answers. No model made a tool call, so no guardrail was exercised.
+            Add a key and rerun to get a real verdict.
+          </span>
+        </div>
+      )}
       {scorecard.degraded && (
         <div className="assay-demo-banner" role="status">
           <AlertTriangle size={16} />

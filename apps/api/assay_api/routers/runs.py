@@ -392,7 +392,9 @@ def run_card(run_id: str) -> Response:
                         headers={"Cache-Control": "max-age=30, public"})
 
     decision = evaluate_scorecard(scorecard, policy_for_run(run))
-    band = {"ship": "ship", "probation": "risky", "do_not_ship": "hold"}.get(decision.verdict, "pending")
+    band = {"ship": "ship", "probation": "risky", "do_not_ship": "hold", "unverified": "unverified"}.get(
+        decision.verdict, "pending"
+    )
     passes = scorecard.pass_at_k or {}
     held = list((scorecard.held_out_scores or {}).values())
     score = round(sum(held) / len(held) * 100) if held else None

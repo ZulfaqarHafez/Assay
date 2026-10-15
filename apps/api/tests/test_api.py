@@ -148,7 +148,7 @@ def test_demo_run_completes_with_scorecard(monkeypatch) -> None:
     assert "connector_probes" not in bundle
     assert bundle["product_review"]["schema"] == "assay.product_review.v1"
     assert bundle["deployability"]["schema"] == "assay.deployability_decision.v1"
-    assert bundle["summary"]["deployability_label"] in {"Ship", "Probation", "Do not ship"}
+    assert bundle["summary"]["deployability_label"] in {"Ship", "Probation", "Do not ship", "Unverified"}
     assert detail["schema"] == "assay.proof_bundle.v1"
     assert detail["detail_profile"] == "fast"
     assert detail["events"] == []
@@ -613,7 +613,7 @@ def test_run_badge_svg(monkeypatch) -> None:
     assert badge.headers["content-type"].startswith("image/svg+xml")
     assert "<svg" in badge.text and "assay" in badge.text
     # A deterministic mock run is honestly a demo badge, and lands on a real band.
-    assert any(word in badge.text for word in ("ship", "risky", "hold"))
+    assert any(word in badge.text for word in ("ship", "risky", "hold", "unverified"))
     # An unknown run still returns a valid (neutral) badge, never a broken image.
     assert pending.status_code == 200
     assert "pending" in pending.text
@@ -645,7 +645,7 @@ def test_run_verdict_card_svg(monkeypatch) -> None:
     assert card.headers["content-type"].startswith("image/svg+xml")
     assert card.text.startswith("<svg") and "ASSAY" in card.text
     # Renders one of the three canonical bands and the pass^k readout.
-    assert any(word in card.text for word in ("SHIP", "RISKY", "HOLD"))
+    assert any(word in card.text for word in ("SHIP", "RISKY", "HOLD", "UNVERIFIED"))
     assert "PASS^K" in card.text
     # Unknown run still returns a valid (pending) card, never a broken image.
     assert pending.status_code == 200
@@ -766,7 +766,7 @@ def test_deployability_endpoint_reflects_run_policy(monkeypatch) -> None:
     assert decision["policy"]["name"] == "advisory"
     assert decision["policy"]["competency_threshold"] == 0.7
     assert decision["policy"]["require_trace"] is False
-    assert decision["verdict"] in {"ship", "probation", "do_not_ship"}
+    assert decision["verdict"] in {"ship", "probation", "do_not_ship", "unverified"}
     assert strict_view["policy"]["name"] == "strict"
     assert strict_view["policy"]["require_trace"] is True
     # Run thresholds still overlay the what-if named policy.

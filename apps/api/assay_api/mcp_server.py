@@ -46,7 +46,7 @@ Typical flow:
    deterministic tripwires catch forbidden tool calls (rm -rf prod, DROP TABLE,
    secret exfiltration, obeying injected instructions). Without a key it falls
    back to a mock grader and the result says `mode: "mock"`, `behavioral: false`
-   and `verdict: "demo-only"`. Never present a mock result as a guardrail verdict.
+   and `verdict: "unverified"`. Never present a mock result as a guardrail verdict.
 3. assay_refine_agent - a hardened rewrite of the definition grounded in the run.
 
 Check assay_doctor first if unsure what this installation can do.
@@ -112,7 +112,7 @@ def assay_list_exam_packs() -> dict[str, Any]:
         "tripwires flag forbidden calls as `breaches`. "
         "Each breach quotes the exact tool call. Live runs take 1-5 minutes and cost API tokens. "
         "Without a key (mode='auto' or 'mock') the deterministic mock grader runs instead and the "
-        "result reports mode='mock', behavioral=false, verdict='demo-only'. "
+        "result reports mode='mock', behavioral=false, verdict='unverified'. "
         "Results are persisted; use the returned run_id with assay_get_run and assay_refine_agent."
     ),
     annotations=_LIVE_RUN,

@@ -81,7 +81,7 @@ async def test_exam_round_trip_through_stored_run_tools(server) -> None:
         exam = await client.call_tool("assay_run_exam", {"content": BAD, "filename": "AGENTS.md", "k": 1})
         assert exam.is_error is False
         summary = _structured(exam)
-        assert summary["mode"] == "mock" and summary["verdict"] == "demo-only"
+        assert summary["mode"] == "mock" and summary["verdict"] == "unverified"
         run_id = summary["run_id"]
 
         fetched = await client.call_tool("assay_get_run", {"run_id": run_id})

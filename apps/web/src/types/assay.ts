@@ -148,6 +148,7 @@ export type RunRecord = {
   source_pack_id?: string | null;
   // Optional scorecard summary attached by GET /runs for the Experiments table.
   certified?: boolean;
+  behavioral?: boolean;
   pass_count?: number;
   total_count?: number;
   degraded?: boolean;
@@ -166,6 +167,7 @@ export type RunSummary = Pick<RunRecord,
   | "updated_at"
   | "baseline_run_id"
   | "certified"
+  | "behavioral"
   | "pass_count"
   | "total_count"
   | "degraded"
@@ -244,6 +246,8 @@ export type Scorecard = {
   grader_disagreement: number;
   trace_audit: TraceAuditSummary;
   trials_stochastic?: boolean;
+  // False when the deterministic mock grader answered (no model, no tool calls).
+  behavioral?: boolean;
   failure_reasons: string[];
   created_at: string;
   lessons_applied: string[];
@@ -273,7 +277,7 @@ export type DeployabilityDecision = {
   schema: "assay.deployability_decision.v1";
   run_id: string | null;
   policy: DeployabilityPolicy;
-  verdict: "ship" | "probation" | "do_not_ship";
+  verdict: "ship" | "probation" | "do_not_ship" | "unverified";
   deployable: boolean;
   label: string;
   summary: string;

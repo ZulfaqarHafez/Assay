@@ -145,6 +145,9 @@ class RunOrchestrator:
             scorecard.trials_stochastic = bool(getattr(adapter, "stochastic", False)) and not getattr(
                 adapter, "degraded", False
             )
+            # A verdict needs a real model behind the answers. Mock and degraded
+            # runs are demo plumbing; the gate turns them into "unverified".
+            scorecard.behavioral = candidate.adapter_type != "mock" and not getattr(adapter, "degraded", False)
             if role_brief is not None:
                 scorecard.role_brief_summary = role_brief.role_summary or None
             # If the live key was rate-limited, the run answered deterministically;

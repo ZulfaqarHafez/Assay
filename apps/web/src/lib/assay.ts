@@ -9,7 +9,7 @@ import { VERDICT_HEADLINE, bandFromDecision, type VerdictBand } from "@/lib/verd
  * scorecard into that human verdict layer.
  */
 
-export type Verdict = "ship" | "risky" | "hold";
+export type Verdict = VerdictBand;
 
 export type VerdictSummary = {
   verdict: Verdict;
@@ -78,7 +78,8 @@ export function deriveVerdict(
 
   const tracePasses = scorecard.trace_audit?.passes ?? false;
   let verdict: VerdictBand;
-  if (scorecard.certified && tracePasses) verdict = "ship";
+  if (scorecard.behavioral === false) verdict = "unverified";
+  else if (scorecard.certified && tracePasses) verdict = "ship";
   else if (scorecard.certified) verdict = "risky";
   else verdict = "hold";
 

@@ -26,8 +26,46 @@ class _FakeAudit:
         )
 
 
+class _SafeLiveAdapter:
+    """Stands in for the live sandboxed adapter: a real-looking model that refuses."""
+
+    stochastic = True
+    degraded = False
+
+    def __init__(self, candidate):
+        self.model = candidate.model or "gpt-4.1"
+
+    async def ask(self, context, question, trial=1):
+        from assay_api.adapters.mock import _ideal_answer
+        from assay_api.models import CandidateResponse, TokenCounts
+
+        # The keyword packs' model answer, as a live model would plausibly give.
+        return CandidateResponse(answer=_ideal_answer(question)[0], tokens=TokenCounts(total=12))
+
+    async def ask_scenario(self, context, question, scenario, trial=1):
+        from assay_api.models import CandidateResponse, TokenCounts
+
+        return CandidateResponse(
+            answer="I cannot do that; it is destructive and irreversible. I will confirm scope first.",
+            tool_calls=[],
+            tokens=TokenCounts(total=8),
+        )
+
+    async def aclose(self):
+        return None
+
+
+def _go_live(monkeypatch) -> None:
+    """Make the CLI take the live path without a real key or network."""
+    from assay_api import orchestrator as orch
+
+    monkeypatch.setattr("assay_api.cli.resolve_openai_key", lambda: "sk-test")
+    monkeypatch.setattr(orch, "adapter_for", _SafeLiveAdapter)
+
+
 def test_assay_cli_run_writes_artifacts_and_exits_zero(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+    _go_live(monkeypatch)
     agent_md = tmp_path / "agent.md"
     score_json = tmp_path / "scorecard.json"
     proof_json = tmp_path / "proof.json"
@@ -70,6 +108,7 @@ def test_assay_cli_run_writes_artifacts_and_exits_zero(tmp_path: Path, monkeypat
 
 def test_assay_cli_exits_one_for_failing_scorecard(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+    _go_live(monkeypatch)
     agent_md = tmp_path / "agent.md"
     pack_file = tmp_path / "hard-pack.json"
     score_json = tmp_path / "scorecard.json"
@@ -221,7 +260,6 @@ def _run_args(tmp_path: Path, *extra: str) -> list[str]:
     return [
         "run",
         "--agent-md", str(agent_md),
-        "--mock",
         "--k", "1",
         "--db-path", str(tmp_path / "assay.db"),
         "--json-out", str(tmp_path / "scorecard.json"),
@@ -249,6 +287,7 @@ def test_cli_scan_includes_static_lint(tmp_path: Path) -> None:
 
 def test_cli_missing_tracerazor_is_skipped_by_default(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _UnavailableAudit)
+    _go_live(monkeypatch)
 
     exit_code = cli.main(_run_args(tmp_path))
     payload = json.loads((tmp_path / "scorecard.json").read_text(encoding="utf-8"))
@@ -256,12 +295,14 @@ def test_cli_missing_tracerazor_is_skipped_by_default(tmp_path: Path, monkeypatc
     assert payload["deployability"]["skipped_checks"] == ["tracerazor"]
     assert not any("not importable" in r for r in payload["blocking_failure_reasons"])
     # The exam itself decides; the missing optional dependency does not.
-    assert exit_code == (0 if payload["passed"] else 1)
-    assert payload["passed"] is payload["deployability"]["deployable"]
+    assert exit_code == 0
+    assert payload["passed"] is True
+    assert payload["deployability"]["verdict"] == "probation"
 
 
 def test_cli_explicit_require_trace_blocks_when_tracerazor_is_missing(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _UnavailableAudit)
+    _go_live(monkeypatch)
 
     assert cli.main(_run_args(tmp_path, "--require-trace")) == 1
     payload = json.loads((tmp_path / "scorecard.json").read_text(encoding="utf-8"))
@@ -276,3 +317,20 @@ def test_cli_help_no_longer_describes_an_interview_product(capsys) -> None:
     text = capsys.readouterr().out.lower()
     assert "guardrails" in text
     assert "interview loop" not in text
+
+
+def test_cli_mock_run_is_unverified_and_exits_four(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+
+    exit_code = cli.main(_run_args(tmp_path, "--mock"))
+    payload = json.loads((tmp_path / "scorecard.json").read_text(encoding="utf-8"))
+    summary = (tmp_path / "summary.md").read_text(encoding="utf-8")
+
+    assert exit_code == cli.EXIT_UNVERIFIED == 4
+    assert payload["passed"] is False
+    assert payload["deployability"]["verdict"] == "unverified"
+    assert payload["scorecard"]["behavioral"] is False
+    assert any("Demo run" in r for r in payload["blocking_failure_reasons"])
+    assert "Assay deployability: Unverified" in summary
+    # The gate command agrees with the run command.
+    assert cli.main(["gate", "--run", payload["run_id"], "--db-path", str(tmp_path / "assay.db")]) == 4

@@ -21,12 +21,13 @@ Every exam result carries three fields you should read before anything else:
 | --- | --- |
 | `mode` | `live` (a real model made the tool calls inside the sandbox) or `mock` (deterministic demo grader, no model) |
 | `behavioral` | `true` only in live mode |
-| `verdict` | `ship`, `probation`, `do_not_ship` in live mode; the literal `demo-only` in mock mode |
+| `verdict` | `ship`, `probation`, `do_not_ship` in live mode; always `unverified` in mock mode |
 
 A mock run is useful to check plumbing, packs, and persistence. It cannot
-catch a guardrail breach because no tool call is ever made, so the SDK never
-reports a mock run as deployable (`deployable` is `null`) and attaches a
-warning explaining why. Live mode needs `OPENAI_API_KEY` in the environment
+catch a guardrail breach because no tool call is ever made, so the gate itself
+returns `unverified` with `deployable: false` and a "Demo run" blocking reason,
+and the SDK attaches a warning explaining why. The web app, CLI (exit code 4),
+badge, and card all show the same Unverified state. Live mode needs `OPENAI_API_KEY` in the environment
 or a root `.env`.
 
 ## Python SDK
