@@ -14,6 +14,30 @@ Single source of truth for anyone (human or coding agent) picking this up. Cover
 - **Web dependencies:** upgraded to Next.js 16.4.1 (plus PostCSS 8.5.30 and sharp 0.35.5 overrides) because new advisories, including a critical one, made `npm audit --omit=dev` fail; it is now clean. `eslint-config-next` 16 adds React Compiler rules: `react-hooks/set-state-in-effect` and `react-hooks/immutability` flag 11 pre-existing spots and are set to warn until those effects are refactored.
 - **Tests:** the hermetic suite uses a scripted model stand-in that lives only in `apps/api/tests/scripted_model.py` (opt out with `@pytest.mark.no_model`). A real reference agent runs over a local socket in `test_http_candidate_integration.py`. `@pytest.mark.live` tests call OpenAI and run when `OPENAI_API_KEY` is set; CI's `live` job runs them when the repo has that secret.
 
+## Update (2026-10-15): website shows real capability
+
+- The landing page renders two genuine exam results bundled at
+  `apps/web/src/data/showcase/{careful,careless}.json` (schema
+  `assay.showcase_run.v1`). Regenerate them with `scripts/export_showcase.py`
+  against a local API with `ASSAY_HTTP_CANDIDATE_ALLOW_PRIVATE=1` and the two
+  agents in `examples/http_candidate` (`server.py` careful on :8091,
+  `careless.py` on :8092). Nothing on the page is typed by hand: the hero card,
+  proof strip, handback grid and the dark "two real runs" band all read from
+  that JSON (`apps/web/src/lib/showcase.ts`).
+- Surfaces and their exact commands live in `apps/web/src/lib/surfaces.ts`
+  (CLI, MCP, SDK, GitHub Action, HTTP API, own HTTP agent, exit codes, the
+  no-key table). Keep them in step with `publish.yml` and the release URL.
+- The no-key path is a structured screen (`LintOnlyResult.tsx`): guardrail
+  coverage per category, dangerous grants, findings, then the three ways to run
+  the exam. The run page leads with the breaches (`BreachList.tsx`, parser in
+  `lib/breaches.ts`), names who played the agent, and shows the privilege delta.
+- README screenshots come from `scripts/capture-readme-shots.mjs` (needs the
+  web app and API; `PLAYWRIGHT_CHROMIUM_PATH` to use a system Chromium). The
+  files are `docs/images/01..08-*.png`; the old 01-05 set was removed.
+- Style rules applied across the site and README: no em dashes, one accent,
+  concrete numbers from the runs. Generated API text was fixed too
+  (`agent_refinery.py`, `role_qualification.py`).
+
 ## Deployment update (2026-07-04)
 
 - **Task A web cut:** implemented. `/agents`, `/suites`, old suite import/export routes, `/connectors`, `/connectors/probe`, and standalone role-analysis routes are retired and covered by 404 tests.

@@ -12,7 +12,7 @@ import {
 import { useRunStream } from "@/lib/useRunStream";
 import { errorMessage, type LoadState } from "@/lib/derive";
 import AgentIntake, { type IntakePolicy } from "@/components/assay/AgentIntake";
-import StaticLintPanel from "@/components/assay/StaticLintPanel";
+import LintOnlyResult from "@/components/assay/LintOnlyResult";
 import { AGENT_TEMPLATES } from "@/lib/assayTemplates";
 import type {
   AgentSpec,
@@ -430,25 +430,7 @@ export function HomeClient({ initialBoot = null }: HomeClientProps) {
           </div>
         )}
         {phase === "lint" && lintOnly && (
-          <section className="assay-lint-only" aria-label="Static lint result">
-            <div className="assay-demo-banner" role="status">
-              <AlertTriangle size={16} />
-              <span>
-                <strong>Lint only - the guardrail exam did not run.</strong> {lintOnly.reason}
-              </span>
-            </div>
-            <h2 className="assay-lint-only-title">{lintOnly.name}</h2>
-            {staticLint && staticLint.findings.length > 0 ? (
-              <StaticLintPanel report={staticLint} />
-            ) : (
-              <p className="assay-muted">No static findings: dangerous grants, guardrail language, and secrets all check out.</p>
-            )}
-            <div className="assay-failcard-actions">
-              <button type="button" className="assay-ghost-button" onClick={testAnother}>
-                Back to start
-              </button>
-            </div>
-          </section>
+          <LintOnlyResult name={lintOnly.name} reason={lintOnly.reason} report={staticLint} onBack={testAnother} />
         )}
         {phase === "verdict" && scorecard && (
           <VerdictPanel

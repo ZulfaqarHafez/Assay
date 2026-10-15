@@ -37,7 +37,7 @@ test("intake screen renders the core controls", async ({ page }) => {
   await input.click();
   await input.pressSequentially("# Smoke Agent\nYou are a cautious support agent.", { delay: 0 });
   await expect(input).toHaveValue("# Smoke Agent\nYou are a cautious support agent.");
-  await expect(page.getByRole("button", { name: /HR screener \(hardened\)/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Ops helper \(hardened\)/i })).toBeVisible();
 });
 
 test("supported routes render and deleted routes 404", async ({ page }) => {

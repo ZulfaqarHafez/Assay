@@ -19,7 +19,7 @@ export default async function ExperimentsPage() {
       <header className="ws-head">
         <div>
           <h1>Experiments</h1>
-          <p>Every run, scored and certified at pass^k. Open one to compare against its previous run and inspect the trace.</p>
+          <p>Every run, with who played the agent and the pass^k result. Open one for the breaches, the privilege delta, the trace and the rewrite.</p>
         </div>
         <span className="ws-count">{runs.length} run{runs.length === 1 ? "" : "s"}</span>
       </header>
@@ -43,11 +43,13 @@ export default async function ExperimentsPage() {
             <thead>
               <tr>
                 <th>Agent</th>
-                <th>Suite</th>
+                <th>Pack</th>
+                <th>Played by</th>
                 <th>Verdict</th>
-                <th className="num">Score</th>
+                <th className="num">pass^k</th>
                 <th className="num">k</th>
                 <th>Status</th>
+                <th>When</th>
                 <th></th>
               </tr>
             </thead>
@@ -85,12 +87,15 @@ function RunRow({ run }: { run: RunSummary }) {
         <Link prefetch={false} href={`/runs/${run.id}`} className="ws-cell-strong">{agentName}</Link>
         <div className="ws-cell-sub mono">{run.id}</div>
       </td>
-      <td data-label="Suite">
+      <td data-label="Pack">
         {run.qualification_status === "tailored" ? (
           <span className="ws-tag" title={run.role_brief_summary ?? "Probes tailored to this agent"}>Tailored</span>
         ) : (
           run.exam_pack_id
         )}
+      </td>
+      <td data-label="Played by">
+        <span className="ws-tag" title={playedByTitle(run.candidate_adapter_type)}>{playedByLabel(run.candidate_adapter_type)}</span>
       </td>
       <td data-label="Verdict">
         {verdict === "ship" ? (
@@ -103,12 +108,32 @@ function RunRow({ run }: { run: RunSummary }) {
           <span className="ws-verdict idle">-</span>
         )}
       </td>
-      <td className="num" data-label="Score">{scored ? `${passCount}/${total}` : "-"}</td>
+      <td className="num" data-label="pass^k">{scored ? `${passCount}/${total}` : "-"}</td>
       <td className="num" data-label="k">{run.k}x</td>
       <td data-label="Status"><RunStatus status={run.status} /></td>
+      <td data-label="When" className="ws-cell-sub" title={run.created_at ?? ""}>{formatWhen(run.created_at ?? "")}</td>
       <td className="num ws-row-action"><Link prefetch={false} href={`/runs/${run.id}`} className="ws-row-link">Open -&gt;</Link></td>
     </tr>
   );
+}
+
+function playedByLabel(adapter: RunSummary["candidate_adapter_type"]): string {
+  if (adapter === "http") return "HTTP agent";
+  if (adapter === "openai-compatible") return "OpenAI model";
+  return adapter ? adapter : "unknown";
+}
+
+function playedByTitle(adapter: RunSummary["candidate_adapter_type"]): string {
+  if (adapter === "http") return "The candidate's own endpoint answered every probe";
+  if (adapter === "openai-compatible") return "A reference model played the definition with its declared tools";
+  return "Adapter not recorded";
+}
+
+function formatWhen(iso: string): string {
+  if (!iso) return "-";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 }
 
 function RunStatus({ status }: { status: RunSummary["status"] }) {

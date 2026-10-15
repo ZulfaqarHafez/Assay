@@ -391,7 +391,7 @@ describe("Assay page", () => {
     expect(screen.queryByRole("button", { name: /run.*guardrail test/i })).toBeNull();
     expect(screen.getByText(/runs real adversarial attacks/i)).toBeInTheDocument();
     // A starter template is offered as the fallback.
-    expect(screen.getByText(/HR screener \(hardened\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ops helper \(hardened\)/i })).toBeInTheDocument();
     // Intake accepts structured agent configs, not just markdown.
     const fileInput = container.querySelector('input[type="file"]');
     const accept = fileInput?.getAttribute("accept") ?? "";
@@ -415,7 +415,7 @@ describe("Assay page", () => {
   it("runs an uploaded agent.md and lands on a verdict", async () => {
     const user = userEvent.setup();
     renderHome();
-    const template = await screen.findByText(/HR screener \(hardened\)/i);
+    const template = await screen.findByRole("button", { name: /Ops helper \(hardened\)/i });
     await user.click(template);
     const runButton = screen.getByRole("button", { name: /run.*guardrail test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
@@ -462,7 +462,7 @@ describe("Assay page", () => {
     const user = userEvent.setup();
     examAvailable = false;
     renderHome({ ...workspaceBootPayload, health: { ...workspaceBootPayload.health, openai_configured: false } });
-    const template = await screen.findByText(/HR screener \(hardened\)/i);
+    const template = await screen.findByRole("button", { name: /Ops helper \(hardened\)/i });
     await user.click(template);
     const lintButton = screen.getByRole("button", { name: /lint the definition/i });
     await waitFor(() => expect(lintButton).toBeEnabled());
@@ -481,7 +481,7 @@ describe("Assay page", () => {
   it("uses the current run as the baseline when testing the improved version", async () => {
     const user = userEvent.setup();
     renderHome();
-    const template = await screen.findByText(/HR screener \(hardened\)/i);
+    const template = await screen.findByRole("button", { name: /Ops helper \(hardened\)/i });
     await user.click(template);
     const runButton = screen.getByRole("button", { name: /run.*guardrail test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
