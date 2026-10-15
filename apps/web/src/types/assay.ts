@@ -282,6 +282,8 @@ export type DeployabilityDecision = {
   critical_findings: string[];
   passed_checks: string[];
   failed_checks: string[];
+  // Checks skipped because an optional dependency (TraceRazor) is absent.
+  skipped_checks?: string[];
   metrics: Record<string, unknown>;
   generated_at: string;
 };

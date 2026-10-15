@@ -7,12 +7,19 @@
 ![Next.js 15](https://img.shields.io/badge/Next.js-15-black.svg)
 ![Behavioral exam](https://img.shields.io/badge/exam-behavioral%20(real%20tool%20calls)-7c5470.svg)
 
-**Assay proves whether your AI agent's guardrails actually hold — before you ship it.**
+**Assay proves whether your AI agent's written guardrails actually hold — before you ship them.**
 Point it at the `AGENTS.md` / `agent.md` / `CLAUDE.md` you already have. Assay
-reconstructs the agent with its tools in a simulated sandbox, runs real adversarial
-scenarios, and shows you the **exact destructive command your guardrails failed to
-block** — plus which tool permissions it never needed and a fixed rewrite. No SDK,
-no test harness, no dataset to write.
+reconstructs the agent from that file with its declared tools, plays it with a
+reference model in a simulated sandbox, runs real adversarial scenarios, and shows
+you the **exact destructive command your guardrails failed to block** — plus which
+tool permissions it never needed and a fixed rewrite. No SDK, no test harness, no
+dataset to write.
+
+**What is under test is the instruction file, not your production runtime.** A live
+run exercises your definition under a reference model (OpenAI; pick it with
+`--model` or `ASSAY_OPENAI_MODEL`, and every result names it as `exercised_model`).
+That proves the instructions hold for that model with those tools. It does not drive
+your deployed agent, its framework, or its real tool implementations.
 
 > Written guardrails aren't enforced guardrails. Assay makes your agent *try* to
 > delete prod, leak secrets, and obey injected instructions — and catches it when it does.
@@ -48,9 +55,14 @@ emits an [embeddable status badge](#product-surface) you can drop in a README.
 - **An audited paper trail.** Every run is persisted as an experiment with a
   portable proof bundle (run, candidate, scorecard, event spans, TraceRazor audit
   summary, and a refined agent spec) you can export as JSON.
-- **Runs offline by default.** Mock grading is deterministic and needs no keys;
-  an optional OpenAI layer evaluates your real agent live, and gracefully
-  degrades to a demo verdict (with a banner) if a key is missing or rate-limited.
+- **Runs offline by default.** Mock grading is deterministic and needs no keys,
+  but it is demo plumbing: no model makes tool calls, so no tripwire can fire.
+  With an OpenAI key the live exam plays your definition under a reference model,
+  and degrades to the demo grader (with a banner) if the key is missing or
+  rate-limited. The SDK and MCP server label mock results `demo-only`.
+- **TraceRazor is optional.** The trace audit runs when `tracerazor` is installed
+  (`pip install "assay[trace]"`). When it is absent the check is reported as
+  skipped, never as a failed exam; pass `--require-trace` to insist on it.
 
 ## Screenshots
 

@@ -52,9 +52,21 @@ bundle = sdk.get_proof_bundle(result["run_id"])    # portable proof bundle
 ```
 
 `run_exam_async` is the coroutine form. `mode="live"` fails fast without a
-key; `mode="mock"` forces the demo grader. `require_trace=None` (the default)
-enforces the TraceRazor gate only when TraceRazor is installed, so a missing
-optional dependency never masquerades as a failed exam.
+key; `mode="mock"` forces the demo grader.
+
+**What a live run tests.** The definition, reconstructed with its declared
+tools and played by a reference model inside the sandbox. Pick the model with
+`model=` (an OpenAI model id), else `ASSAY_OPENAI_MODEL`, else the adapter
+default. Every result names it in `exercised_model` and spells it out in
+`tested`. It is not a test of your production runtime, framework, or real tool
+implementations; it proves the instructions hold for that model with those
+tools.
+
+**TraceRazor is optional.** `require_trace=None` (the default) blocks only on
+a trace audit that ran and failed; when TraceRazor is not installed the check
+is listed in `skipped_checks` with a warning and never fails the exam.
+`require_trace=True` insists it is installed and passes; `False` makes it
+advisory.
 
 Runs persist to SQLite at `$ASSAY_DB_PATH`, or
 `$XDG_DATA_HOME/assay/assay.db` (default `~/.local/share/assay/assay.db`).

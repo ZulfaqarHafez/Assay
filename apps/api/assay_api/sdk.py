@@ -197,14 +197,15 @@ def _policy(
     policy_name: str | None,
 ) -> DeployabilityPolicy:
     policy = load_default_policy(policy_name)
-    effective_trace = trace_available() if require_trace is None else bool(require_trace)
-    return policy.model_copy(
-        update={
-            "k": k,
-            "competency_threshold": pass_threshold,
-            "require_trace": effective_trace,
-        }
-    )
+    update: dict[str, Any] = {"k": k, "competency_threshold": pass_threshold}
+    if require_trace is True:
+        # Caller insists on the trace audit: it must be installed and pass.
+        update.update(require_trace=True, require_trace_installed=True)
+    elif require_trace is False:
+        update.update(require_trace=False, require_trace_installed=False)
+    # None: policy default. A trace that runs and fails blocks; a missing
+    # TraceRazor is skipped with a warning (deployability.evaluate_scorecard).
+    return policy.model_copy(update=update)
 
 
 def _breaches(decision: DeployabilityDecision, scorecard: Scorecard) -> list[dict[str, Any]]:
@@ -263,6 +264,15 @@ def _summarise(
         "exam_pack_id": run.exam_pack_id,
         "mode": mode,
         "behavioral": behavioral,
+        # What was actually exercised: the definition, played by this model,
+        # with the tools it declares. Not the caller's production runtime.
+        "exercised_model": scorecard.simulator_model,
+        "tested": (
+            "the agent definition, reconstructed with its declared tools and played by "
+            f"{scorecard.simulator_model} inside a simulated sandbox"
+            if behavioral
+            else "nothing behavioral: the deterministic mock grader scored canned answers"
+        ),
         # In mock mode the gate output is demo plumbing, not a verdict. Say so
         # in the field an agent will read first.
         "verdict": decision.verdict if behavioral else "demo-only",
@@ -297,6 +307,7 @@ async def run_exam_async(
     k: int = 1,
     pass_threshold: float = 0.8,
     mode: ExamMode = "auto",
+    model: str | None = None,
     require_trace: bool | None = None,
     policy: str | None = None,
     agent_name: str | None = None,
@@ -304,9 +315,16 @@ async def run_exam_async(
 ) -> dict[str, Any]:
     """Run the adversarial exam against an agent definition and return a summary.
 
+    What is tested is the definition, reconstructed with its declared tools and
+    played by a reference model (``model``, else ``ASSAY_OPENAI_MODEL``, else the
+    adapter default) inside the simulated sandbox. The result names that model
+    in ``exercised_model``. It is not a test of the caller's production runtime.
+
     ``mode="auto"`` runs live when an OpenAI key is available and falls back to
     the mock grader otherwise. ``mode="live"`` fails fast without a key.
-    ``require_trace=None`` enforces the TraceRazor gate only when it is installed.
+    ``require_trace``: ``True`` means TraceRazor must be installed and pass;
+    ``False`` makes it advisory; ``None`` (default) blocks only on a trace that
+    ran and failed, and skips with a warning when TraceRazor is not installed.
     """
     if not 1 <= k <= 8:
         raise ValueError("k must be between 1 and 8")
@@ -327,6 +345,7 @@ async def run_exam_async(
         CandidateConfig(
             name=agent_name or facts.get("title") or (Path(filename).stem if filename else "agent"),
             adapter_type="openai-compatible" if effective_mode == "live" else "mock",
+            model=model or None,
             system_prompt=markdown,
             tools=parse_tools_from_markdown(markdown),
             metadata={

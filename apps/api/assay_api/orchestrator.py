@@ -116,10 +116,19 @@ class RunOrchestrator:
             lesson_feedback = run_items.lesson_feedback
             judge_results = run_items.judge_results
 
+            # Record which model actually played the agent. A live run exercises
+            # the definition under a reference model (not the user's runtime),
+            # so the scorecard names it instead of the pack's generic label.
+            exercised_model = getattr(adapter, "model", None)
+            simulator_model = (
+                f"openai:{exercised_model}"
+                if exercised_model and candidate.adapter_type != "mock" and not getattr(adapter, "degraded", False)
+                else pack.simulator_model
+            )
             scorecard = self._assemble_scorecard(
                 run,
                 candidate,
-                pack.simulator_model,
+                simulator_model,
                 seen_scores,
                 held_scores,
                 panel_results,

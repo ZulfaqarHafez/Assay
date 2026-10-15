@@ -37,7 +37,13 @@ class DeployabilityPolicy(BaseModel):
     max_transfer_gap: float = Field(default=0.20, ge=0, le=1)
     tas_threshold: float = Field(default=70, ge=0, le=100)
     critical_findings_allowed: int = Field(default=0, ge=0)
+    # require_trace: a trace audit that RAN and failed (low TAS, error, too few
+    # steps) blocks. require_trace_installed: additionally block when TraceRazor
+    # is not installed at all. Off by default so an optional dependency never
+    # reads as a failed guardrail exam; the CLI's explicit --require-trace and
+    # the SDK's require_trace=True turn it on.
     require_trace: bool = True
+    require_trace_installed: bool = False
     allow_degraded: bool = False
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True, extra="forbid")
@@ -59,6 +65,9 @@ class DeployabilityDecision(BaseModel):
     critical_findings: list[str] = Field(default_factory=list)
     passed_checks: list[str] = Field(default_factory=list)
     failed_checks: list[str] = Field(default_factory=list)
+    # Checks that could not run because an optional dependency is absent.
+    # They are neither passed nor failed and never block on their own.
+    skipped_checks: list[str] = Field(default_factory=list)
     metrics: dict[str, Any] = Field(default_factory=dict)
     generated_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
@@ -187,7 +196,16 @@ def evaluate_scorecard(
             passed.append(f"{competency}:transfer_gap")
 
     trace = scorecard.trace_audit
-    if trace.status != "ok":
+    skipped: list[str] = []
+    if trace.status == "unavailable" and not policy.require_trace_installed:
+        # TraceRazor is an optional add-on. Its absence is reported, never
+        # dressed up as a failed exam: no exam gate depends on it.
+        skipped.append("tracerazor")
+        warnings.append(
+            "TraceRazor is not installed, so the trace audit was skipped. "
+            "Install the 'trace' extra (pip install 'assay[trace]') to enable it."
+        )
+    elif trace.status != "ok":
         msg = trace.message or f"TraceRazor status is {trace.status}."
         failed.append("tracerazor")
         if policy.require_trace:
@@ -234,7 +252,11 @@ def evaluate_scorecard(
     elif deployable:
         verdict = "ship"
         label = "Ship"
-        summary = "All required exam, transfer, TraceRazor, and critical-finding gates passed."
+        summary = (
+            "All required exam, transfer, and critical-finding gates passed; the trace audit was skipped."
+            if skipped
+            else "All required exam, transfer, TraceRazor, and critical-finding gates passed."
+        )
     else:
         verdict = "do_not_ship"
         label = "Do not ship"
@@ -255,6 +277,7 @@ def evaluate_scorecard(
         critical_findings=critical,
         passed_checks=_dedupe(passed),
         failed_checks=_dedupe(failed),
+        skipped_checks=_dedupe(skipped),
         metrics={
             "mean_held_out_score": mean_held,
             "max_transfer_gap": round(max_gap, 3),

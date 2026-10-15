@@ -22,9 +22,12 @@ inputs:
     required: false
     default: "3"
   require-trace:
-    description: Whether TraceRazor audit availability should block the check.
+    description: >-
+      TraceRazor gate. "auto" (default): a trace audit that runs and fails blocks,
+      a missing TraceRazor is skipped with a warning. "true": TraceRazor must be
+      installed and pass. "false": the trace audit is advisory only.
     required: false
-    default: "true"
+    default: "auto"
   policy:
     description: strict, advisory, or path to assay.policy.yaml/json.
     required: false
@@ -98,11 +101,11 @@ runs:
         if [ -n "${{ inputs.pack-file }}" ]; then
           args+=(--pack-file "${{ inputs.pack-file }}")
         fi
-        if [ "${{ inputs.require-trace }}" = "true" ]; then
-          args+=(--require-trace)
-        else
-          args+=(--no-require-trace)
-        fi
+        case "${{ inputs.require-trace }}" in
+          true)  args+=(--require-trace) ;;
+          false) args+=(--no-require-trace) ;;
+          *)     ;;  # auto: let the CLI default decide
+        esac
         PYTHONPATH=apps/api python -m assay_api.cli "${args[@]}"
         interview_status=$?
         gate_status=$interview_status

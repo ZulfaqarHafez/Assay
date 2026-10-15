@@ -93,16 +93,16 @@ def main(argv: list[str] | None = None) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="assay",
-        description="Pre-deployment interview loop for AI agents.",
+        description="Prove whether an AI agent definition's guardrails hold before it ships.",
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    scan = subparsers.add_parser("scan", help="Inspect an agent artifact and optional tool file")
+    scan = subparsers.add_parser("scan", help="Parse an agent definition and run the no-key static lint")
     scan.add_argument("--agent", required=True, help="Path to AGENTS.md, agent.md, JSON, YAML, or text")
     scan.add_argument("--tools", help="Optional tools.py or JSON tool schema")
     scan.add_argument("--out", help="JSON output path")
 
-    research = subparsers.add_parser("research-role", help="Create a role brief for the interview loop")
+    research = subparsers.add_parser("research-role", help="Create a role brief that steers exam pack selection")
     research.add_argument("--agent", required=True)
     research.add_argument("--role", default="", help="Plain-language role, e.g. refund support agent")
     research.add_argument("--research", choices=["off", "fast", "deep"], default="off")
@@ -114,15 +114,15 @@ def _parser() -> argparse.ArgumentParser:
     threat.add_argument("--role-brief")
     threat.add_argument("--out", required=True)
 
-    loop = subparsers.add_parser("make-loop", help="Generate an interview loop from role/threat artifacts")
+    loop = subparsers.add_parser("make-loop", help="Generate an exam loop file from role/threat artifacts")
     loop.add_argument("--role-brief", required=True)
     loop.add_argument("--threat-model")
     loop.add_argument("--out", required=True)
 
-    interview = subparsers.add_parser("interview", help="Run an agent through an interview loop")
+    interview = subparsers.add_parser("interview", help="Legacy alias for run (kept for existing scripts)")
     _add_run_args(interview, agent_flag="--agent")
 
-    run = subparsers.add_parser("run", help="Compatibility alias for interview")
+    run = subparsers.add_parser("run", help="Run the adversarial guardrail exam against an agent definition")
     _add_run_args(run, agent_flag="--agent-md")
 
     improve = subparsers.add_parser("improve", help="Write a diff-first improved AGENTS.md from a run")
@@ -153,7 +153,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def _add_run_args(parser: argparse.ArgumentParser, *, agent_flag: str) -> None:
     parser.add_argument(agent_flag, required=True, dest="agent", help="Path to the agent.md or AGENTS.md file")
-    parser.add_argument("--loop", help="Interview loop JSON produced by assay make-loop")
+    parser.add_argument("--loop", help="Exam loop JSON produced by assay make-loop")
     parser.add_argument("--pack", default="guardrail-v1", help="Exam pack id when no loop is supplied")
     parser.add_argument("--pack-file", help="Optional JSON/YAML exam pack file to register before running")
     parser.add_argument("--policy", default=None, help="strict, advisory, or path to assay.policy.yaml/json")
@@ -168,10 +168,18 @@ def _add_run_args(parser: argparse.ArgumentParser, *, agent_flag: str) -> None:
     parser.add_argument("--mock", action="store_true", help="Force deterministic mock mode even when an OpenAI key is available (CI reproducibility)")
     parser.add_argument("--baseline", dest="baseline_run_id", help="Baseline run id for improvement comparisons")
     parser.add_argument(
+        "--model",
+        default=None,
+        help="Model that plays the agent in live mode (default: ASSAY_OPENAI_MODEL or the adapter default)",
+    )
+    parser.add_argument(
         "--require-trace",
         action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Whether TraceRazor must pass for deployability",
+        default=None,
+        help=(
+            "--require-trace: TraceRazor must be installed AND pass. --no-require-trace: trace audit is "
+            "advisory. Default: a trace that runs and fails blocks; a missing TraceRazor is skipped with a warning."
+        ),
     )
 
 
@@ -253,13 +261,12 @@ async def _interview_async(args: argparse.Namespace, agent_path: Path) -> int:
     if args.pack_file:
         register_exam_pack(load_exam_pack_file(args.pack_file))
 
-    policy = load_default_policy(args.policy).model_copy(
-        update={
-            "k": args.k,
-            "competency_threshold": args.pass_threshold,
-            "require_trace": bool(args.require_trace),
-        }
-    )
+    policy_update: dict[str, Any] = {"k": args.k, "competency_threshold": args.pass_threshold}
+    if args.require_trace is True:
+        policy_update.update(require_trace=True, require_trace_installed=True)
+    elif args.require_trace is False:
+        policy_update.update(require_trace=False, require_trace_installed=False)
+    policy = load_default_policy(args.policy).model_copy(update=policy_update)
     pack_id = _pack_id_from_args(args)
     pack = get_exam_pack(pack_id)
     normalized = normalize_agent_definition(
@@ -277,6 +284,7 @@ async def _interview_async(args: argparse.Namespace, agent_path: Path) -> int:
     candidate = CandidateConfig(
         name=detected["title"] or agent_path.stem,
         adapter_type="openai-compatible" if live else "mock",
+        model=getattr(args, "model", None) or None,
         system_prompt=markdown,
         # Parse the agent's declared tools so the privilege-delta can flag
         # grants it never needed (the sandbox also exposes canonical tools).

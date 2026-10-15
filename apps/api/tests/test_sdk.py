@@ -157,3 +157,73 @@ def test_doctor_reports_capabilities(tmp_path: Path) -> None:
     assert report["live_exam_available"] is False
     assert "guardrail-v1" in report["packs"]
     assert isinstance(report["tracerazor_installed"], bool)
+
+
+class _UnavailableAudit:
+    def __init__(self, threshold: float):
+        self.threshold = threshold
+
+    def analyse(self, candidate, trace_steps, task_value_score):
+        return TraceAuditSummary(
+            status="unavailable", passes=False, total_steps=len(trace_steps),
+            message="TraceRazor is not importable. Install the local checkout or tracerazor>=1.0.3.",
+        )
+
+
+class _ModelAwareHardenedAdapter:
+    """Looks like the live sandboxed adapter: exposes the model that played the agent."""
+
+    stochastic = True
+    degraded = False
+
+    def __init__(self, candidate):
+        self.model = candidate.model or "gpt-4.1"
+
+    async def ask(self, context, question, trial=1):
+        raise AssertionError("guardrail scenarios route through ask_scenario")
+
+    async def ask_scenario(self, context, question, scenario, trial=1):
+        return CandidateResponse(
+            answer="I cannot run that; it is destructive and irreversible. I will confirm scope first.",
+            tool_calls=[],
+            tokens=TokenCounts(total=8),
+        )
+
+    async def aclose(self):
+        return None
+
+
+@pytest.mark.asyncio
+async def test_live_result_names_the_model_that_played_the_agent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+    monkeypatch.setattr("assay_api.sdk.resolve_openai_key", lambda: "sk-test")
+    monkeypatch.setattr(orch, "adapter_for", _ModelAwareHardenedAdapter)
+
+    result = await sdk.run_exam_async(HARDENED, "AGENTS.md", k=1, model="gpt-4.1-mini", db_path=tmp_path / "sdk.db")
+
+    assert result["exercised_model"] == "openai:gpt-4.1-mini"
+    assert "gpt-4.1-mini" in result["tested"]
+    assert "not" not in result["tested"].split("inside")[0]  # describes what WAS tested
+
+
+def test_mock_result_says_nothing_behavioral_was_tested(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
+    result = sdk.run_exam(HARDENED, "AGENTS.md", k=1, db_path=tmp_path / "sdk.db")
+    assert result["exercised_model"] == "assay-sandbox"
+    assert result["tested"].startswith("nothing behavioral")
+
+
+@pytest.mark.asyncio
+async def test_missing_tracerazor_never_fails_a_live_exam_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _UnavailableAudit)
+    monkeypatch.setattr("assay_api.sdk.resolve_openai_key", lambda: "sk-test")
+    monkeypatch.setattr(orch, "adapter_for", _ModelAwareHardenedAdapter)
+
+    result = await sdk.run_exam_async(HARDENED, "AGENTS.md", k=1, db_path=tmp_path / "sdk.db")
+    assert result["deployable"] is True
+    assert result["trace_audit"]["status"] == "unavailable"
+    assert not any("not importable" in r for r in result["blocking_reasons"])
+
+    strict = await sdk.run_exam_async(HARDENED, "AGENTS.md", k=1, require_trace=True, db_path=tmp_path / "sdk.db")
+    assert strict["deployable"] is False
+    assert any("not importable" in r for r in strict["blocking_reasons"])

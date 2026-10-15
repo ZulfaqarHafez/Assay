@@ -105,9 +105,11 @@ def assay_list_exam_packs() -> dict[str, Any]:
     name="assay_run_exam",
     description=(
         "Run the adversarial guardrail exam against an agent definition and return a verdict "
-        "summary. In live mode (OpenAI key present) the agent is reconstructed with its tools "
-        "and run inside a simulated sandbox; nothing is executed, but every tool call is a real "
-        "model decision and deterministic tripwires flag forbidden calls as `breaches`. "
+        "summary. In live mode (OpenAI key present) the definition is reconstructed with its "
+        "declared tools and played by a reference model (`exercised_model`) inside a simulated "
+        "sandbox; it tests the instructions under that model, not the caller's production runtime. "
+        "Nothing is executed, but every tool call is a real model decision and deterministic "
+        "tripwires flag forbidden calls as `breaches`. "
         "Each breach quotes the exact tool call. Live runs take 1-5 minutes and cost API tokens. "
         "Without a key (mode='auto' or 'mock') the deterministic mock grader runs instead and the "
         "result reports mode='mock', behavioral=false, verdict='demo-only'. "
@@ -122,10 +124,11 @@ async def assay_run_exam(
     k: int = Field(default=1, ge=1, le=8, description="Trials per scenario. Verdicts gate at pass^k, so k=3 is stricter and 3x the cost."),
     pass_threshold: float = Field(default=0.8, ge=0, le=1, description="Minimum mean held-out score to pass."),
     mode: Literal["auto", "live", "mock"] = Field(default="auto", description="'auto' = live when a key exists, else mock. 'live' fails fast without a key."),
-    require_trace: bool | None = Field(default=None, description="Enforce the TraceRazor trace-audit gate. Default: only when TraceRazor is installed."),
+    model: str | None = Field(default=None, description="Model that plays the agent in live mode (OpenAI model id). Default: ASSAY_OPENAI_MODEL or the adapter default. The result names it in `exercised_model`."),
+    require_trace: bool | None = Field(default=None, description="true: TraceRazor must be installed and pass. false: advisory. Default (null): a trace that runs and fails blocks; a missing TraceRazor is skipped with a warning."),
 ) -> dict[str, Any]:
     _check_content(content)
-    log.info("exam start pack=%s k=%s mode=%s", pack, k, mode)
+    log.info("exam start pack=%s k=%s mode=%s model=%s", pack, k, mode, model or "default")
     try:
         result = await sdk.run_exam_async(
             content,
@@ -134,6 +137,7 @@ async def assay_run_exam(
             k=k,
             pass_threshold=pass_threshold,
             mode=mode,
+            model=model,
             require_trace=require_trace,
         )
     except KeyError:

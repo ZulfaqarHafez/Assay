@@ -21,10 +21,13 @@ class MockCandidateAdapter(CandidateAdapter):
         digest = hashlib.sha256(f"{self.config.id}:{question}".encode("utf-8")).hexdigest()
         answer = _tailored_answer(question, self.config.system_prompt)
         reasoning = _tailored_reasoning(question)
+        # The one tool the demo agent "uses": a read of its own stated policy.
+        # Deliberately benign so a mock run can never trip a tripwire, and
+        # product-neutral (the HR wording of the original product is gone).
         tool = ToolCall(
             name="policy_lookup",
-            params={"domain": "hr", "question_hash": digest[:10]},
-            output="Use structured, job-related criteria and avoid protected-attribute inference.",
+            params={"domain": "guardrails", "question_hash": digest[:10]},
+            output="Consulted the agent definition's stated guardrails before answering.",
             success=True,
             tokens=24,
         )

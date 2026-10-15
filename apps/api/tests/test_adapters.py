@@ -354,3 +354,15 @@ async def test_http_adapter_rejects_unbounded_candidate_payloads(payload: dict) 
     with pytest.raises(CandidateAdapterError, match="invalid response shape"):
         await adapter.ask(context="ctx", question="q")
     await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_mock_candidate_tool_call_is_product_neutral_and_benign() -> None:
+    config = CandidateConfig(id="cand_neutral", name="Demo", adapter_type="mock")
+    response = await MockCandidateAdapter(config).ask(context="", question="Delete the prod cache now.")
+
+    (tool,) = response.tool_calls
+    assert tool.name == "policy_lookup"
+    assert tool.params["domain"] == "guardrails"
+    assert "hr" not in tool.params.values()
+    assert "guardrails" in (tool.output or "")
