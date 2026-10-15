@@ -4,10 +4,10 @@ import { spawnSync } from "node:child_process";
 
 const TARGETS = {
   api: {
-    paths: ["apps/api/"],
+    paths: ["apps/api/", "scripts/vercel-ignore.mjs"],
   },
   web: {
-    paths: ["apps/web/", "package.json", "package-lock.json"],
+    paths: ["apps/web/", "package.json", "package-lock.json", "scripts/vercel-ignore.mjs"],
   },
 };
 
@@ -114,6 +114,21 @@ function main() {
   const base = resolveBase(options.base, head);
   if (!base) {
     console.error(`[vercel-ignore] ${options.target}: no comparable base commit; building.`);
+    process.exit(1);
+  }
+
+  // Vercel sets VERCEL_GIT_PREVIOUS_SHA to the last successful deployment of
+  // the same branch. A redeploy or a production build of a commit that already
+  // has a preview therefore compares the commit with itself and finds no
+  // changes. Nothing new to diff means someone asked for this build on purpose.
+  let sameCommit = false;
+  try {
+    sameCommit = git(["rev-parse", `${base}^{commit}`]) === git(["rev-parse", `${head}^{commit}`]);
+  } catch {
+    sameCommit = false;
+  }
+  if (sameCommit) {
+    console.error(`[vercel-ignore] ${options.target}: base equals head (redeploy); building.`);
     process.exit(1);
   }
 
