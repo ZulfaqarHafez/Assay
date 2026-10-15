@@ -2,6 +2,8 @@
 # Smoke-test one built image before it is pushed. Usage: smoke-image.sh <name> <image-ref>
 # No model key is passed, so each image must lint and refuse the exam cleanly.
 set -euo pipefail
+# Capture output before matching: `cmd | grep -q` under pipefail fails when grep
+# exits on the first match and the writer gets SIGPIPE (curl exit 23).
 name="$1"
 image="$2"
 fixtures="$PWD/apps/api/tests/fixtures"
@@ -19,7 +21,8 @@ wait_for() {
 case "$name" in
   assay)
     docker run --rm "$image" --help >/dev/null
-    docker run --rm -v "$fixtures:/work:ro" "$image" scan --agent /work/agent_bad.md | grep -q '"exec_shell"'
+    scan=$(docker run --rm -v "$fixtures:/work:ro" "$image" scan --agent /work/agent_bad.md)
+    grep -q '"exec_shell"' <<<"$scan"
     set +e
     docker run --rm -v "$fixtures:/work:ro" "$image" run --agent-md /work/agent_bad.md
     code=$?
@@ -49,7 +52,8 @@ case "$name" in
     docker run -d --name smoke-web -p 3000:3000 "$image"
     trap 'docker logs smoke-web || true; docker rm -f smoke-web >/dev/null 2>&1 || true' EXIT
     wait_for http://127.0.0.1:3000/
-    curl -fsS http://127.0.0.1:3000/ | grep -q "<title>Assay"
+    page=$(curl -fsS http://127.0.0.1:3000/)
+    grep -q "<title>Assay" <<<"$page"
     echo "web image ok"
     ;;
   *)

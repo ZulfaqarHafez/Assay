@@ -88,7 +88,8 @@ jobs:
           /tmp/assay/bin/pip install "$(ls dist/*.whl)[mcp]"
           /tmp/assay/bin/assay --help >/dev/null
           /tmp/assay/bin/assay-mcp --help >/dev/null
-          /tmp/assay/bin/assay scan --agent apps/api/tests/fixtures/agent_bad.md | grep -q '"exec_shell"'
+          scan=$(/tmp/assay/bin/assay scan --agent apps/api/tests/fixtures/agent_bad.md)
+          grep -q '"exec_shell"' <<<"$scan"
           set +e
           env -u OPENAI_API_KEY ASSAY_DB_PATH=/tmp/assay.db /tmp/assay/bin/assay run --agent-md apps/api/tests/fixtures/agent_bad.md
           code=$?
