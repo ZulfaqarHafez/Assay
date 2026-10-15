@@ -18,9 +18,6 @@ name: Publish
 on:
   push:
     tags: ["v*"]
-    # TEMPORARY: one-time bootstrap release from this branch (the session that
-    # set this up could not push tags). Removed in the next commit.
-    branches: ["claude/funny-bohr-13ivx5"]
   workflow_dispatch:
     inputs:
       release:
@@ -67,7 +64,6 @@ jobs:
           release=false
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then release=true; fi
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$RELEASE_INPUT" = "true" ]; then release=true; fi
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_TYPE" = "branch" ]; then release=true; fi
           {
             echo "version=$version"
             echo "minor=${version%.*}"
