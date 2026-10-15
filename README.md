@@ -120,7 +120,8 @@ pip install "assay[mcp] @ https://github.com/ZulfaqarHafez/Assay/releases/downlo
 
 Pass `-e OPENAI_API_KEY` (or set it) for the exam; lint works without it. Mount
 `-v assay-data:/data` on the CLI and MCP images to keep run history. Publishing is
-the `Publish` workflow: push a `vX.Y.Z` tag that matches `apps/api/pyproject.toml`.
+the `Publish` workflow: push a `vX.Y.Z` tag that matches `apps/api/pyproject.toml`,
+or run it from the Actions tab with "release" checked.
 
 ### From a checkout
 

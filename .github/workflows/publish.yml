@@ -11,13 +11,22 @@ name: Publish
 # GitHub Packages has no Python registry, so the wheel and sdist ship as
 # release assets. Every image is smoke-tested before it is pushed.
 #
-# Trigger: push a tag matching the package version (v0.1.0 for 0.1.0), or run
-# the workflow manually (images are then tagged sha-<commit> only, no release).
+# Release: push a tag matching the package version (v0.1.0 for 0.1.0), or run
+# the workflow manually with "release" checked (it then creates the tag). A
+# manual run without "release" only publishes sha-<commit> images.
 
 on:
   push:
     tags: ["v*"]
+    # TEMPORARY: one-time bootstrap release from this branch (the session that
+    # set this up could not push tags). Removed in the next commit.
+    branches: ["claude/funny-bohr-13ivx5"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: Publish version tags + latest and create the GitHub Release
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,6 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+      tag: ${{ steps.version.outputs.tag }}
+      minor: ${{ steps.version.outputs.minor }}
     steps:
       - uses: actions/checkout@v5
 
@@ -41,6 +53,8 @@ jobs:
 
       - name: Check the tag matches the package version
         id: version
+        env:
+          RELEASE_INPUT: ${{ inputs.release }}
         run: |
           version=$(python -c "import tomllib; print(tomllib.load(open('apps/api/pyproject.toml','rb'))['project']['version'])")
           init=$(python -c "import ast,sys; t=ast.parse(open('apps/api/assay_api/__init__.py').read()); print(next(n.value.value for n in t.body if isinstance(n, ast.Assign) and n.targets[0].id == '__version__'))")
@@ -50,7 +64,17 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match package version $version (expected v$version)"; exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          release=false
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then release=true; fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$RELEASE_INPUT" = "true" ]; then release=true; fi
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_TYPE" = "branch" ]; then release=true; fi
+          {
+            echo "version=$version"
+            echo "minor=${version%.*}"
+            echo "tag=v$version"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing $version (release=$release)"
 
       - name: Build the wheel and sdist
         run: |
@@ -153,10 +177,10 @@ jobs:
         with:
           images: ${{ steps.image.outputs.ref }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ needs.python-package.outputs.version }},enable=${{ needs.python-package.outputs.release == 'true' }}
+            type=raw,value=${{ needs.python-package.outputs.minor }},enable=${{ needs.python-package.outputs.release == 'true' }}
+            type=raw,value=latest,enable=${{ needs.python-package.outputs.release == 'true' }}
             type=sha,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
           labels: |
             org.opencontainers.image.title=${{ matrix.name }}
             org.opencontainers.image.description=${{ matrix.description }}
@@ -180,7 +204,7 @@ jobs:
 
   release:
     name: GitHub Release
-    if: github.ref_type == 'tag'
+    if: needs.python-package.outputs.release == 'true'
     needs: [python-package, images]
     runs-on: ubuntu-latest
     permissions:
@@ -194,10 +218,11 @@ jobs:
       - name: Release notes
         env:
           VERSION: ${{ needs.python-package.outputs.version }}
+          TAG: ${{ needs.python-package.outputs.tag }}
         run: |
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           wheel="assay-${VERSION}-py3-none-any.whl"
-          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
           cat > notes.md <<NOTES
           Assay ${VERSION}: prove whether an AI agent definition's guardrails hold before it ships.
 
@@ -224,8 +249,12 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          # Creates the tag at this commit when it does not exist yet.
+          tag_name: ${{ needs.python-package.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: Assay ${{ needs.python-package.outputs.version }}
           body_path: notes.md
           files: dist/*
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.python-package.outputs.version, '-') }}
+          make_latest: ${{ !contains(needs.python-package.outputs.version, '-') }}
           fail_on_unmatched_files: true
