@@ -82,6 +82,29 @@ compare against a previous run or inspect the trace.
 
 ![Assay experiments ledger](docs/images/05-experiments.png)
 
+## Use it as a package or an MCP server
+
+The engine is an installable Python distribution (`assay`, import name
+`assay_api`) with a programmatic SDK and a stdio MCP server, so an agent can
+lint and behaviorally test the `AGENTS.md` it is writing before the file ships.
+
+```bash
+pip install -e "apps/api[mcp]"      # `assay` CLI, `assay_api.sdk`, `assay-mcp`
+assay-mcp                           # MCP server over stdio
+```
+
+```python
+from assay_api import sdk
+report = sdk.lint_agent(open("AGENTS.md").read(), filename="AGENTS.md")  # no key
+result = sdk.run_exam(open("AGENTS.md").read(), "AGENTS.md", k=1)        # live with OPENAI_API_KEY
+```
+
+Every result says whether it is `live` (a model made the tool calls) or
+`mock` (deterministic demo grader; reported as `verdict: "demo-only"`, never
+as a guardrail verdict). The repo ships a `.mcp.json` so Claude Code picks the
+server up from a checkout. Tools, config, and the honest-result contract are in
+[docs/mcp.md](docs/mcp.md).
+
 ## Quick Start
 
 ```powershell

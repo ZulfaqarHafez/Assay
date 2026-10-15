@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "assay": {
+      "command": "python",
+      "args": ["-m", "assay_api.mcp_server"],
+      "env": {
+        "PYTHONPATH": "apps/api",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+      }
+    }
+  }
+}

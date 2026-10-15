@@ -26,3 +26,6 @@ dist/
 build/
 *.egg-info/
 exports/
+
+# CLI run outputs (scorecard, proof bundle, summary)
+artifacts/
