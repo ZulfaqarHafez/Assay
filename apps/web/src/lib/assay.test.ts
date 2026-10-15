@@ -179,3 +179,31 @@ describe("policyRuleSentence", () => {
     expect(sentence).toContain("no critical findings");
   });
 });
+
+describe("unverified (demo) runs", () => {
+  it("maps the backend unverified verdict onto its own band, never ship", () => {
+    const decision = {
+      verdict: "unverified",
+      deployable: false,
+      label: "Unverified",
+      summary: "Demo run graded by the deterministic mock grader.",
+      blocking_reasons: ["Demo run: no model answered, so no tool call was made and no guardrail was exercised."],
+      warnings: [],
+      critical_findings: [],
+      passed_checks: [],
+      failed_checks: ["behavioral"],
+      metrics: {},
+      generated_at: "2026-10-15T00:00:00Z",
+      policy: { name: "strict", k: 1, competency_threshold: 0.8, max_transfer_gap: 0.2, tas_threshold: 70, critical_findings_allowed: 0, require_trace: true, allow_degraded: false }
+    } as unknown as DeployabilityDecision;
+    const verdict = deriveVerdict({ ...baseScorecard, certified: true, behavioral: false }, decision);
+    expect(verdict.verdict).toBe("unverified");
+    expect(verdict.label).toBe("Demo run, no verdict");
+    expect(verdict.headline).toMatch(/Demo run/);
+  });
+
+  it("falls back to unverified from the scorecard flag when no decision is attached", () => {
+    const verdict = deriveVerdict({ ...baseScorecard, certified: true, behavioral: false }, null);
+    expect(verdict.verdict).toBe("unverified");
+  });
+});

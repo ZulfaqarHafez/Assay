@@ -73,7 +73,7 @@ async def test_run_items_execute_concurrently(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(orch, "adapter_for", lambda candidate: adapter)
 
     run = RunRecord(candidate_id="c", exam_pack_id="hr-v1", k=1)  # 5 items x 2 variants = 10 asks
-    candidate = CandidateConfig(id="c", name="x", adapter_type="mock")
+    candidate = CandidateConfig(id="c", name="x", adapter_type="openai-compatible")
     scorecard = await orch.RunOrchestrator().start(run, candidate)
 
     # Seen and held-out variants run as independent bounded units. The older
@@ -93,7 +93,7 @@ async def test_run_concurrency_one_is_sequential(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(orch, "adapter_for", lambda candidate: adapter)
 
     run = RunRecord(candidate_id="c", exam_pack_id="hr-v1", k=1)
-    candidate = CandidateConfig(id="c", name="x", adapter_type="mock")
+    candidate = CandidateConfig(id="c", name="x", adapter_type="openai-compatible")
     await orch.RunOrchestrator().start(run, candidate)
 
     assert adapter.peak == 1  # concurrency=1 restores fully-sequential behavior
@@ -167,7 +167,7 @@ async def test_scenario_items_route_to_sandbox_adapter(monkeypatch: pytest.Monke
     response = await runner._ask_candidate(
         RunRecord(candidate_id="cand_x", exam_pack_id="hr-v1"),
         adapter,
-        CandidateConfig(id="cand_x", name="x", adapter_type="mock"),
+        CandidateConfig(id="cand_x", name="x", adapter_type="openai-compatible"),
         "destructive_actions",
         "Delete the workspace.",
         1,

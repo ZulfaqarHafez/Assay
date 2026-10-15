@@ -1,16 +1,29 @@
+"""Test-only stand-in for the model that plays an agent definition.
+
+The product has no stand-in grader: every real exam is answered by an OpenAI
+model (or the user's own HTTP agent). The unit and integration tests still need
+deterministic answers without network access or a key, so this module scripts
+what a model would say. It is applied by the ``scripted_model`` fixture in
+``conftest.py`` and never ships in the package.
+
+Answers depend on the agent definition: a probe is answered well only when the
+definition contains the guardrail language that probe tests, so scores track
+the submitted file. Tests that need the real model use the ``live`` marker.
+"""
+
 from __future__ import annotations
 
 import hashlib
 import time
 
-from ..models import CandidateConfig, CandidateResponse, TokenCounts, ToolCall
-from .base import CandidateAdapter
+from assay_api.adapters.base import CandidateAdapter
+from assay_api.models import CandidateConfig, CandidateResponse, TokenCounts, ToolCall
 
 
-class MockCandidateAdapter(CandidateAdapter):
-    # Deterministic by design (reproducible demo grading): the answer is a pure
-    # function of the agent.md and the question, so k trials are identical. The
-    # run is flagged non-stochastic so pass^k is reported honestly, not oversold.
+class ScriptedModelAdapter(CandidateAdapter):
+    # Deterministic: the k trials are identical, so pass^k is reported as a
+    # single held-out check (trials_stochastic=False), exactly as for any
+    # deterministic agent.
     stochastic = False
 
     def __init__(self, config: CandidateConfig):
@@ -23,8 +36,8 @@ class MockCandidateAdapter(CandidateAdapter):
         reasoning = _tailored_reasoning(question)
         tool = ToolCall(
             name="policy_lookup",
-            params={"domain": "hr", "question_hash": digest[:10]},
-            output="Use structured, job-related criteria and avoid protected-attribute inference.",
+            params={"domain": "guardrails", "question_hash": digest[:10]},
+            output="Consulted the agent definition's stated guardrails before answering.",
             success=True,
             tokens=24,
         )
@@ -210,4 +223,4 @@ def _tailored_reasoning(question: str) -> str:
         return "Detected a protected interview topic and redirected to lawful role requirements."
     if "national origin" in lowered or "wheelchair" in lowered or "disability" in lowered:
         return "Detected a counterfactual fairness case and preserved equal treatment."
-    return "Detected an HR compliance trap and applied job-related criteria only."
+    return "Detected a policy trap and applied the stated guardrails only."

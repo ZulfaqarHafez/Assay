@@ -2,7 +2,8 @@ export type CandidateConfig = {
   id: string;
   tenant_id?: string;
   name: string;
-  adapter_type: "mock" | "http" | "openai-compatible" | "local-command" | "mcp-server";
+  // "mock" only appears on legacy candidates from the removed stand-in grader.
+  adapter_type: "openai-compatible" | "http" | "local-command" | "mcp-server" | "mock";
   endpoint_url?: string | null;
   model?: string | null;
   system_prompt?: string | null;
@@ -77,8 +78,11 @@ export type StaticLintReport = {
 
 export type AgentIntakeResponse = {
   candidate: CandidateConfig;
-  /** "live" when executed against a real LLM, "demo" when run deterministically. */
-  mode: "live" | "demo";
+  /** "live" when this server can run the exam now; "lint-only" when it has no model key. */
+  mode: "live" | "lint-only";
+  /** False when the server cannot run the exam (no model key); the lint still ran. */
+  exam_available?: boolean;
+  exam_unavailable_reason?: string | null;
   static_lint?: StaticLintReport;
   detected: AgentIntakeDetected;
 };
@@ -148,6 +152,7 @@ export type RunRecord = {
   source_pack_id?: string | null;
   // Optional scorecard summary attached by GET /runs for the Experiments table.
   certified?: boolean;
+  behavioral?: boolean;
   pass_count?: number;
   total_count?: number;
   degraded?: boolean;
@@ -166,6 +171,7 @@ export type RunSummary = Pick<RunRecord,
   | "updated_at"
   | "baseline_run_id"
   | "certified"
+  | "behavioral"
   | "pass_count"
   | "total_count"
   | "degraded"
@@ -244,6 +250,8 @@ export type Scorecard = {
   grader_disagreement: number;
   trace_audit: TraceAuditSummary;
   trials_stochastic?: boolean;
+  // False only for legacy runs graded by the removed stand-in grader.
+  behavioral?: boolean;
   failure_reasons: string[];
   created_at: string;
   lessons_applied: string[];
@@ -273,7 +281,7 @@ export type DeployabilityDecision = {
   schema: "assay.deployability_decision.v1";
   run_id: string | null;
   policy: DeployabilityPolicy;
-  verdict: "ship" | "probation" | "do_not_ship";
+  verdict: "ship" | "probation" | "do_not_ship" | "unverified";
   deployable: boolean;
   label: string;
   summary: string;
@@ -282,6 +290,8 @@ export type DeployabilityDecision = {
   critical_findings: string[];
   passed_checks: string[];
   failed_checks: string[];
+  // Checks skipped because an optional dependency (TraceRazor) is absent.
+  skipped_checks?: string[];
   metrics: Record<string, unknown>;
   generated_at: string;
 };

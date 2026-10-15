@@ -59,7 +59,7 @@ def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
     candidate = CandidateConfig(
         id="cand_x",
         name="Solid Agent",
-        adapter_type="mock",
+        adapter_type="openai-compatible",
         system_prompt="# Solid Agent\n\nBe helpful and follow policy.",
     )
     pack = get_exam_pack("hr-v1")
@@ -89,7 +89,7 @@ def test_certified_run_is_ready_and_recommends_no_required_subagents() -> None:
 
 def test_agent_spec_payload_reuses_preloaded_run_evidence(monkeypatch) -> None:
     run = RunRecord(id="run_preloaded", candidate_id="cand_preloaded", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_preloaded", name="Preloaded Agent", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_preloaded", name="Preloaded Agent", adapter_type="openai-compatible")
     scorecard = _scorecard(
         run.id,
         held={"compliance": 0.9},
@@ -122,7 +122,7 @@ def test_agent_spec_payload_reuses_preloaded_run_evidence(monkeypatch) -> None:
 
 def test_failing_competency_recommends_specialist_subagent() -> None:
     run = RunRecord(id="run_gap", candidate_id="cand_y", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_y", name="Weak Agent", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_y", name="Weak Agent", adapter_type="openai-compatible")
     pack = get_exam_pack("hr-v1")
     scorecard = _scorecard(
         run.id,
@@ -152,7 +152,7 @@ def test_refined_markdown_is_not_hardcoded_to_hr() -> None:
     candidate = CandidateConfig(
         id="cand_code",
         name="Repo Refactor Bot",
-        adapter_type="mock",
+        adapter_type="openai-compatible",
         system_prompt="# Repo Refactor Bot\n\nRefactor code safely.",
         metadata={"role": "Repo Refactor Bot", "title": "Repo Refactor Bot"},
     )
@@ -180,7 +180,7 @@ def test_refined_markdown_is_not_hardcoded_to_hr() -> None:
 
 def test_trace_audit_failure_recommends_trace_auditor() -> None:
     run = RunRecord(id="run_trace", candidate_id="cand_z", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_z", name="Chatty Agent", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_z", name="Chatty Agent", adapter_type="openai-compatible")
     pack = get_exam_pack("hr-v1")
     scorecard = _scorecard(
         run.id,
@@ -202,7 +202,7 @@ def test_trace_audit_failure_recommends_trace_auditor() -> None:
 
 def test_certified_run_with_trace_fixes_keeps_subagents_optional() -> None:
     run = RunRecord(id="run_fixes", candidate_id="cand_f", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_f", name="Tidy Agent", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_f", name="Tidy Agent", adapter_type="openai-compatible")
     pack = get_exam_pack("hr-v1")
     scorecard = _scorecard(
         run.id,
@@ -227,7 +227,7 @@ def test_agent_markdown_surfaces_least_privilege_delta() -> None:
     candidate = CandidateConfig(
         id="cand_privilege",
         name="Ops Agent",
-        adapter_type="mock",
+        adapter_type="openai-compatible",
         tools=[
             ToolSpec(name="read_file"),
             ToolSpec(name="delete_repo", dangerous=True),
@@ -259,7 +259,7 @@ def test_agent_markdown_surfaces_least_privilege_delta() -> None:
 
 def test_subagent_cap_reserves_cross_cutting_auditors() -> None:
     run = RunRecord(id="run_cap", candidate_id="cand_c", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_c", name="Overloaded Agent", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_c", name="Overloaded Agent", adapter_type="openai-compatible")
     pack = get_exam_pack("hr-v1")
     held = {f"comp_{index}": 0.4 for index in range(7)}
     scorecard = _scorecard(
@@ -283,7 +283,7 @@ def test_subagent_cap_reserves_cross_cutting_auditors() -> None:
 
 def test_empty_held_scores_is_not_self_contradictory() -> None:
     run = RunRecord(id="run_empty", candidate_id="cand_e", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_e", name="Unscored Agent", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_e", name="Unscored Agent", adapter_type="openai-compatible")
     pack = get_exam_pack("hr-v1")
     scorecard = _scorecard(
         run.id,
@@ -317,7 +317,7 @@ _VALID_SPRITES = {
 def test_all_emitted_subagent_sprites_exist_in_sprite_sheet() -> None:
     # Force every template + cross-cutting auditor to fire across both packs so a
     # typo'd sprite name would render a blank tile in the UI and fail here instead.
-    candidate = CandidateConfig(id="cand_s", name="Sprite Agent", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_s", name="Sprite Agent", adapter_type="openai-compatible")
     for pack_id in ("hr-v1", "hr-injection-v1"):
         pack = get_exam_pack(pack_id)
         competencies = [item.competency for item in pack.items]
@@ -339,7 +339,7 @@ def test_all_emitted_subagent_sprites_exist_in_sprite_sheet() -> None:
 
 def test_retained_lessons_flow_into_markdown() -> None:
     run = RunRecord(id="run_lessons", candidate_id="cand_l", exam_pack_id="hr-v1")
-    candidate = CandidateConfig(id="cand_l", name="Learner", adapter_type="mock")
+    candidate = CandidateConfig(id="cand_l", name="Learner", adapter_type="openai-compatible")
     pack = get_exam_pack("hr-v1")
     events = [
         RunEvent(

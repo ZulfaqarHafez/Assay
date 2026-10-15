@@ -1,0 +1,257 @@
+name: Publish
+
+# Publishes Assay to GitHub Packages (the GitHub Container Registry) and, on a
+# version tag, attaches the Python distributions to a GitHub Release.
+#
+#   ghcr.io/<owner>/assay       CLI           (docker run --rm ghcr.io/<owner>/assay --help)
+#   ghcr.io/<owner>/assay-mcp   MCP server    (docker run -i --rm -e OPENAI_API_KEY ghcr.io/<owner>/assay-mcp)
+#   ghcr.io/<owner>/assay-api   HTTP API
+#   ghcr.io/<owner>/assay-web   web app
+#
+# GitHub Packages has no Python registry, so the wheel and sdist ship as
+# release assets. Every image is smoke-tested before it is pushed.
+#
+# Release: push a tag matching the package version (v0.1.0 for 0.1.0), or run
+# the workflow manually with "release" checked (it then creates the tag). A
+# manual run without "release" only publishes sha-<commit> images.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish version tags + latest and create the GitHub Release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  python-package:
+    name: Python package (wheel + sdist)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+      tag: ${{ steps.version.outputs.tag }}
+      minor: ${{ steps.version.outputs.minor }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Check the tag matches the package version
+        id: version
+        env:
+          RELEASE_INPUT: ${{ inputs.release }}
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('apps/api/pyproject.toml','rb'))['project']['version'])")
+          init=$(python -c "import ast,sys; t=ast.parse(open('apps/api/assay_api/__init__.py').read()); print(next(n.value.value for n in t.body if isinstance(n, ast.Assign) and n.targets[0].id == '__version__'))")
+          if [ "$version" != "$init" ]; then
+            echo "::error::pyproject version $version != assay_api.__version__ $init"; exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package version $version (expected v$version)"; exit 1
+          fi
+          release=false
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then release=true; fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$RELEASE_INPUT" = "true" ]; then release=true; fi
+          {
+            echo "version=$version"
+            echo "minor=${version%.*}"
+            echo "tag=v$version"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing $version (release=$release)"
+
+      - name: Build the wheel and sdist
+        run: |
+          python -m pip install build==1.2.2.post1 twine
+          python -m build --outdir dist apps/api
+          python -m twine check dist/*
+
+      - name: Smoke-test the wheel in a clean environment
+        run: |
+          python -m venv /tmp/assay
+          /tmp/assay/bin/pip install "$(ls dist/*.whl)[mcp]"
+          /tmp/assay/bin/assay --help >/dev/null
+          /tmp/assay/bin/assay-mcp --help >/dev/null
+          scan=$(/tmp/assay/bin/assay scan --agent apps/api/tests/fixtures/agent_bad.md)
+          grep -q '"exec_shell"' <<<"$scan"
+          set +e
+          env -u OPENAI_API_KEY ASSAY_DB_PATH=/tmp/assay.db /tmp/assay/bin/assay run --agent-md apps/api/tests/fixtures/agent_bad.md
+          code=$?
+          set -e
+          test "$code" = "4"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+          if-no-files-found: error
+
+  images:
+    name: Image ${{ matrix.name }}
+    needs: python-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: assay
+            context: apps/api
+            file: apps/api/Dockerfile.package
+            target: cli
+            platforms: linux/amd64,linux/arm64
+            description: "Assay CLI: prove whether an AI agent definition's guardrails hold."
+          - name: assay-mcp
+            context: apps/api
+            file: apps/api/Dockerfile.package
+            target: mcp
+            platforms: linux/amd64,linux/arm64
+            description: "Assay MCP server (stdio): lint and behaviorally test agent definitions from any MCP client."
+          - name: assay-api
+            context: apps/api
+            file: apps/api/Dockerfile
+            target: ""
+            platforms: linux/amd64,linux/arm64
+            description: "Assay HTTP API: the guardrail exam engine behind the web app and CI."
+          - name: assay-web
+            context: .
+            file: apps/web/Dockerfile
+            target: ""
+            platforms: linux/amd64
+            description: "Assay web app: paste an agent definition, watch the guardrail exam, get a verdict."
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Image name
+        id: image
+        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build for the smoke test (linux/amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          load: true
+          tags: smoke/${{ matrix.name }}:test
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Smoke test
+        run: bash .github/scripts/smoke-image.sh "${{ matrix.name }}" "smoke/${{ matrix.name }}:test"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          # Put the description on the multi-arch index too, so the package page shows it.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ steps.image.outputs.ref }}
+          tags: |
+            type=raw,value=${{ needs.python-package.outputs.version }},enable=${{ needs.python-package.outputs.release == 'true' }}
+            type=raw,value=${{ needs.python-package.outputs.minor }},enable=${{ needs.python-package.outputs.release == 'true' }}
+            type=raw,value=latest,enable=${{ needs.python-package.outputs.release == 'true' }}
+            type=sha,prefix=sha-
+          labels: |
+            org.opencontainers.image.title=${{ matrix.name }}
+            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.licenses=MIT
+          annotations: |
+            org.opencontainers.image.description=${{ matrix.description }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: ${{ matrix.platforms }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  release:
+    name: GitHub Release
+    if: needs.python-package.outputs.release == 'true'
+    needs: [python-package, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - name: Release notes
+        env:
+          VERSION: ${{ needs.python-package.outputs.version }}
+          TAG: ${{ needs.python-package.outputs.tag }}
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          wheel="assay-${VERSION}-py3-none-any.whl"
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          cat > notes.md <<NOTES
+          Assay ${VERSION}: prove whether an AI agent definition's guardrails hold before it ships.
+
+          Every exam is answered by a real model (set \`OPENAI_API_KEY\`) or by your own agent over HTTP.
+          Lint and the other no-key commands work without one.
+
+          ## Container images (GitHub Packages)
+
+          | Image | Use |
+          | --- | --- |
+          | \`ghcr.io/${owner}/assay:${VERSION}\` | CLI: \`docker run --rm -v "\$PWD:/work" ghcr.io/${owner}/assay scan --agent /work/AGENTS.md\` |
+          | \`ghcr.io/${owner}/assay-mcp:${VERSION}\` | MCP server over stdio: \`docker run -i --rm -e OPENAI_API_KEY ghcr.io/${owner}/assay-mcp\` |
+          | \`ghcr.io/${owner}/assay-api:${VERSION}\` | HTTP API on port 8000 |
+          | \`ghcr.io/${owner}/assay-web:${VERSION}\` | Web app on port 3000 (calls an API on localhost:8000) |
+
+          ## Python package
+
+          \`\`\`bash
+          pip install "assay[mcp] @ ${base}/${wheel}"
+          \`\`\`
+
+          The wheel and sdist are attached below. Built from ${GITHUB_SHA}.
+          NOTES
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          # Creates the tag at this commit when it does not exist yet.
+          tag_name: ${{ needs.python-package.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Assay ${{ needs.python-package.outputs.version }}
+          body_path: notes.md
+          files: dist/*
+          prerelease: ${{ contains(needs.python-package.outputs.version, '-') }}
+          make_latest: ${{ !contains(needs.python-package.outputs.version, '-') }}
+          fail_on_unmatched_files: true

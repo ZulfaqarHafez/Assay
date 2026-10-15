@@ -15,6 +15,7 @@ _BAND = {
     "ship": ("SHIP", "#1f7a52"),
     "risky": ("RISKY", "#a25e10"),
     "hold": ("HOLD", "#c0392b"),
+    "unverified": ("UNVERIFIED", "#7a756c"),
 }
 _UNKNOWN = ("PENDING", "#7a756c")
 

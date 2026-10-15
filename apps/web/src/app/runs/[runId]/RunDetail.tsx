@@ -33,6 +33,8 @@ import { policyRuleSentence } from "@/lib/assay";
 import { VERDICT_LABEL, bandFromDecision, decisionLabel } from "@/lib/verdict";
 import { downloadJson, errorMessage, labelize, maxTransferGap, traceScoreLabel } from "@/lib/derive";
 import ViewportDeferred from "@/components/ui/ViewportDeferred";
+import PrivilegeDeltaPanel from "@/components/assay/PrivilegeDeltaPanel";
+import BreachList from "@/components/assay/BreachList";
 import type {
   DeployabilityDecision,
   RunComparison as RunComparisonData,
@@ -253,6 +255,9 @@ export default function RunDetail({
             <strong>{passCount}/{passTotal}</strong> competencies passed
           </span>
           <span className="rd-verdict-meta">TraceRazor {traceScoreLabel(scorecard)} · transfer gap {maxTransferGap(scorecard).toFixed(2)}</span>
+          <span className="rd-verdict-model">
+            Played by <code>{playedBy(scorecard.simulator_model)}</code>, {scorecard.k === 1 ? "1 trial" : `${scorecard.k} trials`} per probe
+          </span>
         </div>
       ) : null}
 
@@ -266,10 +271,14 @@ export default function RunDetail({
       ) : null}
 
       {scorecard ? (
-        <div className="rd-cockpit">
-          <DeployabilityMeter decision={deployability} scorecard={scorecard} />
-          <InterviewTimeline events={events} scorecard={scorecard} decision={deployability} />
-        </div>
+        <>
+          <BreachList reasons={scorecard.failure_reasons ?? []} />
+          <div className="rd-cockpit">
+            <DeployabilityMeter decision={deployability} scorecard={scorecard} />
+            <ExamTimeline scorecard={scorecard} decision={deployability} />
+          </div>
+          <PrivilegeDeltaPanel delta={scorecard.privilege_delta} />
+        </>
       ) : isLoading ? (
         <div className="rd-cockpit">
           <div className="ws-skeleton-card" />
@@ -349,6 +358,13 @@ export default function RunDetail({
   );
 }
 
+/** "http:<url>" and "openai:<model>" as the scorecard records them, in words. */
+function playedBy(simulatorModel: string): string {
+  if (simulatorModel.startsWith("http:")) return `HTTP agent at ${simulatorModel.slice("http:".length)}`;
+  if (simulatorModel.startsWith("openai:")) return `OpenAI ${simulatorModel.slice("openai:".length)}`;
+  return simulatorModel;
+}
+
 function LearningSurfaceSkeleton() {
   return <div className="ws-skeleton-card" aria-hidden="true" />;
 }
@@ -364,7 +380,8 @@ function DeployabilityMeter({
   const label = decisionLabel(verdict);
   const blocked = decision?.blocking_reasons ?? scorecard.failure_reasons ?? [];
   const warnings = decision?.warnings ?? [];
-  const tone = verdict === "ship" ? "ship" : verdict === "probation" ? "probation" : "hold";
+  const tone =
+    verdict === "ship" ? "ship" : verdict === "probation" ? "probation" : verdict === "unverified" ? "unverified" : "hold";
   const passValues = Object.values(scorecard.pass_at_k ?? {});
   const traceFixCount = scorecard.trace_audit?.fixes?.length ?? 0;
   const tokensSaved = scorecard.trace_audit?.savings?.tokens_saved;
@@ -467,22 +484,21 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InterviewTimeline({
-  events,
+function ExamTimeline({
   scorecard,
   decision
 }: {
-  events: RunEvent[];
   scorecard: Scorecard;
   decision: DeployabilityDecision | null;
 }) {
-  const toolFindings = (scorecard.failure_reasons ?? []).some((reason) => /tool|agency|mutation/i.test(reason));
+  const breachCount = (scorecard.failure_reasons ?? []).filter((reason) => reason.startsWith("CRITICAL guardrail_breach")).length;
+  const toolFindings = breachCount > 0 || (scorecard.failure_reasons ?? []).some((reason) => /tool|agency|mutation/i.test(reason));
   const steps = [
     {
       icon: <UserRoundSearch size={15} />,
-      label: "Role research",
-      state: scorecard.qualification_status === "tailored" ? "pass" : "warn",
-      detail: scorecard.role_brief_summary || `${scorecard.qualification_status ?? "deterministic"} qualification`
+      label: "Scenario selection",
+      state: "pass",
+      detail: scorecard.role_brief_summary || `${scorecard.qualification_status === "tailored" ? "tailored to the role" : "the full pack"}, played by ${playedBy(scorecard.simulator_model)}`
     },
     {
       icon: <Swords size={15} />,
@@ -492,9 +508,9 @@ function InterviewTimeline({
     },
     {
       icon: <Wrench size={15} />,
-      label: "Tool/state discipline",
+      label: "Tripwires",
       state: toolFindings ? "warn" : "pass",
-      detail: `${events.filter((event) => event.event_type === "tool_called").length} tool call events`
+      detail: `${breachCount} breach${breachCount === 1 ? "" : "es"} recorded`
     },
     {
       icon: <Activity size={15} />,
@@ -511,8 +527,8 @@ function InterviewTimeline({
   ];
 
   return (
-    <section className="rd-timeline" aria-label="Interview timeline">
-      <header>Interview timeline</header>
+    <section className="rd-timeline" aria-label="Exam timeline">
+      <header>Exam timeline</header>
       <ol>
         {steps.map((step) => (
           <li className={step.state} key={step.label}>

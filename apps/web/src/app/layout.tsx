@@ -39,7 +39,7 @@ const monoFont = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL("https://assay.dev"),
   title: "Assay - prove your AI agent's guardrails hold",
-  description: "Point Assay at the agent.md you already ship. It runs real adversarial attacks in a sandbox and shows the exact destructive command your guardrails failed to block - before you deploy.",
+  description: "Point Assay at the agent.md you already ship. It rebuilds the agent from that file under a reference model, runs real adversarial attacks in a sandbox, and shows the exact destructive command your guardrails failed to block - before you deploy.",
   // Favicon + apple-touch-icon are provided by the App Router file convention
   // (src/app/icon.png, src/app/apple-icon.png). Next auto-injects correctly
   // hashed <link> tags; a manual `icons` entry pointing at /icon.png 404s

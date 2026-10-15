@@ -4,13 +4,38 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from .models import CandidateConfig, TraceAuditSummary
 
 
-LOCAL_TRACERAZOR = os.environ.get("TRACERAZOR_REPO", r"C:\Users\zulfa\TraceRazor")
+def _local_tracerazor_checkout(module_file: str | Path | None = None) -> str:
+    """A TraceRazor source checkout to import from when the package is not installed.
+
+    ``TRACERAZOR_REPO`` wins; otherwise a ``TraceRazor`` / ``tracerazor`` folder
+    next to this repository. Empty when neither exists (the installed package,
+    if any, is used either way). Must never raise: this runs at import time,
+    including in containers where the package sits at a shallow path like
+    ``/app/assay_api``.
+    """
+    explicit = os.environ.get("TRACERAZOR_REPO", "").strip()
+    if explicit:
+        return explicit
+    parents = Path(module_file or __file__).resolve().parents
+    # apps/api/assay_api/trace_audit.py -> parents[3] is the repository root.
+    if len(parents) < 4:
+        return ""
+    repo_root = parents[3]
+    for name in ("TraceRazor", "tracerazor"):
+        candidate = repo_root.parent / name
+        if (candidate / "tracerazor" / "__init__.py").is_file():
+            return str(candidate)
+    return ""
+
+
+LOCAL_TRACERAZOR = _local_tracerazor_checkout()
 
 
 class TraceAuditService:
@@ -95,7 +120,8 @@ def tracerazor_doctor(threshold: float = 70) -> dict[str, Any]:
 
     client_cls = _load_tracerazor_client()
     installed = client_cls is not None
-    candidate = CandidateConfig(name="TraceRazor doctor", adapter_type="mock")
+    # Config placeholder only: the doctor audits a synthetic trace, no model is called.
+    candidate = CandidateConfig(name="TraceRazor doctor", adapter_type="openai-compatible")
     steps = [
         {
             "id": index + 1,
@@ -174,7 +200,7 @@ def _load_tracerazor_client() -> Any | None:
 
         return TraceRazorClient
     except Exception:
-        if os.path.isdir(LOCAL_TRACERAZOR) and LOCAL_TRACERAZOR not in sys.path:
+        if LOCAL_TRACERAZOR and os.path.isdir(LOCAL_TRACERAZOR) and LOCAL_TRACERAZOR not in sys.path:
             sys.path.insert(0, LOCAL_TRACERAZOR)
         try:
             from tracerazor import TraceRazorClient
@@ -188,12 +214,15 @@ def _make_client(client_cls: Any, threshold: float, timeout_s: float) -> tuple[A
     """Instantiate the client, passing the timeout through when supported.
 
     Returns (client, client_bounded): client_bounded is True when the client
-    enforces the timeout itself (tracerazor>=1.0.4 subprocess timeout).
+    enforces the timeout itself. TraceRazor 1.1+ names the argument
+    ``timeout_s``; 1.0.4 called it ``timeout``; older clients take neither.
     """
-    try:
-        return client_cls(threshold=threshold, timeout=timeout_s), True
-    except TypeError:
-        return client_cls(threshold=threshold), False
+    for keyword in ("timeout_s", "timeout"):
+        try:
+            return client_cls(threshold=threshold, **{keyword: timeout_s}), True
+        except TypeError:
+            continue
+    return client_cls(threshold=threshold), False
 
 
 def _analyse_real_client_with_timeout(

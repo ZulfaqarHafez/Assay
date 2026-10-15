@@ -3,7 +3,10 @@
 import * as React from "react";
 import { FlaskConical, Upload, UploadCloud, FileText, Wrench, Hash, Sparkles, Zap } from "lucide-react";
 import { detectAgentFacts } from "@/lib/agentDetect";
-import HeroScanCard from "@/components/assay/HeroScanCard";
+import ShowcaseRunCard from "@/components/assay/ShowcaseRunCard";
+import CopyButton from "@/components/ui/CopyButton";
+import { SHOWCASE } from "@/lib/showcase";
+import { INSTALL_ONE_LINER } from "@/lib/surfaces";
 
 /**
  * The calm first screen: "bring the agent.md you already have."
@@ -82,9 +85,9 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
         <span className="assay-kicker">Behavioral guardrail exam</span>
         <h1>Prove your agent&rsquo;s guardrails actually hold.</h1>
         <p>
-          Drop the <code>agent.md</code> / <code>AGENTS.md</code> you already have. Assay reconstructs your
-          agent with its tools in a sandbox, runs real adversarial attacks, and shows you the exact destructive
-          command your guardrails failed to block - before you ship.
+          Drop the <code>AGENTS.md</code> you already ship. A real model plays it with its declared tools, Assay
+          runs real adversarial attacks across 21 scenarios, and deterministic tripwires report the exact forbidden
+          tool call that got through, with the fix.
         </p>
       </header>
 
@@ -163,8 +166,11 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
 
       {!liveMode && (
         <p className="assay-demo-notice" role="note">
-          <Sparkles size={14} /> No OpenAI key detected - this runs a <strong>deterministic demo</strong>,
-          not your real agent. Add a key to grade the real thing.
+          <Sparkles size={14} />
+          <span>
+            This Assay server has no model key, so this <strong>lints the definition only</strong>. The exam needs{" "}
+            <code>OPENAI_API_KEY</code> on the API server, or your own agent over HTTP. Nothing is recorded as a verdict without one.
+          </span>
         </p>
       )}
 
@@ -178,8 +184,8 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           >
             <FlaskConical size={18} />
             {submitting
-              ? liveMode ? "Running the guardrail test…" : "Running the demo…"
-              : liveMode ? "Run the guardrail test" : "Run demo guardrail test"}
+              ? liveMode ? "Running the guardrail test…" : "Linting…"
+              : liveMode ? "Run the guardrail test" : "Lint the definition"}
           </button>
         ) : (
           sampleTemplate && (
@@ -194,7 +200,7 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
               }
             >
               <Zap size={18} />
-              {submitting ? "Running the sample…" : "See a sample verdict (~20s)"}
+              {submitting ? "Running the sample…" : liveMode ? "See a sample verdict" : "Lint the sample agent"}
             </button>
           )
         )}
@@ -262,8 +268,8 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           </div>
           <small className="assay-policy-hint">
             {policyName === "strict"
-              ? "Strict: trace-audit and degraded-mode findings block the verdict."
-              : "Advisory: trace-audit and degraded-mode findings warn instead of block."}
+              ? "Strict: a failed trace audit blocks the verdict."
+              : "Advisory: a failed trace audit warns instead of blocking."}
           </small>
           <label className="assay-policy-slider">
             <span>
@@ -281,9 +287,17 @@ export function AgentIntake({ examPackName, liveMode, submitting, templates, onR
           </label>
         </div>
       </details>
+
+      <div className="assay-install" aria-label="Run it from a shell">
+        <span className="assay-install-lead">Or from a shell, no key needed for lint</span>
+        <div className="lp-code slim">
+          <pre><code>{INSTALL_ONE_LINER}</code></pre>
+          <CopyButton text={INSTALL_ONE_LINER} label="Copy the CLI command" />
+        </div>
+      </div>
         </div>
         <aside className="assay-hero-aside">
-          <HeroScanCard />
+          <ShowcaseRunCard run={SHOWCASE.careless} variant="compact" tab="Real run" />
         </aside>
       </div>
 

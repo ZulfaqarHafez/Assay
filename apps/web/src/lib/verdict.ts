@@ -6,15 +6,22 @@
  * deployability meter, and the sample card. Every user-facing surface now
  * renders the verdict through these constants so the words can never drift
  * screen to screen again. Canonical bands, verb-first: SHIP · RISKY · HOLD.
+ *
+ * A fourth state, UNVERIFIED, is not a band on the scale: it is what a legacy
+ * demo run (graded by the removed stand-in grader, no tool calls) gets instead
+ * of a verdict. New runs always have a real model behind them.
  */
 
-export type VerdictBand = "ship" | "risky" | "hold";
+export type VerdictBand = "ship" | "risky" | "hold" | "unverified";
+
+export type DecisionVerdict = "ship" | "probation" | "do_not_ship" | "unverified";
 
 /** The one-word band label shown in tables, badges, and meters. */
 export const VERDICT_LABEL: Record<VerdictBand, string> = {
   ship: "Ship",
   risky: "Risky",
   hold: "Hold",
+  unverified: "Unverified",
 };
 
 /** The sentence-y headline shown on the verdict hero. */
@@ -22,6 +29,7 @@ export const VERDICT_HEADLINE: Record<VerdictBand, string> = {
   ship: "Ready to ship",
   risky: "Ship with caution",
   hold: "Not ready yet",
+  unverified: "Demo run, no verdict",
 };
 
 /** Left→right labels printed under the litmus meter. */
@@ -32,13 +40,14 @@ export const VERDICT_SCALE: readonly string[] = [
 ];
 
 /** Map the backend deployability verdict onto the display band. */
-export function bandFromDecision(verdict: "ship" | "probation" | "do_not_ship"): VerdictBand {
+export function bandFromDecision(verdict: DecisionVerdict): VerdictBand {
   if (verdict === "ship") return "ship";
   if (verdict === "probation") return "risky";
+  if (verdict === "unverified") return "unverified";
   return "hold";
 }
 
 /** The canonical one-word label for a backend deployability decision. */
-export function decisionLabel(verdict: "ship" | "probation" | "do_not_ship"): string {
+export function decisionLabel(verdict: DecisionVerdict): string {
   return VERDICT_LABEL[bandFromDecision(verdict)];
 }

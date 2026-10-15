@@ -64,8 +64,17 @@ class RunOrchestrator:
         # stable id and lessons carry across reruns in tailored mode too.
         if not run.source_pack_id:
             run.source_pack_id = run.exam_pack_id
+        try:
+            adapter = adapter_for(candidate)
+        except Exception as exc:
+            # Refused before any question (no model configured, legacy candidate,
+            # bad endpoint): record it so the run never sits in "running".
+            run.status = "failed"
+            run.error = str(exc)
+            save_run(run)
+            self._recorder.event(run.id, "system", "run_failed", {"error": str(exc)})
+            raise
         save_run(run)
-        adapter = adapter_for(candidate)
 
         try:
             self._recorder.event(run.id, "system", "run_started", {"candidate": candidate.name, "exam_pack": run.exam_pack_id})
@@ -116,10 +125,19 @@ class RunOrchestrator:
             lesson_feedback = run_items.lesson_feedback
             judge_results = run_items.judge_results
 
+            # Record what actually answered: the reference model that played the
+            # definition, or the user's own HTTP agent.
+            exercised_model = getattr(adapter, "model", None)
+            if candidate.adapter_type == "http":
+                simulator_model = f"http:{candidate.endpoint_url}"
+            elif exercised_model:
+                simulator_model = f"openai:{exercised_model}"
+            else:
+                simulator_model = pack.simulator_model
             scorecard = self._assemble_scorecard(
                 run,
                 candidate,
-                pack.simulator_model,
+                simulator_model,
                 seen_scores,
                 held_scores,
                 panel_results,
@@ -130,25 +148,15 @@ class RunOrchestrator:
             scorecard.prior_run_id = run.baseline_run_id or prior_run_id
             scorecard.qualification_status = qualification_status
             # pass^k only measures reliability-under-resampling when the candidate
-            # can actually vary between trials. A deterministic adapter (or a run
-            # that degraded to demo answers) yields identical trials, so flag it
-            # honestly rather than dressing pass^1 up as pass^k.
-            scorecard.trials_stochastic = bool(getattr(adapter, "stochastic", False)) and not getattr(
-                adapter, "degraded", False
-            )
+            # can actually vary between trials. A deterministic agent yields
+            # identical trials, so flag it rather than dressing pass^1 up as pass^k.
+            scorecard.trials_stochastic = bool(getattr(adapter, "stochastic", False))
+            # Every new run is answered by a real model or agent (adapter_for
+            # refuses anything else). The flag stays on the scorecard so runs
+            # stored by the removed demo grader still read as "unverified".
+            scorecard.behavioral = True
             if role_brief is not None:
                 scorecard.role_brief_summary = role_brief.role_summary or None
-            # If the live key was rate-limited, the run answered deterministically;
-            # mark the verdict as a demo so the UI can say so plainly.
-            if getattr(adapter, "degraded", False):
-                scorecard.degraded = True
-                scorecard.degraded_reason = getattr(adapter, "degraded_reason", None)
-                self._recorder.event(
-                    run.id,
-                    "system",
-                    "degraded_to_demo",
-                    {"reason": scorecard.degraded_reason or "OpenAI rate limit"},
-                )
             record_lesson_outcomes(run, prior_by_comp, scorecard, self._recorder)
             persist_new_lessons(run, candidate, pack, scorecard, lesson_feedback, self._recorder)
             save_scorecard(scorecard)
@@ -275,7 +283,17 @@ class RunOrchestrator:
         ]
         # gather preserves argument order, so aggregation below is deterministic
         # regardless of completion order.
-        results = await asyncio.gather(*(evaluate(item, trial, variant) for item, trial, variant in units))
+        tasks = [asyncio.ensure_future(evaluate(item, trial, variant)) for item, trial, variant in units]
+        try:
+            results = await asyncio.gather(*tasks)
+        except BaseException:
+            # One probe failed (e.g. the model stayed rate-limited): there is no
+            # stand-in answer, so stop the rest of the exam instead of letting
+            # sibling probes keep spending calls on a run that already failed.
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
 
         def record_criticals(competency: str, variant: str, grade: Any) -> None:
             for phrase in getattr(grade, "forbidden_hits", None) or []:

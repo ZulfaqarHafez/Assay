@@ -2,11 +2,43 @@
 
 Single source of truth for anyone (human or coding agent) picking this up. Covers **what the product is now**, **what shipped**, **the architecture**, and **the remaining technical work** (web cut, security, smoke tests, deploy) as an executable runbook.
 
-- **Repo:** monorepo — `apps/api` (FastAPI, package `assay_api`, Python 3.11) · `apps/web` (Next.js 15 / React 19 / TS).
+- **Repo:** monorepo — `apps/api` (FastAPI, package `assay_api`, Python 3.11) · `apps/web` (Next.js 16 / React 19 / TS).
 - **State:** the pivot (sprints S1–S6) is on `main`. Full design context: `.claude/plans/evaluate-a-spawn-multiple-elegant-quiche.md`.
-- **Test baseline:** API suite **214 passing**; web unit tests **77 passing**; type-check, lint, production build, dependency audits, secret scan, and Playwright smoke green on 2026-07-04.
+- **Test baseline (2026-10-15):** see the update below; the 2026-07-04 numbers further down are historical.
 
-## Current deployment update (2026-07-04)
+## Update (2026-10-15): package, MCP server, and no stand-in grader
+
+- **Package + MCP:** `apps/api` is the installable distribution `assay` (CLI `assay`, SDK `assay_api.sdk`, stdio MCP server `assay-mcp`). Details: [docs/mcp.md](docs/mcp.md).
+- **No mock grader.** `adapters/mock.py` is gone. Every exam is answered by a real OpenAI model playing the definition (`openai-compatible`) or the user's own agent over HTTP (`http`). `model_access.py` holds the one refusal message; without a key the web app lints only, `POST /runs/{id}/start` returns 409 and records the run as failed, the CLI exits 4, the SDK raises `ModelUnavailableError`, and the MCP tool errors. Rate limits retry with backoff and then fail the run; answers are never substituted. Legacy demo runs and `mock` candidates still load, read as **Unverified**, and cannot be re-run.
+- **Fixed along the way:** the web app defaulted to the retired `hr-v1` pack (now `guardrail-v1`); HTTP candidates crashed on every run (the adapter rejected the `trial` argument); the TraceRazor client timeout was never applied (the client takes `timeout_s`); a hardcoded personal TraceRazor path; OpenAI 401/403/404 now fail runs with a clear message instead of a 500.
+- **Web dependencies:** upgraded to Next.js 16.4.1 (plus PostCSS 8.5.30 and sharp 0.35.5 overrides) because new advisories, including a critical one, made `npm audit --omit=dev` fail; it is now clean. `eslint-config-next` 16 adds React Compiler rules: `react-hooks/set-state-in-effect` and `react-hooks/immutability` flag 11 pre-existing spots and are set to warn until those effects are refactored.
+- **Tests:** the hermetic suite uses a scripted model stand-in that lives only in `apps/api/tests/scripted_model.py` (opt out with `@pytest.mark.no_model`). A real reference agent runs over a local socket in `test_http_candidate_integration.py`. `@pytest.mark.live` tests call OpenAI and run when `OPENAI_API_KEY` is set; CI's `live` job runs them when the repo has that secret.
+
+## Update (2026-10-15): website shows real capability
+
+- The landing page renders two genuine exam results bundled at
+  `apps/web/src/data/showcase/{careful,careless}.json` (schema
+  `assay.showcase_run.v1`). Regenerate them with `scripts/export_showcase.py`
+  against a local API with `ASSAY_HTTP_CANDIDATE_ALLOW_PRIVATE=1` and the two
+  agents in `examples/http_candidate` (`server.py` careful on :8091,
+  `careless.py` on :8092). Nothing on the page is typed by hand: the hero card,
+  proof strip, handback grid and the dark "two real runs" band all read from
+  that JSON (`apps/web/src/lib/showcase.ts`).
+- Surfaces and their exact commands live in `apps/web/src/lib/surfaces.ts`
+  (CLI, MCP, SDK, GitHub Action, HTTP API, own HTTP agent, exit codes, the
+  no-key table). Keep them in step with `publish.yml` and the release URL.
+- The no-key path is a structured screen (`LintOnlyResult.tsx`): guardrail
+  coverage per category, dangerous grants, findings, then the three ways to run
+  the exam. The run page leads with the breaches (`BreachList.tsx`, parser in
+  `lib/breaches.ts`), names who played the agent, and shows the privilege delta.
+- README screenshots come from `scripts/capture-readme-shots.mjs` (needs the
+  web app and API; `PLAYWRIGHT_CHROMIUM_PATH` to use a system Chromium). The
+  files are `docs/images/01..08-*.png`; the old 01-05 set was removed.
+- Style rules applied across the site and README: no em dashes, one accent,
+  concrete numbers from the runs. Generated API text was fixed too
+  (`agent_refinery.py`, `role_qualification.py`).
+
+## Deployment update (2026-07-04)
 
 - **Task A web cut:** implemented. `/agents`, `/suites`, old suite import/export routes, `/connectors`, `/connectors/probe`, and standalone role-analysis routes are retired and covered by 404 tests.
 - **Security audit:** implemented in [docs/security-review.md](docs/security-review.md). No high/critical dependency findings; sandbox grep and secret scan passed.
@@ -152,6 +184,6 @@ The product now runs a live model with tools and a user key. Verify each surface
 ## 5. Gotchas (hard-won — don't repeat these)
 - **Never run `next build` while `next dev` is up** — they share `.next` and it corrupts (`routes-manifest.json` ENOENT, EXIT 127). Kill dev, `rm -rf apps/web/.next`, then build.
 - **Live-key smokes cost real money.** Keep `ASSAY_LIVE_K=1` + a cheap model.
-- **Offline ≠ tripwire catch.** With no key, a bad agent still fails via deterministic refusal-quality grading (the mock can't make tool calls). The tripwire *catch* only fires with a live model — verify smoke #4/#5 before trusting the headline demo.
+- **No key, no exam.** There is no offline grader any more: the tripwire catch needs a live model (or an HTTP agent). Run `pytest -m live` with a key before trusting the headline claim.
 - **If a Task-A deletion breaks a test, fix the test to the smaller surface — don't restore dead code.**
 - Commit per task with a clear message; branch off `main` if auto-commit isn't handling it.

@@ -126,8 +126,8 @@ class RunRecorder:
     def _step_tokens(reported: Any, *text_fields: str) -> int:
         """Return a faithful per-step token count.
 
-        Prefer the real count an adapter reports (mock and HTTP candidates both
-        emit genuine counts). Only fall back to a deterministic ~4-chars/token
+        Prefer the real count an adapter reports (the OpenAI usage block, or the
+        count an HTTP candidate returns). Only fall back to a deterministic ~4-chars/token
         estimate over the step's own text when no real count exists, so a step
         is never collapsed to the misleading ``tokens=1`` placeholder.
         """

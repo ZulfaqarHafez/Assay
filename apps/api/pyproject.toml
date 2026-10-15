@@ -1,19 +1,48 @@
-# Vercel FastAPI deployment config for the Assay API.
+# Assay: the guardrail prover for AI agent definitions.
 #
-# The repo exports `app` from several files (api/index.py, assay_api/main.py, and
-# the test modules that import it), so Vercel's FastAPI auto-detection can't pick
-# one on its own — `[tool.vercel].entrypoint` points it at the serverless app.
+# This file does two jobs:
 #
-# Vercel installs Python deps with `uv` from this file's `[project.dependencies]`
-# (kept in sync with requirements.txt). `[tool.uv] package = false` marks this a
-# dependency set, not an installable package, so uv doesn't try to build it.
+# 1. It makes `apps/api` an installable Python distribution named `assay`
+#    (import name stays `assay_api`; renaming the namespace is deferred, see the
+#    README). `pip install .` gives you the `assay` CLI, the `assay_api.sdk`
+#    programmatic API, and (with the `mcp` extra) the `assay-mcp` server.
 #
-# Requires the Vercel project's Root Directory = `apps/api` so `assay_api`
-# (imported by api/index.py) is importable.
+# 2. It is still the Vercel FastAPI deploy config. The repo exports `app` from
+#    several files (api/index.py, assay_api/main.py, and the test modules that
+#    import it), so Vercel's auto-detection can't pick one on its own:
+#    `[tool.vercel].entrypoint` points it at the serverless app. Vercel installs
+#    deps with `uv` from `[project.dependencies]` (kept in sync with
+#    requirements.txt); `[tool.uv] package = false` tells uv to install only
+#    the dependencies there, not build the project. Requires the Vercel
+#    project's Root Directory = `apps/api` so `assay_api` is importable.
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "assay-api"
+name = "assay"
 version = "0.1.0"
+description = "Behaviorally prove whether an AI agent's written guardrails hold: lint, adversarial sandbox exam, tripwires, verdict."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Zulfaqar Hafez" }]
 requires-python = ">=3.11"
+keywords = ["ai-agents", "guardrails", "agents.md", "prompt-injection", "security-testing", "mcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Security",
+]
+# Core runtime. `fastapi` stays here because the tenancy/security helpers the
+# models import use its types; `supabase` and `openai` are imported lazily but
+# the hosted deploy relies on them being present, so they ship by default too.
 dependencies = [
     "fastapi>=0.115,<1.0",
     "uvicorn[standard]>=0.30,<1.0",
@@ -24,6 +53,30 @@ dependencies = [
     "openai>=2.2,<3.0",
     "PyYAML>=6.0,<7.0",
 ]
+
+[project.optional-dependencies]
+# MCP server (`assay-mcp`). Requires the v2 Python SDK.
+mcp = ["mcp>=2.0,<3.0"]
+# TraceRazor trace audit (platform wheels; the exam degrades gracefully without it).
+trace = ["tracerazor>=1.0.3"]
+dev = ["pytest>=9.0.3,<10.0", "pytest-asyncio>=0.23,<1.0"]
+all = ["assay[mcp,trace]"]
+
+[project.scripts]
+assay = "assay_api.cli:main"
+assay-mcp = "assay_api.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/ZulfaqarHafez/Assay"
+Repository = "https://github.com/ZulfaqarHafez/Assay"
+Issues = "https://github.com/ZulfaqarHafez/Assay/issues"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["assay_api*"]
+exclude = ["tests*", "api*", "data*"]
 
 [tool.uv]
 package = false

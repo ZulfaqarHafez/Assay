@@ -42,11 +42,16 @@ class HttpCandidateAdapter(CandidateAdapter):
         self._client = client
         self._owns_client = client is None
 
-    async def ask(self, context: str, question: str) -> CandidateResponse:
+    # The agent behind the endpoint is the user's own; treat repeated trials as
+    # independent samples (a deterministic agent is still graded correctly).
+    stochastic = True
+
+    async def ask(self, context: str, question: str, trial: int = 1) -> CandidateResponse:
         started = time.perf_counter()
         payload = {
             "context": context,
             "question": question,
+            "trial": trial,
             "candidate_id": self.config.id,
             "metadata": self.config.metadata,
         }

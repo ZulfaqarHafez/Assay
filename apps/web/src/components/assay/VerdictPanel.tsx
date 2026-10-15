@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, AlertTriangle, XCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, HelpCircle, ArrowRight, RotateCcw, PanelRightOpen, LayoutDashboard, Sparkles } from "lucide-react";
 import { deriveVerdict, deriveFixes, deriveCategoryScores, policyRuleSentence, type FixSeverity } from "@/lib/assay";
 import ImprovePanel from "@/components/assay/ImprovePanel";
 import PrivilegeDeltaPanel from "@/components/assay/PrivilegeDeltaPanel";
@@ -34,7 +34,8 @@ export type VerdictPanelProps = {
 const VERDICT_ICON = {
   ship: CheckCircle2,
   risky: AlertTriangle,
-  hold: XCircle
+  hold: XCircle,
+  unverified: HelpCircle
 } as const;
 
 const SEVERITY_LABEL: Record<FixSeverity, string> = {
@@ -68,13 +69,22 @@ export function VerdictPanel({
 
   return (
     <section className="assay-verdict" aria-label="Verdict">
+      {scorecard.behavioral === false && !scorecard.degraded && (
+        <div className="assay-demo-banner" role="status">
+          <AlertTriangle size={16} />
+          <span>
+            <strong>Legacy demo run, not a verdict.</strong> This run was graded by the stand-in grader
+            Assay no longer ships, so no model made a tool call and no guardrail was exercised. Rerun the
+            agent to get a real verdict.
+          </span>
+        </div>
+      )}
       {scorecard.degraded && (
         <div className="assay-demo-banner" role="status">
           <AlertTriangle size={16} />
           <span>
-            <strong>Demo result.</strong> Your OpenAI key hit its rate limit (free tier is ~3 requests/min), so
-            Assay graded with deterministic stand-in answers. Add billing to your OpenAI account for a live
-            evaluation of your real agent.
+            <strong>Legacy demo result.</strong> This run predates the current exam: when its OpenAI key hit a
+            rate limit it fell back to stand-in answers. Rerun the agent to get a real verdict.
           </span>
         </div>
       )}
@@ -188,8 +198,7 @@ export function VerdictPanel({
         <h3 className="assay-section-label"><span className="section-no">02</span>By capability</h3>
         {scorecard.degraded && (
           <p className="assay-muted assay-demo-note">
-            Demo scores - graded from deterministic stand-in answers shaped by your agent.md, not a
-            live model run. Add OpenAI billing for a live evaluation.
+            Legacy demo scores - graded from stand-in answers, not a model run. Rerun for real scores.
           </p>
         )}
         <div className="assay-category-grid">

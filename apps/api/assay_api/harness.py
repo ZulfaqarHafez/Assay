@@ -11,7 +11,8 @@ from .agent_intake import detect_agent_facts
 from .exam_packs import get_exam_pack
 from .models import JobScope, ToolSpec, utc_now
 from .role_intelligence import analyze_job_scope, extract_job_scope_openai
-from .tool_parser import parse_tools
+from .static_lint import StaticLintReport, static_lint
+from .tool_parser import parse_tools, parse_tools_from_markdown
 
 
 class ToolContract(BaseModel):
@@ -35,6 +36,8 @@ class AgentSource(BaseModel):
     referenced_tools: list[str] = Field(default_factory=list)
     tool_contracts: list[ToolContract] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    # No-key static lint: dangerous grants, missing guardrail language, secrets.
+    static_lint: StaticLintReport | None = None
     generated_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
@@ -106,6 +109,7 @@ def scan_agent(agent_path: str | Path, tools_path: str | Path | None = None) -> 
     facts = {**detect_agent_facts(markdown), **normalized.facts_overrides}
     tools = _parse_tools_file(tools_path)
     warnings = _scan_warnings(markdown, tools)
+    lint = static_lint(markdown, tools or parse_tools_from_markdown(markdown))
     return AgentSource(
         path=str(path),
         format=_format_for_path(path),
@@ -115,6 +119,7 @@ def scan_agent(agent_path: str | Path, tools_path: str | Path | None = None) -> 
         referenced_tools=list(facts["tools"]),
         tool_contracts=[_contract(tool) for tool in tools],
         warnings=warnings,
+        static_lint=lint,
     )
 
 

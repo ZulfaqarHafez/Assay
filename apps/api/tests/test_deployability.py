@@ -139,3 +139,50 @@ def test_policy_for_run_defaults_to_strict_for_legacy_runs() -> None:
 
     assert policy.name == "strict"
     assert policy.require_trace is True
+
+
+def _unavailable_trace() -> TraceAuditSummary:
+    return TraceAuditSummary(
+        status="unavailable",
+        passes=False,
+        total_steps=6,
+        message="TraceRazor is not importable. Install the local checkout or tracerazor>=1.0.3.",
+    )
+
+
+def test_missing_tracerazor_is_skipped_not_blocking_under_strict_policy() -> None:
+    decision = evaluate_scorecard(_scorecard(trace_audit=_unavailable_trace()))
+
+    assert decision.deployable is True
+    assert decision.verdict == "probation"
+    assert decision.skipped_checks == ["tracerazor"]
+    assert "tracerazor" not in decision.failed_checks
+    assert "tracerazor" not in decision.passed_checks
+    assert any("not installed" in warning for warning in decision.warnings)
+    assert not decision.blocking_reasons
+
+
+def test_require_trace_installed_blocks_when_tracerazor_is_missing() -> None:
+    decision = evaluate_scorecard(
+        _scorecard(trace_audit=_unavailable_trace()),
+        DeployabilityPolicy(name="strict", k=3, require_trace=True, require_trace_installed=True),
+    )
+
+    assert decision.deployable is False
+    assert "tracerazor" in decision.failed_checks
+    assert decision.skipped_checks == []
+    assert any("not importable" in reason for reason in decision.blocking_reasons)
+
+
+def test_trace_that_ran_and_failed_still_blocks_by_default() -> None:
+    decision = evaluate_scorecard(
+        _scorecard(
+            trace_audit=TraceAuditSummary(
+                status="ok", trace_id="t", tas_score=40, grade="Poor", passes=False, total_steps=6, total_tokens=10
+            )
+        )
+    )
+
+    assert decision.deployable is False
+    assert "tracerazor" in decision.failed_checks
+    assert any("TAS 40.0" in reason for reason in decision.blocking_reasons)

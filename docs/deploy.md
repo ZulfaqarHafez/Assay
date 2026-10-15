@@ -2,7 +2,7 @@
 
 Assay is a monorepo with two deployable parts:
 
-- **`apps/web`** — a Next.js 15 app. **Vercel-native** (`next build` passes; ~113 kB first load).
+- **`apps/web`** — a Next.js 16 app. **Vercel-native** (`next build` passes; ~113 kB first load).
 - **`apps/api`** — a FastAPI (Python) service. Deployable two ways: as **Vercel Python
   Serverless Functions** (`apps/api/vercel.json` + `apps/api/api/index.py` are wired up), or
   on a **long-lived Python host** (Render/Railway/Fly/VM). Use a long-lived host for *live*

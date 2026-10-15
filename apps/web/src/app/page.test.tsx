@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -225,17 +225,21 @@ let proofDetailFetches = 0;
 let payoffFetches = 0;
 let traceFetches = 0;
 let eventFetches = 0;
+// The intake response's exam_available flag; false simulates a server with no model key.
+let examAvailable = true;
+const NO_MODEL_REASON =
+  "The guardrail exam needs a real model to play the agent: set OPENAI_API_KEY on the Assay server.";
 
 const workspaceBootPayload: WorkspaceBoot = {
   schema: "assay.workspace_boot.v1",
-  health: { ok: true, tracerazor_importable: true, database_backend: "sqlite" },
+  health: { ok: true, tracerazor_importable: true, database_backend: "sqlite", openai_configured: true },
   exam_pack_summaries: [
     {
-      id: "hr-v1",
-      name: "HR screening reliability",
-      simulator_model: "assay-deterministic-sim-v1",
+      id: "guardrail-v1",
+      name: "Guardrail prover",
+      simulator_model: "assay-sandbox",
       item_count: 2,
-      competencies: ["compliance", "fairness"]
+      competencies: ["destructive_actions", "injection"]
     }
   ],
   candidate_summaries: [{
@@ -257,6 +261,7 @@ beforeEach(() => {
   payoffFetches = 0;
   traceFetches = 0;
   eventFetches = 0;
+  examAvailable = true;
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/workspace/boot")) {
@@ -273,8 +278,10 @@ beforeEach(() => {
     if (url.endsWith("/candidates/from-markdown")) {
       const body = JSON.parse(String(init?.body ?? "{}"));
       return json({
-        candidate: { ...candidate, system_prompt: body.markdown, adapter_type: "mock" },
-        mode: "demo",
+        candidate: { ...candidate, system_prompt: body.markdown, adapter_type: "openai-compatible" },
+        mode: examAvailable ? "live" : "lint-only",
+        exam_available: examAvailable,
+        exam_unavailable_reason: examAvailable ? null : NO_MODEL_REASON,
         static_lint: {
           schema: "assay.static_lint.v1",
           kind: "static_analysis",
@@ -384,16 +391,15 @@ describe("Assay page", () => {
     expect(screen.queryByRole("button", { name: /run.*guardrail test/i })).toBeNull();
     expect(screen.getByText(/runs real adversarial attacks/i)).toBeInTheDocument();
     // A starter template is offered as the fallback.
-    expect(screen.getByText(/HR screener \(hardened\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ops helper \(hardened\)/i })).toBeInTheDocument();
     // Intake accepts structured agent configs, not just markdown.
     const fileInput = container.querySelector('input[type="file"]');
     const accept = fileInput?.getAttribute("accept") ?? "";
     expect(accept).toContain(".json");
     expect(accept).toContain(".yaml");
     expect(accept).toContain(".toml");
-    // With no OpenAI key the demo framing is honest up front (not a post-run reveal).
-    expect(screen.getByText(/runs a/i)).toBeInTheDocument();
-    expect(screen.getByText(/deterministic demo/i)).toBeInTheDocument();
+    // A server with a model key runs the real exam: no lint-only notice.
+    expect(screen.queryByText(/lints the definition only/i)).toBeNull();
     // Zero-input path: a one-click sample verdict + a "see how it works" jump are offered.
     expect(screen.getByRole("button", { name: /see how it works/i })).toBeInTheDocument();
     expect(workspaceBootFetches).toBe(0);
@@ -409,7 +415,7 @@ describe("Assay page", () => {
   it("runs an uploaded agent.md and lands on a verdict", async () => {
     const user = userEvent.setup();
     renderHome();
-    const template = await screen.findByText(/HR screener \(hardened\)/i);
+    const template = await screen.findByRole("button", { name: /Ops helper \(hardened\)/i });
     await user.click(template);
     const runButton = screen.getByRole("button", { name: /run.*guardrail test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
@@ -440,10 +446,42 @@ describe("Assay page", () => {
     expect(proofDetailFetches).toBe(0);
   }, 15000);
 
+  it("says up front that a server without a model key can only lint", async () => {
+    const { container } = renderHome({
+      ...workspaceBootPayload,
+      health: { ...workspaceBootPayload.health, openai_configured: false }
+    });
+    await screen.findByRole("heading", { name: /prove your agent/i });
+    expect(screen.getByText(/lints the definition only/i)).toBeInTheDocument();
+    const actions = within(container.querySelector(".assay-intake-actions") as HTMLElement);
+    expect(actions.getByRole("button", { name: /lint the sample agent/i })).toBeEnabled();
+    expect(actions.queryByRole("button", { name: /see a sample verdict/i })).toBeNull();
+  });
+
+  it("shows the lint and the reason, and starts no run, when the exam is unavailable", async () => {
+    const user = userEvent.setup();
+    examAvailable = false;
+    renderHome({ ...workspaceBootPayload, health: { ...workspaceBootPayload.health, openai_configured: false } });
+    const template = await screen.findByRole("button", { name: /Ops helper \(hardened\)/i });
+    await user.click(template);
+    const lintButton = screen.getByRole("button", { name: /lint the definition/i });
+    await waitFor(() => expect(lintButton).toBeEnabled());
+    await user.click(lintButton);
+
+    await screen.findByText(/lint only - the guardrail exam did not run/i);
+    expect(screen.getByText(NO_MODEL_REASON)).toBeInTheDocument();
+    expect(screen.getByText("Dangerous capability granted: `delete_user`")).toBeInTheDocument();
+    expect(runCreateBodies).toHaveLength(0);
+    expect(screen.queryByText("What to fix")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /back to start/i }));
+    await screen.findByRole("heading", { name: /prove your agent/i });
+  });
+
   it("uses the current run as the baseline when testing the improved version", async () => {
     const user = userEvent.setup();
     renderHome();
-    const template = await screen.findByText(/HR screener \(hardened\)/i);
+    const template = await screen.findByRole("button", { name: /Ops helper \(hardened\)/i });
     await user.click(template);
     const runButton = screen.getByRole("button", { name: /run.*guardrail test/i });
     await waitFor(() => expect(runButton).toBeEnabled());
@@ -458,7 +496,7 @@ describe("Assay page", () => {
     expect(runListFetches).toBe(0);
     expect(runCreateBodies[1]).toMatchObject({
       candidate_id: "cand_demo",
-      exam_pack_id: "hr-v1",
+      exam_pack_id: "guardrail-v1",
       baseline_run_id: "run_demo"
     });
   }, 20000);

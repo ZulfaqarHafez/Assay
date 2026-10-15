@@ -7,7 +7,9 @@ from typing import Literal
 AgentReadiness = Literal["ready", "refine", "needs_subagents"]
 SubAgentPriority = Literal["recommended", "optional"]
 Seniority = Literal["intern", "junior", "mid", "senior", "lead", "executive", "unspecified"]
-AdapterType = Literal["mock", "http", "openai-compatible", "local-command", "mcp-server"]
+# "mock" is read-only legacy: candidates stored by the removed demo grader still
+# load, but cannot be created or examined (see model_access).
+AdapterType = Literal["openai-compatible", "http", "local-command", "mcp-server", "mock"]
 RunStatus = Literal["created", "running", "completed", "failed"]
 LessonOutcome = Literal["pending", "improved", "regressed", "unchanged", "still_failing"]
 

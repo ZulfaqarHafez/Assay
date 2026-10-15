@@ -88,15 +88,18 @@ class Scorecard(BaseModel):
     transfer_gap: dict[str, float]
     grader_disagreement: float
     trace_audit: TraceAuditSummary
-    # False when the candidate answered deterministically (mock/demo, or a live
-    # run that degraded), so the k trials are identical and pass^k is a single
-    # held-out check rather than a reliability-under-resampling measure.
+    # False when the candidate answered deterministically (k identical trials),
+    # so pass^k is a single held-out check rather than a resampling measure.
     trials_stochastic: bool = True
+    # Always True for new runs: a real model or the user's own agent answered.
+    # False only on runs stored by the removed demo grader, which the gate
+    # reports as "unverified" because no model made a tool call.
+    behavioral: bool = True
     failure_reasons: list[str] = Field(default_factory=list)
     lessons_applied: list[str] = Field(default_factory=list)
     prior_run_id: str | None = None
-    # True when the live OpenAI key was rate-limited / out of quota and the run
-    # fell back to deterministic demo answers, so the verdict is illustrative.
+    # Legacy: set on runs from before the stand-in grader was removed, when a
+    # rate-limited key fell back to canned answers. New runs fail instead.
     degraded: bool = False
     degraded_reason: str | None = None
     # How the exam/rubric for this run was sourced. ``tailored`` = fully

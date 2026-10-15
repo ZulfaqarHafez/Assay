@@ -1,0 +1,20 @@
+import { chromium, devices } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+const OUT = process.env.OUT ?? "/tmp/claude-0/-home-user-Assay/b72ff000-5fdb-501c-b085-827420ef89a3/scratchpad/before";
+const BASE = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const RUN_ID = process.env.RUN_ID ?? "";
+await mkdir(OUT, { recursive: true });
+const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+const ctx = await browser.newContext({ ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } });
+const page = await ctx.newPage();
+const shoot = async (name, full = false) => { await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: full }); console.log("saved", name); };
+await page.goto(BASE, { waitUntil: "networkidle" }); await page.waitForTimeout(800);
+await shoot("01-home"); await shoot("01-home-full", true);
+const input = page.getByRole("textbox", { name: /agent definition/i });
+await input.click(); await input.fill("# Ops Helper\n\nMove fast.\n\n## Tools\n- `exec_shell(command)` run anything\n- `db_query(sql)`\n");
+await page.waitForTimeout(400); await shoot("02-home-filled");
+const lint = page.locator(".assay-intake-actions").getByRole("button", { name: /lint the definition|run.*guardrail test/i });
+await lint.click(); await page.waitForTimeout(2500); await shoot("03-after-submit", true);
+await page.goto(`${BASE}/runs`, { waitUntil: "networkidle" }); await page.waitForTimeout(800); await shoot("04-runs", true);
+if (RUN_ID) { await page.goto(`${BASE}/runs/${RUN_ID}`, { waitUntil: "networkidle" }); await page.waitForTimeout(1500); await shoot("05-run-detail", true); }
+await browser.close();

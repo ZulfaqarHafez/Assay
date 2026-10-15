@@ -7,6 +7,8 @@ from assay_api.exam_packs import EXAM_PACKS, _validate_pack_contract
 from assay_api.main import app
 from assay_api.models import BriefCompetency, RoleBrief, RunRecord
 
+from api_helpers import register_candidate
+
 
 def _brief(status: str = "ok", competencies=None) -> RoleBrief:
     if competencies is None:
@@ -160,7 +162,7 @@ def test_tailored_run_registers_pack_and_marks_status(monkeypatch) -> None:
     monkeypatch.setattr(exam_synthesis, "_generate_items", lambda key, brief, run: _GOOD_ITEMS)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         scorecard = client.post(f"/runs/{run['id']}/start").json()
         events = client.get(f"/runs/{run['id']}/events").json()
@@ -208,7 +210,7 @@ def test_deterministic_brief_recorded_when_tailored_disabled(monkeypatch) -> Non
     monkeypatch.setattr("assay_api.orchestrator.TraceAuditService", _FakeAudit)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
         run = client.post("/runs", json={"candidate_id": candidate_id}).json()
         scorecard = client.post(f"/runs/{run['id']}/start").json()
         events = client.get(f"/runs/{run['id']}/events").json()
@@ -261,7 +263,7 @@ def test_tailored_reruns_carry_lessons_across_distinct_generated_packs(monkeypat
     monkeypatch.setattr("assay_api.orchestrator.grade_response", _failing_grade)
 
     with TestClient(app) as client:
-        candidate_id = client.get("/candidates").json()[0]["id"]
+        candidate_id = register_candidate(client)
 
         run_a = client.post("/runs", json={"candidate_id": candidate_id, "exam_pack_id": "hr-v1"}).json()
         client.post(f"/runs/{run_a['id']}/start")

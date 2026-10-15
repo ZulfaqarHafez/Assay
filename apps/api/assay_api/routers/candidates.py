@@ -9,13 +9,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ..agent_formats import normalize_agent_definition
 from ..cache_headers import public_read_json_headers
 from ..agent_intake import detect_agent_facts
-from ..agent_research import resolve_openai_key
 from ..database import (
     get_candidate,
     list_candidate_summaries,
     list_candidates,
     save_candidate,
 )
+from ..model_access import exam_unavailable_reason
 from ..models import CandidateConfig
 from ..progress import candidate_progress, lesson_library
 from ..static_lint import static_lint
@@ -71,6 +71,11 @@ def candidate_summaries() -> JSONResponse:
 
 @router.post("/candidates")
 def create_candidate(candidate: CandidateConfig) -> dict:
+    if candidate.adapter_type == "mock":
+        raise HTTPException(
+            status_code=422,
+            detail="The mock grader was removed. Register an 'openai-compatible' or 'http' candidate.",
+        )
     return save_candidate(candidate).model_dump(mode="json")
 
 
@@ -78,11 +83,11 @@ def create_candidate(candidate: CandidateConfig) -> dict:
 def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
     """Register an agent definition markdown as a candidate under test.
 
-    The raw ``agent.md`` is stored as the candidate's ``system_prompt``. When an
-    OpenAI key is configured the candidate runs live via the OpenAI-compatible
-    prompt adapter; otherwise it falls back to the deterministic mock so the demo
-    still runs offline. Facts (role, tools, token estimate) are detected from the
-    markdown without any network call.
+    The raw ``agent.md`` is stored as the candidate's ``system_prompt`` and is
+    always examined by a real model. The static lint and detected facts (role,
+    tools, token estimate) need no network call and are returned either way;
+    ``exam_available`` says whether this server can run the exam right now, and
+    ``exam_unavailable_reason`` says why not.
     """
 
     raw = (request.content or request.markdown or "")[:_MAX_AGENT_MD_CHARS]
@@ -95,9 +100,7 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
     tools = parse_tools(request.tools_code, request.tools_format) if request.tools_code else []
     lint_report = static_lint(markdown, declared_tools=tools)
 
-    live = bool(resolve_openai_key())
-    mode = "live" if live else "demo"
-    adapter_type = "openai-compatible" if live else "mock"
+    unavailable = exam_unavailable_reason()
 
     metadata: dict = {
         "source": "agent-md",
@@ -110,7 +113,7 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
 
     candidate = CandidateConfig(
         name=request.name or detected["title"],
-        adapter_type=adapter_type,
+        adapter_type="openai-compatible",
         system_prompt=markdown,
         tools=tools,
         metadata=metadata,
@@ -119,7 +122,9 @@ def create_candidate_from_markdown(request: AgentMarkdownRequest) -> dict:
 
     return {
         "candidate": saved.model_dump(mode="json"),
-        "mode": mode,
+        "mode": "live" if unavailable is None else "lint-only",
+        "exam_available": unavailable is None,
+        "exam_unavailable_reason": unavailable,
         "format": normalized.format,
         "static_lint": lint_report.model_dump(mode="json", by_alias=True),
         "detected": {

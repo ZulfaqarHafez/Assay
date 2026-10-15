@@ -78,7 +78,7 @@ class CandidateConfig(BaseModel):
     id: str = Field(default_factory=lambda: f"cand_{uuid4().hex[:10]}")
     tenant_id: str = Field(default_factory=current_tenant_id, pattern=_TENANT_ID_PATTERN)
     name: str
-    adapter_type: AdapterType = "mock"
+    adapter_type: AdapterType = "openai-compatible"
     endpoint_url: HttpUrl | None = None
     model: str | None = None
     system_prompt: str | None = None

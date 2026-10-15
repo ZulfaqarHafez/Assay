@@ -246,7 +246,7 @@ def _deterministic_brief(
         candidate_name=candidate.name,
         mode="deterministic",
         status=status,  # "deterministic" (no key) or "error" (call failed)
-        role_summary=f"{title} (deterministic profile — offline static-pack evaluation).",
+        role_summary=f"{title} (deterministic profile, the full pack).",
         competencies=competencies,
     )
 

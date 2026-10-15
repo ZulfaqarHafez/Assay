@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 
 from assay_api.main import app
 
+from api_helpers import register_candidate
+
 
 @pytest.fixture(autouse=True)
 def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -19,7 +21,7 @@ def _local_sqlite_only(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _candidate_id(client: TestClient) -> str:
-    return client.get("/candidates").json()[0]["id"]
+    return register_candidate(client)
 
 
 def test_no_key_configured_allows_open_access() -> None:
@@ -99,7 +101,7 @@ def test_tenant_scope_isolates_candidates_and_runs(monkeypatch: pytest.MonkeyPat
         created = client.post(
             "/candidates",
             headers=headers_a,
-            json={"name": "Tenant A Candidate", "adapter_type": "mock"},
+            json={"name": "Tenant A Candidate", "adapter_type": "openai-compatible"},
         ).json()
         run = client.post(
             "/runs",

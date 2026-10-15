@@ -146,6 +146,6 @@ spec to OpenAI, so it is always an explicit, on-demand action triggered from the
 
 ## Boundaries
 
-Refined specs are internal capability artifacts derived from deterministic mock
-grading — not legal or standards compliance claims, mirroring the rest of the
-Assay MVP.
+Refined specs are internal capability artifacts derived from a real exam run
+(a reference model or the user's HTTP agent answered every probe) — not legal or
+standards compliance claims, mirroring the rest of the Assay MVP.

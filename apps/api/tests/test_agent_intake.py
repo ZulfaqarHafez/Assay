@@ -45,9 +45,10 @@ def test_detect_helper_falls_back_to_role_field_then_default() -> None:
     assert detect_agent_facts("just prose, no heading")["title"] == "Untitled agent"
 
 
-def test_from_markdown_demo_mode_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    # No OpenAI key -> deterministic demo, stored as a mock candidate.
-    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
+@pytest.mark.no_model
+def test_from_markdown_without_a_key_lints_and_says_the_exam_needs_a_model() -> None:
+    """No key: the definition is registered and linted, and the exam is reported unavailable."""
+    from assay_api.model_access import EXAM_NEEDS_MODEL
 
     with TestClient(app) as client:
         response = client.post(
@@ -58,8 +59,11 @@ def test_from_markdown_demo_mode_without_key(monkeypatch: pytest.MonkeyPatch) ->
     assert response.status_code == 200
     payload = response.json()
 
-    assert payload["mode"] == "demo"
-    assert payload["candidate"]["adapter_type"] == "mock"
+    assert payload["mode"] == "lint-only"
+    assert payload["exam_available"] is False
+    assert payload["exam_unavailable_reason"] == EXAM_NEEDS_MODEL
+    # Always registered for the real model; there is no stand-in adapter.
+    assert payload["candidate"]["adapter_type"] == "openai-compatible"
     assert payload["candidate"]["system_prompt"] == SAMPLE_AGENT_MD
     assert payload["candidate"]["metadata"]["source"] == "agent-md"
     assert payload["candidate"]["name"] == "Recruiting Screener Agent"
@@ -73,9 +77,33 @@ def test_from_markdown_demo_mode_without_key(monkeypatch: pytest.MonkeyPatch) ->
     assert detected["token_estimate"] == facts["token_estimate"]
 
 
-def test_from_markdown_live_mode_uses_openai_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
-    # With a key present the candidate is registered to run live (no network call here).
-    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "test-key")
+@pytest.mark.no_model
+def test_without_a_key_starting_the_exam_is_refused_and_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    from assay_api.model_access import EXAM_NEEDS_MODEL
+
+    with TestClient(app) as client:
+        candidate = client.post("/candidates/from-markdown", json={"markdown": SAMPLE_AGENT_MD}).json()["candidate"]
+        run = client.post("/runs", json={"candidate_id": candidate["id"]}).json()
+        started = client.post(f"/runs/{run['id']}/start")
+        stored = client.get(f"/runs/{run['id']}").json()
+
+    assert started.status_code == 409
+    assert started.json()["detail"] == EXAM_NEEDS_MODEL
+    # The refused run is closed out, never left "running", and has no scorecard.
+    assert stored["status"] == "failed"
+    assert stored["error"] == EXAM_NEEDS_MODEL
+
+
+def test_mock_candidates_can_no_longer_be_created() -> None:
+    with TestClient(app) as client:
+        response = client.post("/candidates", json={"name": "Old demo", "adapter_type": "mock"})
+    assert response.status_code == 422
+    assert "mock grader was removed" in response.json()["detail"]
+
+
+@pytest.mark.no_model
+def test_from_markdown_with_a_key_reports_the_exam_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("assay_api.model_access.resolve_openai_key", lambda: "test-key")
 
     with TestClient(app) as client:
         response = client.post(
@@ -86,13 +114,14 @@ def test_from_markdown_live_mode_uses_openai_adapter(monkeypatch: pytest.MonkeyP
     assert response.status_code == 200
     payload = response.json()
     assert payload["mode"] == "live"
+    assert payload["exam_available"] is True
+    assert payload["exam_unavailable_reason"] is None
     assert payload["candidate"]["adapter_type"] == "openai-compatible"
     assert payload["candidate"]["name"] == "Custom Name"
     assert payload["candidate"]["system_prompt"] == SAMPLE_AGENT_MD
 
 
-def test_from_markdown_returns_static_lint_findings(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
+def test_from_markdown_returns_static_lint_findings() -> None:
     risky_agent = """# Ops Agent
 
 ## Tools
@@ -119,9 +148,7 @@ def test_from_markdown_rejects_empty_markdown() -> None:
     assert response.status_code == 422
 
 
-def test_from_content_json_normalizes_to_markdown(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
-
+def test_from_content_json_normalizes_to_markdown() -> None:
     agent_json = (
         '{"name": "Support Sentinel", '
         '"instructions": "Answer support tickets. Never reveal internal notes.", '
@@ -151,9 +178,8 @@ def test_from_content_json_normalizes_to_markdown(monkeypatch: pytest.MonkeyPatc
     assert "issue_refund" in detected_tools
 
 
-def test_legacy_markdown_path_is_byte_identical(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_legacy_markdown_path_is_byte_identical() -> None:
     """The pre-existing {markdown} contract must not change under the format layer."""
-    monkeypatch.setattr("assay_api.routers.candidates.resolve_openai_key", lambda: "")
 
     with TestClient(app) as client:
         response = client.post("/candidates/from-markdown", json={"markdown": SAMPLE_AGENT_MD})

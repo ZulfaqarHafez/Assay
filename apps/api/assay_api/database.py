@@ -1109,6 +1109,7 @@ def proof_bundle(
         "summary": {
             "status": run.status,
             "certified": scorecard.certified if scorecard else False,
+            "behavioral": scorecard.behavioral if scorecard else None,
             "deployable": bool(deployability.get("deployable")) if deployability else False,
             "deployability_label": deployability.get("label") if deployability else "Pending",
             "certificate_label": scorecard.certificate_label if scorecard else "Internal capability bar only",
@@ -1188,7 +1189,7 @@ def _candidate_summary_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": payload.get("id"),
         "name": payload.get("name") or "Agent",
-        "adapter_type": payload.get("adapter_type") or "mock",
+        "adapter_type": payload.get("adapter_type") or "openai-compatible",
         "created_at": payload.get("created_at"),
     }
 
@@ -1224,6 +1225,7 @@ def _run_summary_from_row(row: Any, scorecard_payload: dict[str, Any] | None = N
     if status == "completed" and scorecard_payload:
         passes = scorecard_payload.get("pass_at_k") or {}
         item["certified"] = scorecard_payload.get("certified")
+        item["behavioral"] = scorecard_payload.get("behavioral", True)
         item["pass_count"] = sum(1 for value in passes.values() if value)
         item["total_count"] = len(passes)
         item["degraded"] = scorecard_payload.get("degraded", False)

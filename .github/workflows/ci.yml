@@ -90,7 +90,7 @@ jobs:
       - name: Install Playwright Chromium
         run: npx --workspace apps/web playwright install --with-deps chromium
 
-      - name: Start deterministic API for e2e
+      - name: Start the API without a model key for e2e
         shell: pwsh
         run: |
           $proc = Start-Process -FilePath pwsh -ArgumentList @("-NoProfile", "-File", "./scripts/start-e2e-api.ps1") -PassThru
@@ -102,7 +102,7 @@ jobs:
               if ($health.ok -and -not $health.openai_configured) { exit 0 }
             } catch {}
           }
-          throw "E2E API did not become ready in deterministic mode"
+          throw "E2E API did not become ready without a model key"
 
       - name: Playwright e2e
         env:
@@ -129,7 +129,7 @@ jobs:
 
       - name: Wait for /health
         run: |
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl --max-time 5 -fsS http://127.0.0.1:8000/health >/dev/null; then echo "healthy"; exit 0; fi
             sleep 2
           done
@@ -141,17 +141,22 @@ jobs:
           curl -fsS http://127.0.0.1:8000/health | grep -q '"ok":true'
           # The status badge is public and returns valid SVG even for unknown runs.
           curl -fsS http://127.0.0.1:8000/runs/run_ci/badge.svg | grep -q '<svg'
-          # A full demo run (mock adapter, no key) completes end to end.
-          CID=$(curl -fsS -X POST http://127.0.0.1:8000/candidates/from-markdown \
+          # No model key in the container: intake still lints, and the exam
+          # refuses with 409 and the shared message instead of faking a run.
+          # shellcheck disable=SC2016  # the backticks are literal markdown
+          INTAKE=$(curl -fsS -X POST http://127.0.0.1:8000/candidates/from-markdown \
             -H 'Content-Type: application/json' \
-            -d '{"markdown":"# CI Agent\n\nStay within policy; never leak secrets."}' \
-            | python3 -c "import sys,json;print(json.load(sys.stdin)['candidate']['id'])")
+            -d '{"markdown":"# CI Agent\n\n## Tools\n- `exec_shell(command)` run anything\n"}')
+          echo "$INTAKE" | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['exam_available'] is False;assert 'OPENAI_API_KEY' in d['exam_unavailable_reason'];assert 'exec_shell' in d['static_lint']['dangerous_tools'];print('lint-only intake ok')"
+          CID=$(echo "$INTAKE" | python3 -c "import sys,json;print(json.load(sys.stdin)['candidate']['id'])")
           RID=$(curl -fsS -X POST http://127.0.0.1:8000/runs \
             -H 'Content-Type: application/json' \
             -d "{\"candidate_id\":\"$CID\"}" \
             | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
-          curl -fsS -X POST "http://127.0.0.1:8000/runs/$RID/start" \
-            | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['run_id']==\"$RID\";print('run completed; certified=',d['certified'])"
+          STATUS=$(curl -sS -o /tmp/start.json -w '%{http_code}' -X POST "http://127.0.0.1:8000/runs/$RID/start")
+          test "$STATUS" = "409"
+          python3 -c "import json;d=json.load(open('/tmp/start.json'));assert 'OPENAI_API_KEY' in d['detail'];print('exam refused without a model:', d['detail'][:60])"
+          curl -fsS "http://127.0.0.1:8000/runs/$RID" | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['status']=='failed';print('refused run recorded as failed')"
 
       - name: Container logs on failure
         if: failure()
@@ -160,3 +165,35 @@ jobs:
       - name: Teardown
         if: always()
         run: docker rm -f assay-api || true
+
+  live:
+    # The exam against a real model, nothing scripted. Runs when the repository
+    # has an OPENAI_API_KEY secret (forks and keyless repos skip it cleanly).
+    name: Live exam (real model)
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        if: env.OPENAI_API_KEY != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: apps/api/requirements-dev.txt
+
+      - name: Install API dependencies
+        if: env.OPENAI_API_KEY != ''
+        run: python -m pip install -r apps/api/requirements-dev.txt
+
+      - name: Run the live tests
+        if: env.OPENAI_API_KEY != ''
+        env:
+          ASSAY_LIVE_K: "1"
+        run: python -m pytest apps/api/tests -m live -v
+
+      - name: No key configured
+        if: env.OPENAI_API_KEY == ''
+        run: echo "OPENAI_API_KEY secret is not set; live exam tests skipped."

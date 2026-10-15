@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 from assay_api import agent_research
 from assay_api.main import app
 
+from api_helpers import register_candidate
+
 
 class _FakeAudit:
     def __init__(self, threshold: float):
@@ -20,7 +22,7 @@ class _FakeAudit:
 
 
 def _started_run(client: TestClient) -> str:
-    candidate_id = client.get("/candidates").json()[0]["id"]
+    candidate_id = register_candidate(client)
     run = client.post("/runs", json={"candidate_id": candidate_id}).json()
     client.post(f"/runs/{run['id']}/start")
     return run["id"]

@@ -1,5 +1,5 @@
 name: Assay
-description: Run an agent through the Assay pre-deployment interview loop and publish proof artifacts.
+description: Run the Assay guardrail exam on an agent definition (a real model plays the agent) and publish proof artifacts.
 
 inputs:
   agent-md:
@@ -22,9 +22,12 @@ inputs:
     required: false
     default: "3"
   require-trace:
-    description: Whether TraceRazor audit availability should block the check.
+    description: >-
+      TraceRazor gate. "auto" (default): a trace audit that runs and fails blocks,
+      a missing TraceRazor is skipped with a warning. "true": TraceRazor must be
+      installed and pass. "false": the trace audit is advisory only.
     required: false
-    default: "true"
+    default: "auto"
   policy:
     description: strict, advisory, or path to assay.policy.yaml/json.
     required: false
@@ -49,6 +52,12 @@ inputs:
     description: Markdown summary output path.
     required: false
     default: artifacts/assay/summary.md
+  openai-api-key:
+    description: >-
+      OpenAI key for the model that plays the agent. Defaults to the OPENAI_API_KEY
+      environment variable. The exam never runs without one: the step exits 4.
+    required: false
+    default: ""
   comment-pr:
     description: Comment the markdown summary on pull requests.
     required: false
@@ -79,14 +88,16 @@ runs:
       shell: bash
       run: python -m pip install -r apps/api/requirements-dev.txt
 
-    - name: Run assay interview and gate
+    - name: Run the assay exam and gate
       id: assay
       shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai-api-key || env.OPENAI_API_KEY }}
       run: |
         set +e
         args=(
-          interview
-          --agent "${{ inputs.agent-md }}"
+          run
+          --agent-md "${{ inputs.agent-md }}"
           --pack "${{ inputs.pack }}"
           --policy "${{ inputs.policy }}"
           --pass-threshold "${{ inputs.pass-threshold }}"
@@ -98,14 +109,23 @@ runs:
         if [ -n "${{ inputs.pack-file }}" ]; then
           args+=(--pack-file "${{ inputs.pack-file }}")
         fi
-        if [ "${{ inputs.require-trace }}" = "true" ]; then
-          args+=(--require-trace)
-        else
-          args+=(--no-require-trace)
-        fi
+        case "${{ inputs.require-trace }}" in
+          true)  args+=(--require-trace) ;;
+          false) args+=(--no-require-trace) ;;
+          *)     ;;  # auto: let the CLI default decide
+        esac
         PYTHONPATH=apps/api python -m assay_api.cli "${args[@]}"
-        interview_status=$?
-        gate_status=$interview_status
+        run_status=$?
+        gate_status=$run_status
+        if [ "$run_status" = "4" ] && [ ! -f "${{ inputs.summary-out }}" ]; then
+          mkdir -p "$(dirname "${{ inputs.summary-out }}")"
+          {
+            echo "# Assay: no verdict"
+            echo
+            echo "The guardrail exam needs a real model to play the agent, and no OpenAI key was available."
+            echo "Pass your OpenAI key secret to this action as the openai-api-key input, or set OPENAI_API_KEY."
+          } > "${{ inputs.summary-out }}"
+        fi
         if [ -f "${{ inputs.json-out }}" ]; then
           run_id="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["run_id"])' "${{ inputs.json-out }}")"
           PYTHONPATH=apps/api python -m assay_api.cli gate \

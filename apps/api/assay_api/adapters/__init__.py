@@ -1,14 +1,14 @@
 from .base import CandidateAdapter, CandidateAdapterError
 from .factory import adapter_for
 from .http import HttpCandidateAdapter
-from .mock import MockCandidateAdapter
 from .prompt import PromptAgentAdapter
+from .sandboxed import SandboxedAgentAdapter
 
 __all__ = [
     "CandidateAdapter",
     "CandidateAdapterError",
     "HttpCandidateAdapter",
-    "MockCandidateAdapter",
     "PromptAgentAdapter",
+    "SandboxedAgentAdapter",
     "adapter_for",
 ]

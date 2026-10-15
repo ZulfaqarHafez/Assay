@@ -19,7 +19,7 @@ Monorepo:
 - apps/api  — Python FastAPI backend (package assay_api): orchestrator.py, scoring.py,
   exam_packs.py, deployability.py, agent_refinery.py, agent_diff.py, agent_formats.py,
   trace_audit.py, role_intelligence.py, product_review.py, routers/*.
-- apps/web  — Next.js 15 / React 19 / TypeScript. Routes: / (intake -> judging -> verdict),
+- apps/web  — Next.js 16 / React 19 / TypeScript. Routes: / (intake -> judging -> verdict),
   /runs, /runs/[runId], /agents, /agents/[candidateId], /suites. Components in
   src/components/assay/*, src/components/scorecard/*, src/components/trace/*. Styling is
   Tailwind v3 + a ~2700-line src/app/globals.css using a warm-bone / deep-ink / plum token
