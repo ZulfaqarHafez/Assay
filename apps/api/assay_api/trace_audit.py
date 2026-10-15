@@ -11,17 +11,23 @@ from uuid import uuid4
 from .models import CandidateConfig, TraceAuditSummary
 
 
-def _local_tracerazor_checkout() -> str:
+def _local_tracerazor_checkout(module_file: str | Path | None = None) -> str:
     """A TraceRazor source checkout to import from when the package is not installed.
 
     ``TRACERAZOR_REPO`` wins; otherwise a ``TraceRazor`` / ``tracerazor`` folder
     next to this repository. Empty when neither exists (the installed package,
-    if any, is used either way).
+    if any, is used either way). Must never raise: this runs at import time,
+    including in containers where the package sits at a shallow path like
+    ``/app/assay_api``.
     """
     explicit = os.environ.get("TRACERAZOR_REPO", "").strip()
     if explicit:
         return explicit
-    repo_root = Path(__file__).resolve().parents[3]
+    parents = Path(module_file or __file__).resolve().parents
+    # apps/api/assay_api/trace_audit.py -> parents[3] is the repository root.
+    if len(parents) < 4:
+        return ""
+    repo_root = parents[3]
     for name in ("TraceRazor", "tracerazor"):
         candidate = repo_root.parent / name
         if (candidate / "tracerazor" / "__init__.py").is_file():

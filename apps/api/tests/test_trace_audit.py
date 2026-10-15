@@ -283,3 +283,13 @@ def test_local_checkout_path_has_no_hardcoded_personal_default(monkeypatch) -> N
     assert trace_audit._local_tracerazor_checkout() == "/opt/tracerazor"
     monkeypatch.delenv("TRACERAZOR_REPO")
     assert "zulfa" not in trace_audit._local_tracerazor_checkout()
+
+
+def test_local_checkout_lookup_never_raises_at_a_shallow_install_path(monkeypatch) -> None:
+    """Regression: the API image installs the package at /app/assay_api, where
+    parents[3] does not exist; the lookup runs at import time and must not raise."""
+    from assay_api import trace_audit
+
+    monkeypatch.delenv("TRACERAZOR_REPO", raising=False)
+    assert trace_audit._local_tracerazor_checkout("/app/assay_api/trace_audit.py") == ""
+    assert trace_audit._local_tracerazor_checkout("/trace_audit.py") == ""
