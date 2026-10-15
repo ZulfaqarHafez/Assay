@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+# The `assay` Python package (CLI + MCP server) as container images.
+#
+# Build context is apps/api:
+#   docker build -f apps/api/Dockerfile.package --target cli -t assay     apps/api
+#   docker build -f apps/api/Dockerfile.package --target mcp -t assay-mcp apps/api
+#
+# Every exam runs a real model: pass OPENAI_API_KEY at runtime. Lint and the
+# other no-key commands work without it. Runs persist to /data (mount a volume).
+
+FROM python:3.11-slim AS wheel
+WORKDIR /src
+RUN pip install --no-cache-dir build==1.2.2.post1
+COPY . .
+RUN python -m build --wheel --outdir /dist .
+
+FROM python:3.11-slim AS base
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    ASSAY_DB_PATH=/data/assay.db
+COPY --from=wheel /dist /dist
+RUN pip install "$(ls /dist/assay-*.whl)[mcp]" \
+    && (pip install "tracerazor>=1.0.3" \
+        || echo "tracerazor has no wheel for this platform; the trace audit will report as skipped") \
+    && rm -rf /dist \
+    && useradd -m -u 10001 assay \
+    && mkdir -p /data && chown assay:assay /data
+USER assay
+WORKDIR /home/assay
+VOLUME ["/data"]
+
+# Command-line interface: `docker run --rm -v "$PWD:/work" assay scan --agent /work/AGENTS.md`
+FROM base AS cli
+ENTRYPOINT ["assay"]
+CMD ["--help"]
+
+# MCP server over stdio: `docker run -i --rm -e OPENAI_API_KEY assay-mcp`
+FROM base AS mcp
+LABEL io.modelcontextprotocol.server.name="io.github.zulfaqarhafez/assay"
+ENTRYPOINT ["assay-mcp"]

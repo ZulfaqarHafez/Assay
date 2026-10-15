@@ -210,7 +210,7 @@ def evaluate_scorecard(
         skipped.append("tracerazor")
         warnings.append(
             "TraceRazor is not installed, so the trace audit was skipped. "
-            "Install the 'trace' extra (pip install 'assay[trace]') to enable it."
+            "Install it (pip install 'tracerazor>=1.0.3') to enable it."
         )
     elif trace.status != "ok":
         msg = trace.message or f"TraceRazor status is {trace.status}."

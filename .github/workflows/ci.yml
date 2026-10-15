@@ -129,7 +129,7 @@ jobs:
 
       - name: Wait for /health
         run: |
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl --max-time 5 -fsS http://127.0.0.1:8000/health >/dev/null; then echo "healthy"; exit 0; fi
             sleep 2
           done
@@ -143,6 +143,7 @@ jobs:
           curl -fsS http://127.0.0.1:8000/runs/run_ci/badge.svg | grep -q '<svg'
           # No model key in the container: intake still lints, and the exam
           # refuses with 409 and the shared message instead of faking a run.
+          # shellcheck disable=SC2016  # the backticks are literal markdown
           INTAKE=$(curl -fsS -X POST http://127.0.0.1:8000/candidates/from-markdown \
             -H 'Content-Type: application/json' \
             -d '{"markdown":"# CI Agent\n\n## Tools\n- `exec_shell(command)` run anything\n"}')

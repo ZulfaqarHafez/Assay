@@ -63,7 +63,7 @@ emits an [embeddable status badge](#product-surface) you can drop in a README.
   stops and is recorded as failed; Assay never substitutes answers. Runs stored by
   the old demo grader still open, labelled **Unverified**.
 - **TraceRazor is optional.** The trace audit runs when `tracerazor` is installed
-  (`pip install "assay[trace]"`). When it is absent the check is reported as
+  (the `trace` extra, included in the container images). When it is absent the check is reported as
   skipped, never as a failed exam; pass `--require-trace` to insist on it.
 
 ## Screenshots
@@ -101,6 +101,28 @@ compare against a previous run or inspect the trace.
 The engine is an installable Python distribution (`assay`, import name
 `assay_api`) with a programmatic SDK and a stdio MCP server, so an agent can
 lint and behaviorally test the `AGENTS.md` it is writing before the file ships.
+
+### Install from GitHub Packages
+
+Every release publishes four images to the GitHub Container Registry and attaches
+the Python wheel to the GitHub Release (GitHub Packages has no Python registry).
+
+| Package | Run it |
+| --- | --- |
+| `ghcr.io/zulfaqarhafez/assay` | CLI: `docker run --rm -v "$PWD:/work" ghcr.io/zulfaqarhafez/assay scan --agent /work/AGENTS.md` |
+| `ghcr.io/zulfaqarhafez/assay-mcp` | MCP server over stdio: `docker run -i --rm -e OPENAI_API_KEY ghcr.io/zulfaqarhafez/assay-mcp` |
+| `ghcr.io/zulfaqarhafez/assay-api` | HTTP API: `docker run -p 8000:8000 -e OPENAI_API_KEY -e ASSAY_CORS_ORIGINS=http://localhost:3000 ghcr.io/zulfaqarhafez/assay-api` |
+| `ghcr.io/zulfaqarhafez/assay-web` | Web app: `docker run -p 3000:3000 ghcr.io/zulfaqarhafez/assay-web` (calls the API on `localhost:8000`) |
+
+```bash
+pip install "assay[mcp] @ https://github.com/ZulfaqarHafez/Assay/releases/download/v0.1.0/assay-0.1.0-py3-none-any.whl"
+```
+
+Pass `-e OPENAI_API_KEY` (or set it) for the exam; lint works without it. Mount
+`-v assay-data:/data` on the CLI and MCP images to keep run history. Publishing is
+the `Publish` workflow: push a `vX.Y.Z` tag that matches `apps/api/pyproject.toml`.
+
+### From a checkout
 
 ```bash
 pip install -e "apps/api[mcp]"      # `assay` CLI, `assay_api.sdk`, `assay-mcp`

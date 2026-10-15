@@ -7,8 +7,11 @@ simulated sandbox, runs adversarial scenarios, and reports the exact forbidden
 tool call that slipped through.
 
 ```bash
-pip install "assay[mcp]"          # CLI + Python SDK + MCP server
-pip install "assay[mcp,trace]"    # plus the TraceRazor trace audit
+# From the GitHub Release (the `assay` name on PyPI belongs to another project):
+pip install "assay[mcp,trace] @ https://github.com/ZulfaqarHafez/Assay/releases/download/v0.1.0/assay-0.1.0-py3-none-any.whl"
+# Or as containers from GitHub Packages:
+docker pull ghcr.io/zulfaqarhafez/assay        # CLI
+docker pull ghcr.io/zulfaqarhafez/assay-mcp    # MCP server (stdio)
 ```
 
 ## Python

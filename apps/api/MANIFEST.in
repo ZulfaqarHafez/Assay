@@ -1,0 +1,6 @@
+# Source distribution = the importable package plus metadata. The test suite
+# and the Vercel entrypoint live in the repository, not in the sdist.
+prune tests
+prune api
+prune data
+global-exclude *.py[cod] *.db *.sqlite *.sqlite3

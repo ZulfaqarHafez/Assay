@@ -6,12 +6,17 @@ All three surfaces run the same code as the CLI and the web workspace.
 ## Install
 
 ```bash
-pip install "assay[mcp]"            # CLI (`assay`), SDK (`assay_api.sdk`), MCP server (`assay-mcp`)
-pip install "assay[mcp,trace]"      # plus the TraceRazor trace audit
-pip install -e "apps/api[mcp,dev]"  # from a checkout
+# The MCP server as a container (GitHub Packages), nothing else to install:
+docker pull ghcr.io/zulfaqarhafez/assay-mcp:latest
+# Or the Python package from the GitHub Release:
+pip install "assay[mcp,trace] @ https://github.com/ZulfaqarHafez/Assay/releases/download/v0.1.0/assay-0.1.0-py3-none-any.whl"
+# Or from a checkout:
+pip install -e "apps/api[mcp,dev]"
 ```
 
-The import name is `assay_api` for now; the distribution name is `assay`.
+The import name is `assay_api`; the distribution name is `assay`. The `assay`
+name on PyPI belongs to an unrelated project, so always install from the release
+URL or a checkout, never with a bare `pip install assay`.
 
 ## Every exam is real
 
@@ -91,9 +96,24 @@ Claude Code (the repo ships this as `.mcp.json`):
 }
 ```
 
-Claude Desktop (`claude_desktop_config.json`) and Cursor use the same shape.
-Without a packaged install, use `python -m assay_api.mcp_server` with
-`PYTHONPATH=apps/api` instead of `assay-mcp`.
+With the container image instead of a Python install (Claude Desktop's
+`claude_desktop_config.json` and Cursor use the same shape):
+
+```json
+{
+  "mcpServers": {
+    "assay": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "OPENAI_API_KEY", "-v", "assay-data:/data",
+               "ghcr.io/zulfaqarhafez/assay-mcp:latest"],
+      "env": { "OPENAI_API_KEY": "sk-..." }
+    }
+  }
+}
+```
+
+The named volume keeps run history between sessions. Without a packaged
+install, use `python -m assay_api.mcp_server` with `PYTHONPATH=apps/api`.
 
 ### Tools
 

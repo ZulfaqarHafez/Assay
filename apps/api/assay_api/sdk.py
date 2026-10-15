@@ -48,7 +48,7 @@ from .trace_audit import tracerazor_doctor
 
 TRACE_WARNING = (
     "TraceRazor is not installed, so the trace-audit gate was skipped. Install "
-    "the 'trace' extra (pip install 'assay[trace]') to enable it."
+    "it with pip install 'tracerazor>=1.0.3' to enable it."
 )
 
 _SDK_SOURCE = "assay-sdk"
